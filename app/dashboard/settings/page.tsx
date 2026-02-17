@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 
+const TOAST_DURATION_MS = 3000;
+
 const DEFAULT_SYSTEM_PROMPT = `你是一位專業且友善的客服助理。
 
 主要職責：
@@ -93,7 +95,7 @@ export default function SettingsPage() {
 
   const showToast = (message: string, type: 'success' | 'error') => {
     setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
+    setTimeout(() => setToast(null), TOAST_DURATION_MS);
   };
 
   const handleSave = async () => {
@@ -259,7 +261,7 @@ export default function SettingsPage() {
             >
               {isSaving ? (
                 <>
-                  <span className="animate-spin mr-2">⏳</span>
+                  <span className="animate-spin mr-2" role="status" aria-label="儲存中">⏳</span>
                   儲存中...
                 </>
               ) : (
@@ -304,7 +306,7 @@ export default function SettingsPage() {
             >
               {isTesting ? (
                 <>
-                  <span className="animate-spin mr-2">⏳</span>
+                  <span className="animate-spin mr-2" role="status" aria-label="測試中">⏳</span>
                   測試中...
                 </>
               ) : (

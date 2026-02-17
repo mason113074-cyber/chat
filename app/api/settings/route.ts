@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
+const MIN_PROMPT_LENGTH = 10;
+const MAX_PROMPT_LENGTH = 5000;
+
 export async function GET(request: NextRequest) {
   try {
     // 驗證用戶已登入
@@ -60,6 +63,21 @@ export async function POST(request: NextRequest) {
     if (typeof systemPrompt !== 'string') {
       return NextResponse.json(
         { error: '無效的 system_prompt 格式' },
+        { status: 400 }
+      );
+    }
+
+    // 驗證 prompt 長度
+    if (systemPrompt.trim().length < MIN_PROMPT_LENGTH) {
+      return NextResponse.json(
+        { error: `System prompt 至少需要 ${MIN_PROMPT_LENGTH} 個字元` },
+        { status: 400 }
+      );
+    }
+
+    if (systemPrompt.length > MAX_PROMPT_LENGTH) {
+      return NextResponse.json(
+        { error: `System prompt 不能超過 ${MAX_PROMPT_LENGTH} 個字元` },
         { status: 400 }
       );
     }

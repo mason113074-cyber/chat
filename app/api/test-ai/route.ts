@@ -2,8 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import OpenAI from 'openai';
 
+const MAX_TEST_RESPONSE_TOKENS = 500;
+
 export async function POST(request: NextRequest) {
   try {
+    // 檢查 OpenAI API key
+    if (!process.env.OPENAI_API_KEY) {
+      return NextResponse.json(
+        { error: 'OpenAI API key 未設定' },
+        { status: 500 }
+      );
+    }
+
     // 驗證用戶已登入
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -32,14 +42,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 呼叫 OpenAI
-    if (!process.env.OPENAI_API_KEY) {
-      return NextResponse.json(
-        { error: 'OpenAI API key 未設定' },
-        { status: 500 }
-      );
-    }
-
     const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
@@ -56,7 +58,7 @@ export async function POST(request: NextRequest) {
           content: message,
         },
       ],
-      max_tokens: 500,
+      max_tokens: MAX_TEST_RESPONSE_TOKENS,
       temperature: 0.7,
     });
 
