@@ -27,11 +27,14 @@ type Contact = {
   tags: string[];
 };
 
+type ConversationStatus = 'ai_handled' | 'needs_human' | 'resolved' | 'closed';
+
 type Conversation = {
   id: string;
   message: string;
   role: string;
   created_at: string;
+  status?: string | null;
 };
 
 export default function ConversationDetailPage() {
@@ -42,8 +45,10 @@ export default function ConversationDetailPage() {
   const [tagInput, setTagInput] = useState('');
   const [tagsSaving, setTagsSaving] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [conversationStatus, setConversationStatus] = useState<ConversationStatus>('ai_handled');
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [statusSaving, setStatusSaving] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -78,14 +83,21 @@ export default function ConversationDetailPage() {
       });
       setTags(tagsArr);
 
-      // Get all conversations for this contact
       const { data: conversationsData } = await supabase
         .from('conversations')
-        .select('id, message, role, created_at')
+        .select('id, message, role, created_at, status')
         .eq('contact_id', contactId)
         .order('created_at', { ascending: true });
 
       setConversations(conversationsData || []);
+
+      const latestAssistant = (conversationsData ?? [])
+        .filter((c) => c.role === 'assistant')
+        .pop();
+      const status = latestAssistant?.status ?? 'ai_handled';
+      setConversationStatus(
+        ['ai_handled', 'needs_human', 'resolved', 'closed'].includes(status) ? (status as ConversationStatus) : 'ai_handled'
+      );
       setLoading(false);
     };
 
@@ -175,6 +187,27 @@ export default function ConversationDetailPage() {
     saveTags(tags.filter((x) => x !== tag));
   }
 
+  async function changeStatus(newStatus: ConversationStatus) {
+    setStatusSaving(true);
+    try {
+      const res = await fetch(`/api/conversations/${contactId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (res.ok) setConversationStatus(newStatus);
+    } finally {
+      setStatusSaving(false);
+    }
+  }
+
+  const STATUS_LABELS: Record<ConversationStatus, string> = {
+    ai_handled: 'AI 已處理',
+    needs_human: '需人工處理',
+    resolved: '已解決',
+    closed: '已關閉',
+  };
+
   return (
     <div className="max-h-screen flex flex-col">
       {/* Header with back button */}
@@ -251,6 +284,46 @@ export default function ConversationDetailPage() {
           {PRESET_TAGS.every((t) => tags.includes(t)) && (
             <span className="text-xs text-gray-400">已全部加入</span>
           )}
+        </div>
+      </div>
+
+      {/* 變更狀態 */}
+      <div className="bg-white border-b border-gray-200 p-4">
+        <h3 className="text-sm font-medium text-gray-700 mb-2">對話狀態</h3>
+        <p className="text-xs text-gray-500 mb-2">目前：{STATUS_LABELS[conversationStatus]}</p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => changeStatus('resolved')}
+            disabled={statusSaving || conversationStatus === 'resolved'}
+            className="rounded-lg bg-blue-100 px-3 py-1.5 text-sm text-blue-800 hover:bg-blue-200 disabled:opacity-50"
+          >
+            標記為已解決
+          </button>
+          <button
+            type="button"
+            onClick={() => changeStatus('needs_human')}
+            disabled={statusSaving || conversationStatus === 'needs_human'}
+            className="rounded-lg bg-orange-100 px-3 py-1.5 text-sm text-orange-800 hover:bg-orange-200 disabled:opacity-50"
+          >
+            標記為需人工
+          </button>
+          <button
+            type="button"
+            onClick={() => changeStatus('closed')}
+            disabled={statusSaving || conversationStatus === 'closed'}
+            className="rounded-lg bg-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-300 disabled:opacity-50"
+          >
+            關閉對話
+          </button>
+          <button
+            type="button"
+            onClick={() => changeStatus('ai_handled')}
+            disabled={statusSaving || conversationStatus === 'ai_handled'}
+            className="rounded-lg bg-green-100 px-3 py-1.5 text-sm text-green-800 hover:bg-green-200 disabled:opacity-50"
+          >
+            重新開啟
+          </button>
         </div>
       </div>
 

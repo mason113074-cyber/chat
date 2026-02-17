@@ -3,12 +3,15 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
+type ConversationStatus = 'ai_handled' | 'needs_human' | 'resolved' | 'closed';
+
 type Contact = {
   id: string;
   name: string | null;
   line_user_id: string;
   tags: string[];
   status?: 'pending' | 'resolved';
+  conversationStatus: ConversationStatus;
   lastMessage: string;
   lastMessageTime: string;
 };
@@ -45,6 +48,24 @@ function tagColor(tag: string): string {
   return TAG_COLORS[Math.abs(i) % TAG_COLORS.length];
 }
 
+const STATUS_BADGE: Record<ConversationStatus, { label: string; className: string; pulse?: boolean }> = {
+  ai_handled: { label: 'AI 已處理', className: 'bg-green-100 text-green-800' },
+  needs_human: { label: '需人工處理', className: 'bg-orange-100 text-orange-800', pulse: true },
+  resolved: { label: '已解決', className: 'bg-blue-100 text-blue-800' },
+  closed: { label: '已關閉', className: 'bg-gray-100 text-gray-700' },
+};
+
+function StatusBadge({ status }: { status: ConversationStatus }) {
+  const conf = STATUS_BADGE[status] ?? STATUS_BADGE.ai_handled;
+  return (
+    <span
+      className={`rounded-full px-2 py-0.5 text-xs font-medium ${conf.className} ${conf.pulse ? 'animate-pulse opacity-90' : ''}`}
+    >
+      {conf.label}
+    </span>
+  );
+}
+
 type Conversation = {
   id: string;
   message: string;
@@ -52,7 +73,7 @@ type Conversation = {
   created_at: string;
 };
 
-type StatusFilter = 'all' | 'resolved' | 'pending';
+type StatusFilter = 'all' | 'ai_handled' | 'needs_human' | 'resolved' | 'closed';
 type DateRangeFilter = 'all' | 'today' | '7' | '30';
 type SortBy = 'newest' | 'oldest' | 'unread_first' | 'name_az';
 
@@ -78,6 +99,8 @@ export default function ConversationsPage() {
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [counts, setCounts] = useState<{ total: number; ai_handled: number; needs_human: number; resolved: number; closed: number } | null>(null);
+  const [openStatusMenuId, setOpenStatusMenuId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Debounce search 300ms
@@ -106,7 +129,7 @@ export default function ConversationsPage() {
     }
 
     if (statusFilter !== 'all') {
-      list = list.filter((c) => (c.status ?? 'pending') === statusFilter);
+      list = list.filter((c) => c.conversationStatus === statusFilter);
     }
 
     if (dateRangeFilter !== 'all') {
@@ -132,26 +155,35 @@ export default function ConversationsPage() {
   }, [tagFilteredContacts, searchQuery, statusFilter, dateRangeFilter]);
 
   const sortedContacts = useMemo(() => {
-    const list = [...filteredContacts];
+    let list = [...filteredContacts];
     const time = (c: Contact) => (c.lastMessageTime ? new Date(c.lastMessageTime).getTime() : 0);
     const name = (c: Contact) => c.name || '未命名';
 
-    if (sortBy === 'newest') {
-      list.sort((a, b) => time(b) - time(a));
-    } else if (sortBy === 'oldest') {
-      list.sort((a, b) => time(a) - time(b));
-    } else if (sortBy === 'unread_first') {
+    if (statusFilter === 'all') {
       list.sort((a, b) => {
-        const aPending = (a.status ?? 'pending') === 'pending' ? 0 : 1;
-        const bPending = (b.status ?? 'pending') === 'pending' ? 0 : 1;
-        if (aPending !== bPending) return aPending - bPending;
+        const aNeeds = a.conversationStatus === 'needs_human' ? 0 : 1;
+        const bNeeds = b.conversationStatus === 'needs_human' ? 0 : 1;
+        if (aNeeds !== bNeeds) return aNeeds - bNeeds;
         return time(b) - time(a);
       });
     } else {
-      list.sort((a, b) => name(a).localeCompare(name(b), 'zh-TW'));
+      if (sortBy === 'newest') {
+        list.sort((a, b) => time(b) - time(a));
+      } else if (sortBy === 'oldest') {
+        list.sort((a, b) => time(a) - time(b));
+      } else if (sortBy === 'unread_first') {
+        list.sort((a, b) => {
+          const aNeeds = a.conversationStatus === 'needs_human' ? 0 : 1;
+          const bNeeds = b.conversationStatus === 'needs_human' ? 0 : 1;
+          if (aNeeds !== bNeeds) return aNeeds - bNeeds;
+          return time(b) - time(a);
+        });
+      } else {
+        list.sort((a, b) => name(a).localeCompare(name(b), 'zh-TW'));
+      }
     }
     return list;
-  }, [filteredContacts, sortBy]);
+  }, [filteredContacts, sortBy, statusFilter]);
 
   const allFilteredSelected =
     filteredContacts.length > 0 &&
@@ -225,6 +257,57 @@ export default function ConversationsPage() {
     const tag = window.prompt('請輸入要新增的標籤名稱');
     if (tag == null || tag.trim() === '') return;
     runBatch('add_tag', tag.trim());
+  }
+
+  async function changeStatus(contactId: string, newStatus: ConversationStatus) {
+    const prev = contacts.find((c) => c.id === contactId);
+    if (!prev) return;
+    setContacts((prevList) =>
+      prevList.map((c) => (c.id === contactId ? { ...c, conversationStatus: newStatus } : c))
+    );
+    if (counts) {
+      const prevCount = counts[prev.conversationStatus] ?? 0;
+      const nextCount = (counts[newStatus] ?? 0) + 1;
+      setCounts((c) =>
+        c
+          ? {
+              ...c,
+              [prev.conversationStatus]: Math.max(0, prevCount - 1),
+              [newStatus]: nextCount,
+            }
+          : c
+      );
+    }
+    try {
+      const res = await fetch(`/api/conversations/${contactId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) {
+        setContacts((prevList) =>
+          prevList.map((c) => (c.id === contactId ? { ...c, conversationStatus: prev.conversationStatus } : c))
+        );
+        if (counts) setCounts(counts);
+      } else {
+        const countsRes = await fetch('/api/conversations/counts');
+        if (countsRes.ok) {
+          const json = await countsRes.json();
+          setCounts({
+            total: json.total ?? 0,
+            ai_handled: json.ai_handled ?? 0,
+            needs_human: json.needs_human ?? 0,
+            resolved: json.resolved ?? 0,
+            closed: json.closed ?? 0,
+          });
+        }
+      }
+    } catch {
+      setContacts((prevList) =>
+        prevList.map((c) => (c.id === contactId ? { ...c, conversationStatus: prev.conversationStatus } : c))
+      );
+      if (counts) setCounts(counts);
+    }
   }
 
   // 更新聯絡人列表並重新排序的輔助函數
@@ -345,6 +428,7 @@ export default function ConversationsPage() {
                 line_user_id: newContact.line_user_id,
                 tags: [],
                 status: 'pending',
+                conversationStatus: 'ai_handled',
                 lastMessage: '尚無對話',
                 lastMessageTime: '',
               },
@@ -416,7 +500,24 @@ export default function ConversationsPage() {
       return;
     }
 
-    // For each contact, get the latest message
+    const contactIds = contactsData.map((c) => c.id);
+    const { data: assistantRows } = await supabase
+      .from('conversations')
+      .select('contact_id, status, created_at')
+      .eq('role', 'assistant')
+      .in('contact_id', contactIds)
+      .order('created_at', { ascending: false });
+    const latestStatusByContact = new Map<string, ConversationStatus>();
+    for (const row of assistantRows ?? []) {
+      if (!latestStatusByContact.has(row.contact_id)) {
+        const s = row.status ?? 'ai_handled';
+        latestStatusByContact.set(
+          row.contact_id,
+          ['ai_handled', 'needs_human', 'resolved', 'closed'].includes(s) ? (s as ConversationStatus) : 'ai_handled'
+        );
+      }
+    }
+
     const contactsWithMessages = await Promise.all(
       contactsData.map(async (contact) => {
         const { data: lastMsg } = await supabase
@@ -433,13 +534,13 @@ export default function ConversationsPage() {
           line_user_id: contact.line_user_id,
           tags: (contact.tags as string[] | null) ?? [],
           status: (contact.status === 'resolved' ? 'resolved' : 'pending') as 'pending' | 'resolved',
+          conversationStatus: latestStatusByContact.get(contact.id) ?? 'ai_handled',
           lastMessage: lastMsg?.message || '尚無對話',
           lastMessageTime: lastMsg?.created_at || '',
         };
       })
     );
 
-    // Sort by last message time
     contactsWithMessages.sort((a, b) => {
       if (!a.lastMessageTime) return 1;
       if (!b.lastMessageTime) return -1;
@@ -448,12 +549,24 @@ export default function ConversationsPage() {
 
     setContacts(contactsWithMessages);
 
-    // Load tag counts for filter
     try {
-      const res = await fetch('/api/tags');
-      if (res.ok) {
-        const json = await res.json();
+      const [tagsRes, countsRes] = await Promise.all([
+        fetch('/api/tags'),
+        fetch('/api/conversations/counts'),
+      ]);
+      if (tagsRes.ok) {
+        const json = await tagsRes.json();
         setTagList(json.tags ?? []);
+      }
+      if (countsRes.ok) {
+        const json = await countsRes.json();
+        setCounts({
+          total: json.total ?? 0,
+          ai_handled: json.ai_handled ?? 0,
+          needs_human: json.needs_human ?? 0,
+          resolved: json.resolved ?? 0,
+          closed: json.closed ?? 0,
+        });
       }
     } catch {
       // ignore
@@ -499,17 +612,33 @@ export default function ConversationsPage() {
             aria-label="搜尋對話"
           />
         </div>
-        {/* Status + Date filters */}
+        {/* Status filter tabs */}
+        <div className="mb-3 overflow-x-auto">
+          <div className="flex gap-1 min-w-0 pb-1">
+            {[
+              { value: 'all' as const, label: '全部', count: counts?.total ?? 0 },
+              { value: 'ai_handled' as const, label: 'AI 已處理', count: counts?.ai_handled ?? 0, color: 'text-green-700' },
+              { value: 'needs_human' as const, label: '需人工處理', count: counts?.needs_human ?? 0, color: 'text-orange-700' },
+              { value: 'resolved' as const, label: '已解決', count: counts?.resolved ?? 0 },
+              { value: 'closed' as const, label: '已關閉', count: counts?.closed ?? 0 },
+            ].map((tab) => (
+              <button
+                key={tab.value}
+                type="button"
+                onClick={() => setStatusFilter(tab.value)}
+                className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
+                  statusFilter === tab.value
+                    ? 'border-indigo-600 text-gray-900 font-semibold bg-indigo-50'
+                    : 'border-transparent text-gray-600 hover:bg-gray-100'
+                } ${tab.color ?? ''}`}
+              >
+                {tab.label} {tab.count > 0 ? `(${tab.count})` : ''}
+              </button>
+            ))}
+          </div>
+        </div>
+        {/* Date filters */}
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
-          >
-            <option value="all">全部狀態</option>
-            <option value="resolved">已解決</option>
-            <option value="pending">未解決</option>
-          </select>
           <div className="flex flex-wrap gap-1">
             {(['today', '7', '30', 'all'] as const).map((range) => (
               <button
@@ -694,7 +823,9 @@ export default function ConversationsPage() {
             {sortedContacts.map((contact) => (
               <div
                 key={contact.id}
-                className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
+                className={`flex items-start gap-3 rounded-xl border border-gray-200 p-4 shadow-sm ${
+                  contact.conversationStatus === 'needs_human' ? 'bg-orange-50' : 'bg-white'
+                }`}
               >
                 <input
                   type="checkbox"
@@ -710,9 +841,12 @@ export default function ConversationsPage() {
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900">
-                        {highlightMatch(contact.name || '未命名客戶', searchQuery)}
-                      </p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium text-gray-900">
+                          {highlightMatch(contact.name || '未命名客戶', searchQuery)}
+                        </p>
+                        <StatusBadge status={contact.conversationStatus} />
+                      </div>
                       <p className="mt-1 text-sm text-gray-600 line-clamp-1">
                         {highlightMatch(
                           contact.lastMessage.length > 50
@@ -749,6 +883,27 @@ export default function ConversationsPage() {
                     )}
                   </div>
                 </a>
+                <div className="relative shrink-0">
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); setOpenStatusMenuId((id) => (id === contact.id ? null : contact.id)); }}
+                    className="rounded p-1.5 text-gray-500 hover:bg-gray-200"
+                    aria-label="變更狀態"
+                  >
+                    ⋯
+                  </button>
+                  {openStatusMenuId === contact.id && (
+                    <>
+                      <div className="fixed inset-0 z-10" onClick={() => setOpenStatusMenuId(null)} aria-hidden />
+                      <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                        <button type="button" onClick={() => { changeStatus(contact.id, 'resolved'); setOpenStatusMenuId(null); }} className="block w-full px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100">標記為已解決</button>
+                        <button type="button" onClick={() => { changeStatus(contact.id, 'needs_human'); setOpenStatusMenuId(null); }} className="block w-full px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100">標記為需人工</button>
+                        <button type="button" onClick={() => { changeStatus(contact.id, 'closed'); setOpenStatusMenuId(null); }} className="block w-full px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100">關閉對話</button>
+                        <button type="button" onClick={() => { changeStatus(contact.id, 'ai_handled'); setOpenStatusMenuId(null); }} className="block w-full px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100">重新開啟</button>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -777,18 +932,31 @@ export default function ConversationsPage() {
                   aria-label="搜尋對話"
                 />
               </div>
-              {/* Status + Date filters */}
-              <div className="p-3 border-b border-gray-100 space-y-2">
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
-                >
-                  <option value="all">全部狀態</option>
-                  <option value="resolved">已解決</option>
-                  <option value="pending">未解決</option>
-                </select>
+              {/* Status filter tabs */}
+              <div className="p-3 border-b border-gray-100">
                 <div className="flex flex-wrap gap-1">
+                  {[
+                    { value: 'all' as const, label: '全部', count: counts?.total ?? 0 },
+                    { value: 'ai_handled' as const, label: 'AI 已處理', count: counts?.ai_handled ?? 0 },
+                    { value: 'needs_human' as const, label: '需人工', count: counts?.needs_human ?? 0 },
+                    { value: 'resolved' as const, label: '已解決', count: counts?.resolved ?? 0 },
+                    { value: 'closed' as const, label: '已關閉', count: counts?.closed ?? 0 },
+                  ].map((tab) => (
+                    <button
+                      key={tab.value}
+                      type="button"
+                      onClick={() => setStatusFilter(tab.value)}
+                      className={`rounded-lg px-2.5 py-1 text-xs font-medium border-b-2 transition-colors ${
+                        statusFilter === tab.value
+                          ? 'border-indigo-600 bg-indigo-50 text-gray-900 font-semibold'
+                          : 'border-transparent text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      {tab.label} {tab.count > 0 ? tab.count : ''}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-1 mt-2">
                   {(['today', '7', '30', 'all'] as const).map((range) => (
                     <button
                       key={range}
@@ -968,8 +1136,8 @@ export default function ConversationsPage() {
                       <div
                         key={contact.id}
                         className={`
-                          flex items-start gap-3 w-full text-left p-4 hover:bg-gray-50 transition-colors
-                          ${selectedContactId === contact.id ? 'bg-indigo-50' : ''}
+                          flex items-start gap-3 w-full text-left p-4 transition-colors
+                          ${selectedContactId === contact.id ? 'bg-indigo-50' : contact.conversationStatus === 'needs_human' ? 'bg-orange-50 hover:bg-orange-100' : 'hover:bg-gray-50'}
                         `}
                       >
                         <input
@@ -985,9 +1153,12 @@ export default function ConversationsPage() {
                           onClick={() => setSelectedContactId(contact.id)}
                           className="flex-1 min-w-0 text-left"
                         >
-                        <p className="font-medium text-gray-900">
-                          {highlightMatch(contact.name || '未命名客戶', searchQuery)}
-                        </p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-medium text-gray-900">
+                              {highlightMatch(contact.name || '未命名客戶', searchQuery)}
+                            </p>
+                            <StatusBadge status={contact.conversationStatus} />
+                          </div>
                         <p className="mt-1 text-sm text-gray-600 line-clamp-1">
                           {highlightMatch(
                             contact.lastMessage.length > 40
@@ -1022,6 +1193,27 @@ export default function ConversationsPage() {
                           </p>
                         )}
                         </button>
+                        <div className="relative shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setOpenStatusMenuId((id) => (id === contact.id ? null : contact.id)); }}
+                            className="rounded p-1.5 text-gray-500 hover:bg-gray-200"
+                            aria-label="變更狀態"
+                          >
+                            ⋯
+                          </button>
+                          {openStatusMenuId === contact.id && (
+                            <>
+                              <div className="fixed inset-0 z-10" onClick={() => setOpenStatusMenuId(null)} aria-hidden />
+                              <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                                <button type="button" onClick={() => { changeStatus(contact.id, 'resolved'); setOpenStatusMenuId(null); }} className="block w-full px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100">標記為已解決</button>
+                                <button type="button" onClick={() => { changeStatus(contact.id, 'needs_human'); setOpenStatusMenuId(null); }} className="block w-full px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100">標記為需人工</button>
+                                <button type="button" onClick={() => { changeStatus(contact.id, 'closed'); setOpenStatusMenuId(null); }} className="block w-full px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100">關閉對話</button>
+                                <button type="button" onClick={() => { changeStatus(contact.id, 'ai_handled'); setOpenStatusMenuId(null); }} className="block w-full px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100">重新開啟</button>
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

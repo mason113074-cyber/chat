@@ -2,12 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { SignOutButton } from './SignOutButton';
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: '總覽' },
-  { href: '/dashboard/conversations', label: '對話紀錄' },
+  { href: '/dashboard/conversations', label: '對話紀錄', countsKey: 'conversations' as const },
   { href: '/dashboard/contacts', label: '客戶聯絡人' },
   { href: '/dashboard/billing', label: '方案與計費' },
   { href: '/dashboard/analytics', label: '數據分析' },
@@ -18,6 +18,29 @@ const NAV_ITEMS = [
 export function DashboardNav({ userEmail }: { userEmail: string }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [needsHumanCount, setNeedsHumanCount] = useState(0);
+  const prevCountRef = useRef(0);
+
+  useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        const res = await fetch('/api/conversations/counts');
+        if (res.ok) {
+          const json = await res.json();
+          const n = Number(json.needs_human) || 0;
+          if (n !== prevCountRef.current) {
+            prevCountRef.current = n;
+            setNeedsHumanCount(n);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    };
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const linkClass = (href: string) => {
     const isActive = pathname === href || (href !== '/dashboard' && pathname.startsWith(href));
@@ -39,9 +62,17 @@ export function DashboardNav({ userEmail }: { userEmail: string }) {
             <Link
               key={item.href}
               href={item.href}
-              className={linkClass(item.href)}
+              className={`${linkClass(item.href)} relative inline-flex items-center gap-1`}
             >
               {item.label}
+              {'countsKey' in item && item.countsKey === 'conversations' && needsHumanCount > 0 && (
+                <span
+                  key={needsHumanCount}
+                  className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-red-500 text-xs font-bold text-white animate-badge-pop"
+                >
+                  {needsHumanCount > 99 ? '99+' : needsHumanCount}
+                </span>
+              )}
             </Link>
           ))}
           <span className="text-sm text-gray-500">{userEmail}</span>
@@ -78,9 +109,14 @@ export function DashboardNav({ userEmail }: { userEmail: string }) {
               key={item.href}
               href={item.href}
               onClick={() => setMobileOpen(false)}
-              className={`rounded-lg px-4 py-3 ${linkClass(item.href)}`}
+              className={`rounded-lg px-4 py-3 ${linkClass(item.href)} relative inline-flex items-center gap-2`}
             >
               {item.label}
+              {'countsKey' in item && item.countsKey === 'conversations' && needsHumanCount > 0 && (
+                <span className="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1 rounded-full bg-red-500 text-xs font-bold text-white">
+                  {needsHumanCount > 99 ? '99+' : needsHumanCount}
+                </span>
+              )}
             </Link>
           ))}
           <div className="mt-4 border-t border-gray-100 pt-4">
