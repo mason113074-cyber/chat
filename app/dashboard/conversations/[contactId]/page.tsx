@@ -5,26 +5,26 @@ import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 
-const PRESET_TAGS = ['退款', '技術問題', '帳號問題', '一般諮詢', '投訴', '已解決'];
-
-const TAG_COLORS = [
-  'bg-indigo-100 text-indigo-800',
-  'bg-emerald-100 text-emerald-800',
-  'bg-amber-100 text-amber-800',
-  'bg-rose-100 text-rose-800',
-  'bg-sky-100 text-sky-800',
-  'bg-violet-100 text-violet-800',
-];
-function tagColor(tag: string): string {
-  const i = tag.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-  return TAG_COLORS[Math.abs(i) % TAG_COLORS.length];
+const COLOR_CLASS: Record<string, string> = {
+  red: 'bg-red-100 text-red-800',
+  orange: 'bg-orange-100 text-orange-800',
+  yellow: 'bg-yellow-100 text-yellow-800',
+  green: 'bg-green-100 text-green-800',
+  blue: 'bg-blue-100 text-blue-800',
+  purple: 'bg-purple-100 text-purple-800',
+  pink: 'bg-pink-100 text-pink-800',
+  gray: 'bg-gray-100 text-gray-800',
+};
+function tagClass(color: string): string {
+  return COLOR_CLASS[color] ?? COLOR_CLASS.gray;
 }
 
+type ContactTag = { id: string; name: string; color: string; assigned_by: string };
 type Contact = {
   id: string;
   name: string | null;
   line_user_id: string;
-  tags: string[];
+  tags: ContactTag[];
 };
 
 type ConversationStatus = 'ai_handled' | 'needs_human' | 'resolved' | 'closed';
@@ -41,8 +41,7 @@ export default function ConversationDetailPage() {
   const params = useParams();
   const contactId = params.contactId as string;
   const [contact, setContact] = useState<Contact | null>(null);
-  const [tags, setTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState('');
+  const [allTags, setAllTags] = useState<{ id: string; name: string; color: string }[]>([]);
   const [tagsSaving, setTagsSaving] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [conversationStatus, setConversationStatus] = useState<ConversationStatus>('ai_handled');
@@ -61,27 +60,23 @@ export default function ConversationDetailPage() {
     const loadData = async () => {
       const supabase = createClient();
 
-      // Get contact info with tags
-      const { data: contactData } = await supabase
-        .from('contacts')
-        .select('id, name, line_user_id, tags')
-        .eq('id', contactId)
-        .single();
+      const [contactRes, tagsRes] = await Promise.all([
+        fetch(`/api/contacts/${contactId}`),
+        fetch('/api/contacts/tags'),
+      ]);
 
-      if (!contactData) {
+      if (!contactRes.ok) {
         setNotFound(true);
         setLoading(false);
         return;
       }
+      const contactJson = await contactRes.json();
+      setContact(contactJson.contact ?? null);
 
-      const tagsArr = (contactData.tags as string[] | null) ?? [];
-      setContact({
-        id: contactData.id,
-        name: contactData.name,
-        line_user_id: contactData.line_user_id,
-        tags: tagsArr,
-      });
-      setTags(tagsArr);
+      if (tagsRes.ok) {
+        const tagsJson = await tagsRes.json();
+        setAllTags(tagsJson.tags ?? []);
+      }
 
       const { data: conversationsData } = await supabase
         .from('conversations')
@@ -158,33 +153,34 @@ export default function ConversationDetailPage() {
     );
   }
 
-  async function saveTags(newTags: string[]) {
+  async function addContactTag(tagId: string) {
+    if (!contact || contact.tags.some((t) => t.id === tagId)) return;
     setTagsSaving(true);
     try {
-      const res = await fetch(`/api/conversations/${contactId}/tags`, {
-        method: 'PATCH',
+      const res = await fetch(`/api/contacts/${contactId}/tags`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tags: newTags }),
+        body: JSON.stringify({ tag_id: tagId }),
       });
       if (res.ok) {
         const json = await res.json();
-        setTags(json.tags ?? newTags);
-        setContact((c) => (c ? { ...c, tags: json.tags ?? newTags } : c));
+        const tag = json.tag ?? allTags.find((t) => t.id === tagId);
+        if (tag) setContact((c) => (c ? { ...c, tags: [...c.tags, { ...tag, assigned_by: 'manual' }] } : c));
       }
     } finally {
       setTagsSaving(false);
     }
   }
 
-  function addTag(tag: string) {
-    const t = tag.trim();
-    if (!t || tags.includes(t)) return;
-    saveTags([...tags, t]);
-    setTagInput('');
-  }
-
-  function removeTag(tag: string) {
-    saveTags(tags.filter((x) => x !== tag));
+  async function removeContactTag(tagId: string) {
+    if (!contact) return;
+    setTagsSaving(true);
+    try {
+      const res = await fetch(`/api/contacts/${contactId}/tags/${tagId}`, { method: 'DELETE' });
+      if (res.ok) setContact((c) => (c ? { ...c, tags: c.tags.filter((t) => t.id !== tagId) } : c));
+    } finally {
+      setTagsSaving(false);
+    }
   }
 
   async function changeStatus(newStatus: ConversationStatus) {
@@ -223,67 +219,43 @@ export default function ConversationDetailPage() {
         </h1>
       </div>
 
-      {/* Manage tags */}
+      {/* 標籤（新系統：手動 / AI 自動） */}
       <div className="bg-white border-b border-gray-200 p-4">
-        <h3 className="text-sm font-medium text-gray-700 mb-2">管理標籤</h3>
+        <h3 className="text-sm font-medium text-gray-700 mb-2">標籤</h3>
         <div className="flex flex-wrap gap-2 mb-2">
-          {tags.map((t) => (
+          {contact.tags.map((t) => (
             <span
-              key={t}
-              className={`inline-flex items-center gap-1 rounded-full pl-2.5 pr-1 py-0.5 text-xs font-medium ${tagColor(t)}`}
+              key={t.id}
+              className={`inline-flex items-center gap-1 rounded-full pl-2.5 pr-1 py-0.5 text-xs font-medium ${tagClass(t.color)}`}
             >
-              {t}
+              {t.name}
+              <span className="text-[10px] opacity-80">({t.assigned_by === 'auto' ? 'AI 自動' : '手動'})</span>
               <button
                 type="button"
-                onClick={() => removeTag(t)}
+                onClick={() => removeContactTag(t.id)}
                 disabled={tagsSaving}
                 className="rounded-full p-0.5 hover:bg-black/10 disabled:opacity-50"
-                aria-label={`移除 ${t}`}
+                aria-label={`移除 ${t.name}`}
               >
                 ×
               </button>
             </span>
           ))}
         </div>
-        <div className="flex flex-wrap gap-2 items-center">
-          <input
-            type="text"
-            value={tagInput}
-            onChange={(e) => setTagInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                addTag(tagInput);
-              }
-            }}
-            placeholder="新增標籤"
-            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm w-28"
-          />
-          <button
-            type="button"
-            onClick={() => addTag(tagInput)}
-            disabled={tagsSaving || !tagInput.trim()}
-            className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700 disabled:opacity-50"
-          >
-            新增
-          </button>
-        </div>
-        <p className="text-xs text-gray-500 mt-2 mb-1">建議標籤：</p>
+        <p className="text-xs text-gray-500 mb-1">新增標籤：</p>
         <div className="flex flex-wrap gap-1.5">
-          {PRESET_TAGS.filter((t) => !tags.includes(t)).map((t) => (
+          {allTags.filter((t) => !contact.tags.some((ct) => ct.id === t.id)).map((t) => (
             <button
-              key={t}
+              key={t.id}
               type="button"
-              onClick={() => addTag(t)}
+              onClick={() => addContactTag(t.id)}
               disabled={tagsSaving}
-              className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-700 hover:bg-gray-200 disabled:opacity-50"
+              className={`rounded-full px-2.5 py-0.5 text-xs font-medium hover:opacity-90 ${tagClass(t.color)}`}
             >
-              + {t}
+              + {t.name}
             </button>
           ))}
-          {PRESET_TAGS.every((t) => tags.includes(t)) && (
-            <span className="text-xs text-gray-400">已全部加入</span>
-          )}
+          {allTags.length === 0 && <span className="text-xs text-gray-400">尚無標籤，請至客戶管理建立</span>}
         </div>
       </div>
 

@@ -1,75 +1,234 @@
+'use client';
+
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { TAG_COLORS } from '@/lib/contact-tags';
 
-export default async function ContactsPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+type Tag = { id: string; name: string; color: string };
+type ContactTag = { id: string; name: string; color: string; assigned_by: string };
+type Contact = {
+  id: string;
+  name: string | null;
+  line_user_id: string;
+  created_at: string;
+  conversationCount: number;
+  lastInteraction: string | null;
+  tags: ContactTag[];
+};
 
-  // ✅ 使用關聯查詢一次取得所有資料，避免 N+1 問題
-  const { data: contacts } = await supabase
-    .from('contacts')
-    .select(`
-      id,
-      line_user_id,
-      name,
-      created_at,
-      conversations(id, created_at)
-    `)
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false });
+const COLOR_CLASS: Record<string, string> = {
+  red: 'bg-red-100 text-red-800',
+  orange: 'bg-orange-100 text-orange-800',
+  yellow: 'bg-yellow-100 text-yellow-800',
+  green: 'bg-green-100 text-green-800',
+  blue: 'bg-blue-100 text-blue-800',
+  purple: 'bg-purple-100 text-purple-800',
+  pink: 'bg-pink-100 text-pink-800',
+  gray: 'bg-gray-100 text-gray-800',
+};
+function tagClass(color: string): string {
+  return COLOR_CLASS[color] ?? COLOR_CLASS.gray;
+}
 
-  type Conversation = { id: string; created_at: string };
+export default function ContactsPage() {
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set());
+  const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
+  const [manageOpen, setManageOpen] = useState(false);
+  const [newTagName, setNewTagName] = useState('');
+  const [newTagColor, setNewTagColor] = useState('gray');
+  const [editingTagId, setEditingTagId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const [editingColor, setEditingColor] = useState('gray');
+  const popoverRef = useRef<HTMLDivElement>(null);
 
-  type ContactWithStats = {
-    id: string;
-    name: string | null;
-    line_user_id: string;
-    created_at: string;
-    conversationCount: number;
-    lastInteraction: string | null;
-  };
-
-  // 在前端計算每個 contact 的對話數和最後互動時間
-  const contactsWithStats: ContactWithStats[] = (contacts || []).map((contact) => {
-    const conversations = (contact.conversations as Conversation[]) || [];
-    
-    // 計算對話數量
-    const conversationCount = conversations.length;
-    
-    // 找出最後互動時間（最新的對話）- 使用 reduce 找最大值，避免排序
-    let lastInteraction: string | null = null;
-    if (conversations.length > 0) {
-      lastInteraction = conversations.reduce((latest, conv) => {
-        return new Date(conv.created_at) > new Date(latest) ? conv.created_at : latest;
-      }, conversations[0].created_at);
+  const fetchContacts = useCallback(async () => {
+    const res = await fetch('/api/contacts');
+    if (res.ok) {
+      const json = await res.json();
+      setContacts(json.contacts ?? []);
     }
-    
-    return {
-      id: contact.id,
-      name: contact.name,
-      line_user_id: contact.line_user_id,
-      created_at: contact.created_at,
-      conversationCount,
-      lastInteraction,
-    };
-  });
+  }, []);
+  const fetchTags = useCallback(async () => {
+    const res = await fetch('/api/contacts/tags');
+    if (res.ok) {
+      const json = await res.json();
+      setTags(json.tags ?? []);
+    }
+  }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([fetchContacts(), fetchTags()]).finally(() => setLoading(false));
+  }, [fetchContacts, fetchTags]);
+
+  const filteredContacts =
+    selectedTagIds.size === 0
+      ? contacts
+      : contacts.filter((c) => selectedTagIds.size > 0 && [...selectedTagIds].every((tid) => c.tags.some((t) => t.id === tid)));
+
+  function toggleTagFilter(tagId: string) {
+    setSelectedTagIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(tagId)) next.delete(tagId);
+      else next.add(tagId);
+      return next;
+    });
+  }
+
+  async function addTagToContact(contactId: string, tagId: string) {
+    const contact = contacts.find((c) => c.id === contactId);
+    if (contact?.tags.some((t) => t.id === tagId)) return;
+    setContacts((prev) =>
+      prev.map((c) => {
+        if (c.id !== contactId) return c;
+        const tag = tags.find((t) => t.id === tagId);
+        if (!tag) return c;
+        return { ...c, tags: [...c.tags, { ...tag, assigned_by: 'manual' }] };
+      })
+    );
+    const res = await fetch(`/api/contacts/${contactId}/tags`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tag_id: tagId }),
+    });
+    if (!res.ok) {
+      await fetchContacts();
+    }
+  }
+
+  async function removeTagFromContact(contactId: string, tagId: string) {
+    setContacts((prev) =>
+      prev.map((c) => (c.id === contactId ? { ...c, tags: c.tags.filter((t) => t.id !== tagId) } : c))
+    );
+    const res = await fetch(`/api/contacts/${contactId}/tags/${tagId}`, { method: 'DELETE' });
+    if (!res.ok) {
+      await fetchContacts();
+    }
+  }
+
+  async function createTag() {
+    const name = newTagName.trim();
+    if (!name) return;
+    const res = await fetch('/api/contacts/tags', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, color: newTagColor }),
+    });
+    if (res.ok) {
+      const tag = await res.json();
+      setTags((prev) => [...prev, tag]);
+      setNewTagName('');
+      setNewTagColor('gray');
+    }
+  }
+
+  async function updateTag(tagId: string, name: string, color: string) {
+    const res = await fetch(`/api/contacts/tags/${tagId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name.trim(), color }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      setTags((prev) => prev.map((t) => (t.id === tagId ? updated : t)));
+      setContacts((prev) =>
+        prev.map((c) => ({
+          ...c,
+          tags: c.tags.map((t) => (t.id === tagId ? { ...t, name: updated.name, color: updated.color } : t)),
+        }))
+      );
+      setEditingTagId(null);
+    }
+  }
+
+  async function deleteTag(tagId: string) {
+    const res = await fetch(`/api/contacts/tags/${tagId}`, { method: 'DELETE' });
+    if (res.ok) {
+      setTags((prev) => prev.filter((t) => t.id !== tagId));
+      setContacts((prev) =>
+        prev.map((c) => ({ ...c, tags: c.tags.filter((t) => t.id !== tagId) }))
+      );
+      setSelectedTagIds((prev) => {
+        const next = new Set(prev);
+        next.delete(tagId);
+        return next;
+      });
+    }
+  }
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        setOpenPopoverId(null);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <p className="text-gray-500">載入中...</p>
+      </div>
+    );
+  }
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900">客戶管理</h1>
-      <p className="mt-1 text-gray-600">來自 LINE 與其他管道之聯絡人</p>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">客戶管理</h1>
+          <p className="mt-1 text-gray-600">來自 LINE 與其他管道之聯絡人</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setManageOpen(true)}
+          className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          管理標籤
+        </button>
+      </div>
+
+      {/* Tag filter */}
+      {tags.length > 0 && (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="text-sm text-gray-500">標籤篩選：</span>
+          {tags.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => toggleTagFilter(t.id)}
+              className={`rounded-full px-3 py-1 text-xs font-medium ${tagClass(t.color)} ${
+                selectedTagIds.has(t.id) ? 'ring-2 ring-offset-1 ring-gray-400' : ''
+              }`}
+            >
+              {t.name}
+            </button>
+          ))}
+          {selectedTagIds.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setSelectedTagIds(new Set())}
+              className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+            >
+              清除篩選
+            </button>
+          )}
+        </div>
+      )}
 
       <div className="mt-8">
-        {!contactsWithStats || contactsWithStats.length === 0 ? (
+        {!contacts.length ? (
           <div className="rounded-xl border border-gray-200 bg-white px-6 py-16 text-center shadow-sm">
             <div className="flex flex-col items-center">
               <div className="rounded-full bg-indigo-100 w-20 h-20 flex items-center justify-center mb-4">
                 <span className="text-4xl">👥</span>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                還沒有客戶
-              </h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">還沒有客戶</h3>
               <p className="text-sm text-gray-600 max-w-md">
                 當客戶透過 LINE 發送第一則訊息後，會自動建立聯絡人並顯示於此。
               </p>
@@ -80,22 +239,16 @@ export default async function ContactsPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                    名稱
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                    LINE User ID
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                    對話數量
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                    最後互動時間
-                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">名稱</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">LINE User ID</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">標籤</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">對話數量</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">最後互動時間</th>
+                  <th className="px-6 py-3 w-12" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
-                {contactsWithStats.map((c) => (
+                {filteredContacts.map((c) => (
                   <tr key={c.id} className="hover:bg-gray-50 transition-colors">
                     <td className="whitespace-nowrap px-6 py-4">
                       <Link
@@ -105,16 +258,84 @@ export default async function ContactsPage() {
                         {c.name || '未命名客戶'}
                       </Link>
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600 font-mono">
-                      {c.line_user_id}
+                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600 font-mono">{c.line_user_id}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-wrap gap-1">
+                        {c.tags.slice(0, 3).map((t) => (
+                          <span
+                            key={t.id}
+                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${tagClass(t.color)}`}
+                          >
+                            {t.name}
+                          </span>
+                        ))}
+                        {c.tags.length > 3 && (
+                          <span className="text-xs text-gray-500">+{c.tags.length - 3}</span>
+                        )}
+                      </div>
                     </td>
-                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
-                      {c.conversationCount}
-                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">{c.conversationCount}</td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                      {c.lastInteraction
-                        ? new Date(c.lastInteraction).toLocaleString('zh-TW')
-                        : '—'}
+                      {c.lastInteraction ? new Date(c.lastInteraction).toLocaleString('zh-TW') : '—'}
+                    </td>
+                    <td className="px-6 py-4 relative">
+                      <div className="relative inline-block" ref={openPopoverId === c.id ? popoverRef : undefined}>
+                      <button
+                        type="button"
+                        onClick={() => setOpenPopoverId((id) => (id === c.id ? null : c.id))}
+                        className="rounded p-1.5 text-gray-500 hover:bg-gray-200"
+                        aria-label="標籤"
+                      >
+                        🏷️
+                      </button>
+                      {openPopoverId === c.id && (
+                        <div className="absolute right-0 top-full z-20 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-2 shadow-lg">
+                          <div className="max-h-48 overflow-y-auto px-2">
+                            {tags.map((t) => {
+                              const assigned = c.tags.some((x) => x.id === t.id);
+                              return (
+                                <button
+                                  key={t.id}
+                                  type="button"
+                                  onClick={() => (assigned ? removeTagFromContact(c.id, t.id) : addTagToContact(c.id, t.id))}
+                                  className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm ${tagClass(t.color)}`}
+                                >
+                                  {assigned ? '✅' : '○'} {t.name}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div className="border-t border-gray-100 mt-2 pt-2 px-2 space-y-2">
+                            <p className="text-xs font-medium text-gray-500">+ 新增標籤</p>
+                            <input
+                              type="text"
+                              value={newTagName}
+                              onChange={(e) => setNewTagName(e.target.value)}
+                              placeholder="標籤名稱"
+                              className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                            />
+                            <select
+                              value={newTagColor}
+                              onChange={(e) => setNewTagColor(e.target.value)}
+                              className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                            >
+                              {TAG_COLORS.map((col) => (
+                                <option key={col} value={col}>
+                                  {col}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => createTag()}
+                              className="w-full rounded bg-indigo-600 px-2 py-1 text-sm text-white hover:bg-indigo-700"
+                            >
+                              新增標籤
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -123,6 +344,54 @@ export default async function ContactsPage() {
           </div>
         )}
       </div>
+
+      {/* Manage tags modal */}
+      {manageOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setManageOpen(false)}>
+          <div
+            className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">管理標籤</h2>
+              <button type="button" onClick={() => setManageOpen(false)} className="text-gray-500 hover:text-gray-700">✕</button>
+            </div>
+            <div className="p-4 overflow-y-auto flex-1">
+              {tags.map((t) => (
+                <div key={t.id} className="flex items-center gap-2 py-2 border-b border-gray-100 last:border-0">
+                  {editingTagId === t.id ? (
+                    <>
+                      <input
+                        type="text"
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
+                      />
+                      <select
+                        value={editingColor}
+                        onChange={(e) => setEditingColor(e.target.value)}
+                        className="rounded border border-gray-300 px-2 py-1 text-sm"
+                      >
+                        {TAG_COLORS.map((col) => (
+                          <option key={col} value={col}>{col}</option>
+                        ))}
+                      </select>
+                      <button type="button" onClick={() => updateTag(t.id, editingName, editingColor)} className="text-sm text-indigo-600">儲存</button>
+                      <button type="button" onClick={() => setEditingTagId(null)} className="text-sm text-gray-500">取消</button>
+                    </>
+                  ) : (
+                    <>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium flex-1 ${tagClass(t.color)}`}>{t.name}</span>
+                      <button type="button" onClick={() => { setEditingTagId(t.id); setEditingName(t.name); setEditingColor(t.color); }} className="text-sm text-indigo-600">編輯</button>
+                      <button type="button" onClick={() => deleteTag(t.id)} className="text-sm text-red-600">刪除</button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

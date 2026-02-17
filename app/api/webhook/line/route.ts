@@ -5,6 +5,7 @@ import { searchKnowledgeWithSources } from '@/lib/knowledge-search';
 import { getOrCreateContactByLineUserId, getUserSettings, insertConversationMessage } from '@/lib/supabase';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getConversationUsageForUser } from '@/lib/billing-usage';
+import { autoTagContact } from '@/lib/auto-tag';
 
 const KNOWLEDGE_PREFIX = '\n\n以下是相關的知識庫資料，請優先參考這些資訊來回答：\n';
 
@@ -105,6 +106,8 @@ async function handleEvent(event: LineWebhookEvent): Promise<void> {
       resolved_by: resolution.resolved_by,
       is_resolved: resolution.is_resolved,
     });
+
+    void autoTagContact(contact.id, ownerUserId, userMessage);
 
     console.log('Successfully processed message:', {
       contactId: contact.id,
