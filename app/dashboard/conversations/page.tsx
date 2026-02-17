@@ -54,6 +54,14 @@ type Conversation = {
 
 type StatusFilter = 'all' | 'resolved' | 'pending';
 type DateRangeFilter = 'all' | 'today' | '7' | '30';
+type SortBy = 'newest' | 'oldest' | 'unread_first' | 'name_az';
+
+const SORT_OPTIONS: { value: SortBy; label: string }[] = [
+  { value: 'newest', label: '最新訊息優先' },
+  { value: 'oldest', label: '最舊訊息優先' },
+  { value: 'unread_first', label: '未讀優先' },
+  { value: 'name_az', label: '按客戶名稱 A-Z' },
+];
 
 export default function ConversationsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -63,6 +71,7 @@ export default function ConversationsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [dateRangeFilter, setDateRangeFilter] = useState<DateRangeFilter>('all');
+  const [sortBy, setSortBy] = useState<SortBy>('newest');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchLoading, setBatchLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -121,6 +130,28 @@ export default function ConversationsPage() {
 
     return list;
   }, [tagFilteredContacts, searchQuery, statusFilter, dateRangeFilter]);
+
+  const sortedContacts = useMemo(() => {
+    const list = [...filteredContacts];
+    const time = (c: Contact) => (c.lastMessageTime ? new Date(c.lastMessageTime).getTime() : 0);
+    const name = (c: Contact) => c.name || '未命名';
+
+    if (sortBy === 'newest') {
+      list.sort((a, b) => time(b) - time(a));
+    } else if (sortBy === 'oldest') {
+      list.sort((a, b) => time(a) - time(b));
+    } else if (sortBy === 'unread_first') {
+      list.sort((a, b) => {
+        const aPending = (a.status ?? 'pending') === 'pending' ? 0 : 1;
+        const bPending = (b.status ?? 'pending') === 'pending' ? 0 : 1;
+        if (aPending !== bPending) return aPending - bPending;
+        return time(b) - time(a);
+      });
+    } else {
+      list.sort((a, b) => name(a).localeCompare(name(b), 'zh-TW'));
+    }
+    return list;
+  }, [filteredContacts, sortBy]);
 
   const allFilteredSelected =
     filteredContacts.length > 0 &&
@@ -496,6 +527,22 @@ export default function ConversationsPage() {
             ))}
           </div>
         </div>
+        {/* Sort */}
+        <div className="mb-3 flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-500 shrink-0">排序 ↕</span>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as SortBy)}
+            className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+            aria-label="排序方式"
+          >
+            {SORT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
         {/* Mobile tag filter */}
         {(tagList.length > 0 || selectedTagFilters.size > 0) && (
           <div className="mb-4 p-3 rounded-xl border border-gray-200 bg-white">
@@ -644,7 +691,7 @@ export default function ConversationsPage() {
               />
               <span className="text-xs text-gray-500">全選/取消全選</span>
             </div>
-            {filteredContacts.map((contact) => (
+            {sortedContacts.map((contact) => (
               <div
                 key={contact.id}
                 className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
@@ -757,6 +804,22 @@ export default function ConversationsPage() {
                     </button>
                   ))}
                 </div>
+              </div>
+              {/* Sort */}
+              <div className="p-3 border-b border-gray-100">
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">排序 ↕</label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortBy)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+                  aria-label="排序方式"
+                >
+                  {SORT_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
               </div>
               {/* Tag filter */}
               <div className="p-3 border-b border-gray-100">
@@ -901,7 +964,7 @@ export default function ConversationsPage() {
                       />
                       <span className="text-xs text-gray-500">全選/取消全選</span>
                     </div>
-                    {filteredContacts.map((contact) => (
+                    {sortedContacts.map((contact) => (
                       <div
                         key={contact.id}
                         className={`
