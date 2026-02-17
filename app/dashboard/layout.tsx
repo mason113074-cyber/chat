@@ -42,6 +42,12 @@ export default async function DashboardLayout({
               {'\u5BA2\u6236\u806F\u7D61\u4EBA'}
             </Link>
             <Link
+              href="/dashboard/billing"
+              className="text-gray-600 hover:text-gray-900 font-medium"
+            >
+              {'\u65B9\u6848\u8207\u8A08\u8CBB'}
+            </Link>
+            <Link
               href="/settings"
               className="text-gray-600 hover:text-gray-900 font-medium"
             >

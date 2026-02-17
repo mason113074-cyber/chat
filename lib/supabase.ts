@@ -80,12 +80,46 @@ export interface Order {
   created_at?: string;
 }
 
+export interface Plan {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  price_monthly: number;
+  price_yearly: number;
+  features: unknown;
+  limits: Record<string, unknown>;
+  is_active: boolean;
+  sort_order: number;
+  created_at?: string;
+}
+
 export interface Subscription {
   id: string;
   user_id: string;
-  plan: string;
+  plan_id: string;
   status: string;
-  expires_at: string | null;
+  billing_cycle: string;
+  current_period_start: string | null;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+  payment_provider: string | null;
+  provider_subscription_id: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Payment {
+  id: string;
+  user_id: string;
+  subscription_id: string | null;
+  amount: number;
+  currency: string;
+  status: string;
+  payment_method: string | null;
+  provider: string | null;
+  provider_payment_id: string | null;
+  paid_at: string | null;
   created_at?: string;
 }
 
