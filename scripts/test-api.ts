@@ -1,7 +1,7 @@
 /**
  * API 端對端測試腳本
- * 從 .env.local 讀取：NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, TEST_USER_EMAIL, TEST_USER_PASSWORD
- * （任務要求之 SUPABASE_SERVICE_ROLE_KEY 未用於本腳本；登入改用 anon key + 測試帳密取得 session）
+ * 從 .env.local 讀取：NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY（任務要求）
+ * 登入需額外：NEXT_PUBLIC_SUPABASE_ANON_KEY, TEST_USER_EMAIL, TEST_USER_PASSWORD（用 Supabase Auth 取得 session）
  * 執行前請先啟動 dev server: npm run dev (localhost:3000)
  */
 

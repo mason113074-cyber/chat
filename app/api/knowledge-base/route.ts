@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       console.error(error);
       return NextResponse.json({ error: '新增失敗' }, { status: 500 });
     }
-    return NextResponse.json({ item: data });
+    return NextResponse.json({ item: data }, { status: 201 });
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: '伺服器錯誤' }, { status: 500 });
