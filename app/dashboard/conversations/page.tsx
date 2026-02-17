@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 type Contact = {
@@ -25,6 +25,39 @@ export default function ConversationsPage() {
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // 更新聯絡人列表並重新排序的輔助函數
+  const updateContactsList = useCallback((
+    contacts: Contact[],
+    contactId: string,
+    message: string,
+    created_at: string
+  ): Contact[] => {
+    let contactFound = false;
+    const updated = contacts.map((contact) => {
+      if (contact.id === contactId) {
+        contactFound = true;
+        return {
+          ...contact,
+          lastMessage: message,
+          lastMessageTime: created_at,
+        };
+      }
+      return contact;
+    });
+    
+    // 如果聯絡人不在列表中，跳過更新（讓新聯絡人訂閱處理）
+    if (!contactFound) {
+      return contacts;
+    }
+    
+    // 重新排序，最新訊息的聯絡人排到最上面
+    return updated.sort((a, b) => {
+      if (!a.lastMessageTime) return 1;
+      if (!b.lastMessageTime) return -1;
+      return new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime();
+    });
+  }, []);
+
   useEffect(() => {
     loadContacts();
   }, []);
@@ -39,32 +72,6 @@ export default function ConversationsPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [conversations]);
-
-  // 更新聯絡人列表並重新排序的輔助函數
-  const updateContactsList = (
-    contacts: Contact[],
-    contactId: string,
-    message: string,
-    created_at: string
-  ): Contact[] => {
-    const updated = contacts.map((contact) => {
-      if (contact.id === contactId) {
-        return {
-          ...contact,
-          lastMessage: message,
-          lastMessageTime: created_at,
-        };
-      }
-      return contact;
-    });
-    
-    // 重新排序，最新訊息的聯絡人排到最上面
-    return updated.sort((a, b) => {
-      if (!a.lastMessageTime) return 1;
-      if (!b.lastMessageTime) return -1;
-      return new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime();
-    });
-  };
 
   // 訂閱對話即時更新
   useEffect(() => {
@@ -100,7 +107,7 @@ export default function ConversationsPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [selectedContactId]);
+  }, [selectedContactId, updateContactsList]);
 
   // 訂閱新聯絡人
   useEffect(() => {
@@ -184,7 +191,7 @@ export default function ConversationsPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [updateContactsList]);
 
   async function loadContacts() {
     const supabase = createClient();

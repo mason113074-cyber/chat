@@ -28,6 +28,12 @@ export default function ConversationDetailPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    if (!contactId) {
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
+
     const loadData = async () => {
       const supabase = createClient();
 
