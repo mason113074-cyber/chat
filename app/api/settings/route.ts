@@ -17,23 +17,24 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 讀取用戶的 system_prompt
     const { data, error } = await supabase
       .from('users')
-      .select('system_prompt')
+      .select('system_prompt, ai_model, store_name')
       .eq('id', user.id)
       .single();
 
     if (error) {
-      console.error('Error fetching system_prompt:', error);
+      console.error('Error fetching settings:', error);
       return NextResponse.json(
         { error: '無法讀取設定' },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ 
-      systemPrompt: data?.system_prompt || null 
+    return NextResponse.json({
+      systemPrompt: data?.system_prompt ?? null,
+      aiModel: data?.ai_model ?? 'gpt-4o-mini',
+      storeName: data?.store_name ?? null,
     });
   } catch (error) {
     console.error('Settings GET API error:', error);
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { systemPrompt } = body;
+    const { systemPrompt, storeName, aiModel } = body;
 
     if (typeof systemPrompt !== 'string') {
       return NextResponse.json(
@@ -67,7 +68,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 驗證 prompt 長度
     if (systemPrompt.trim().length < MIN_PROMPT_LENGTH) {
       return NextResponse.json(
         { error: `System prompt 至少需要 ${MIN_PROMPT_LENGTH} 個字元` },
@@ -82,10 +82,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 儲存用戶的 system_prompt
+    const updates: { system_prompt: string; store_name?: string | null; ai_model?: string } = { system_prompt: systemPrompt };
+    if (typeof storeName === 'string') updates.store_name = storeName.trim().slice(0, 100) || null;
+    if (typeof aiModel === 'string' && ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo'].includes(aiModel)) {
+      updates.ai_model = aiModel;
+    }
+
     const { error } = await supabase
       .from('users')
-      .update({ system_prompt: systemPrompt })
+      .update(updates)
       .eq('id', user.id);
 
     if (error) {

@@ -58,11 +58,28 @@ const TONE_PRESETS = {
 - 避免廢話，提高效率`
 };
 
+const AI_MODELS = ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo'] as const;
+const EXAMPLE_QUESTIONS = [
+  '你們的營業時間是幾點？',
+  '有什麼優惠活動嗎？',
+  '如何退換貨？',
+];
+
 export default function SettingsPage() {
   const toast = useToast();
   const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT);
+  const [storeName, setStoreName] = useState('');
+  const [aiModel, setAiModel] = useState<string>('gpt-4o-mini');
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Live Preview
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewQuestion, setPreviewQuestion] = useState(EXAMPLE_QUESTIONS[0]);
+  const [previewAnswer, setPreviewAnswer] = useState<string | 'pending' | 'updated' | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [lastSyncedPrompt, setLastSyncedPrompt] = useState('');
+  const [lastSyncedModel, setLastSyncedModel] = useState('');
 
   // AI 測試相關狀態
   const [testMessage, setTestMessage] = useState('');
@@ -70,18 +87,15 @@ export default function SettingsPage() {
   const [isTesting, setIsTesting] = useState(false);
   const [testError, setTestError] = useState('');
 
-  // 載入用戶的 system_prompt
   useEffect(() => {
-    async function loadSystemPrompt() {
+    async function load() {
       try {
         const response = await fetch('/api/settings');
-        if (!response.ok) {
-          throw new Error('無法載入設定');
-        }
+        if (!response.ok) throw new Error('無法載入設定');
         const data = await response.json();
-        if (data.systemPrompt) {
-          setSystemPrompt(data.systemPrompt);
-        }
+        if (data.systemPrompt) setSystemPrompt(data.systemPrompt);
+        if (data.storeName != null) setStoreName(data.storeName || '');
+        if (data.aiModel) setAiModel(data.aiModel);
       } catch (error) {
         console.error('載入設定失敗:', error);
         toast.show('載入設定失敗', 'error');
@@ -89,9 +103,14 @@ export default function SettingsPage() {
         setIsLoading(false);
       }
     }
-    loadSystemPrompt();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    load();
+  }, [toast]);
+
+  useEffect(() => {
+    if (previewAnswer !== null && previewAnswer !== 'pending' && (systemPrompt !== lastSyncedPrompt || aiModel !== lastSyncedModel)) {
+      setPreviewAnswer('updated');
+    }
+  }, [systemPrompt, aiModel, lastSyncedPrompt, lastSyncedModel, previewAnswer]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -99,13 +118,9 @@ export default function SettingsPage() {
       const response = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ systemPrompt }),
+        body: JSON.stringify({ systemPrompt, storeName, aiModel }),
       });
-
-      if (!response.ok) {
-        throw new Error('儲存失敗');
-      }
-
+      if (!response.ok) throw new Error('儲存失敗');
       toast.show('已儲存', 'success');
     } catch (error) {
       console.error('儲存失敗:', error);
@@ -114,6 +129,35 @@ export default function SettingsPage() {
       setIsSaving(false);
     }
   };
+
+  const handlePreviewReply = async (questionOverride?: string) => {
+    const q = questionOverride ?? previewQuestion;
+    setPreviewQuestion(q);
+    setPreviewLoading(true);
+    setPreviewAnswer('pending');
+    setLastSyncedPrompt(systemPrompt);
+    setLastSyncedModel(aiModel);
+    try {
+      const res = await fetch('/api/settings/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: q,
+          system_prompt: systemPrompt,
+          ai_model: aiModel,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '預覽失敗');
+      setPreviewAnswer(data.answer ?? '');
+    } catch (e) {
+      setPreviewAnswer(e instanceof Error ? e.message : '預覽失敗');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const welcomeText = systemPrompt.trim().split(/\n/)[0]?.trim() || '歡迎使用 CustomerAIPro！';
 
   const handleReset = () => {
     setSystemPrompt(DEFAULT_SYSTEM_PROMPT);
@@ -172,27 +216,33 @@ export default function SettingsPage() {
       <h1 className="text-2xl font-bold text-gray-900">AI 助理設定</h1>
       <p className="mt-1 text-gray-600">管理您的 AI 客服助理設定與行為</p>
 
-      <div className="mt-8 space-y-6">
-        {/* AI Model Information Card */}
+      <div className="mt-8 flex flex-col lg:flex-row gap-8">
+        {/* Left: Form lg:w-3/5 */}
+        <div className="lg:w-3/5 space-y-6">
+        {/* 商店名稱 */}
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <div className="flex items-start justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">AI 模型資訊</h2>
-              <p className="mt-1 text-sm text-gray-600">目前使用的 AI 模型與狀態</p>
-            </div>
-            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-3 py-1 text-sm font-medium text-green-700">
-              ✅ 運作中
-            </span>
-          </div>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div className="rounded-lg bg-gray-50 p-4">
-              <p className="text-xs text-gray-500 uppercase tracking-wide">模型</p>
-              <p className="mt-1 text-lg font-semibold text-gray-900">GPT-4o-mini</p>
-            </div>
-            <div className="rounded-lg bg-gray-50 p-4">
-              <p className="text-xs text-gray-500 uppercase tracking-wide">提供商</p>
-              <p className="mt-1 text-lg font-semibold text-gray-900">OpenAI</p>
-            </div>
+          <h2 className="text-lg font-semibold text-gray-900">商店名稱</h2>
+          <p className="mt-1 text-sm text-gray-600">顯示於聊天 Widget 頂部</p>
+          <input
+            type="text"
+            value={storeName}
+            onChange={(e) => setStoreName(e.target.value)}
+            placeholder="我的商店"
+            className="mt-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-20"
+          />
+        </div>
+
+        {/* AI Model */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900">AI 模型</h2>
+          <p className="mt-1 text-sm text-gray-600">選擇回覆使用的模型</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {AI_MODELS.map((id) => (
+              <label key={id} className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 cursor-pointer has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50">
+                <input type="radio" name="ai_model" value={id} checked={aiModel === id} onChange={() => setAiModel(id)} className="text-indigo-600" />
+                <span className="text-sm font-medium">{id}</span>
+              </label>
+            ))}
           </div>
         </div>
 
@@ -350,6 +400,139 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
+        </div>
+
+        {/* Right: Live Preview lg:w-2/5 lg:sticky lg:top-24 (hidden on mobile, use collapsible below) */}
+        <div className="hidden lg:block lg:w-2/5 lg:sticky lg:top-24 self-start">
+          <div className="rounded-xl bg-gradient-to-br from-indigo-50 to-purple-50 p-4 shadow-sm border border-indigo-100">
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">Live Preview</h2>
+            <div className="mx-auto max-w-sm rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden" style={{ height: '500px' }}>
+              <div className="bg-indigo-600 text-white px-4 py-3 flex items-center gap-2">
+                <span className="font-medium truncate">{storeName || '我的商店'}</span>
+                <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" title="線上" />
+              </div>
+              <div className="h-[380px] overflow-y-auto p-4 space-y-3 bg-white">
+                <div className="flex justify-start">
+                  <div className="max-w-[85%] rounded-2xl rounded-tl-md bg-gray-100 text-gray-900 px-4 py-2 text-sm">
+                    {welcomeText}
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-indigo-500 text-white px-4 py-2 text-sm">
+                    {previewQuestion}
+                  </div>
+                </div>
+                <div className="flex justify-start">
+                  <div className="max-w-[85%] rounded-2xl rounded-tl-md bg-gray-100 text-gray-900 px-4 py-2 text-sm">
+                    {previewLoading && (
+                      <span className="inline-flex gap-1">
+                        <span className="w-2 h-2 rounded-full bg-gray-500 animate-typing-dot" />
+                        <span className="w-2 h-2 rounded-full bg-gray-500 animate-typing-dot" />
+                        <span className="w-2 h-2 rounded-full bg-gray-500 animate-typing-dot" />
+                      </span>
+                    )}
+                    {!previewLoading && previewAnswer === 'updated' && (
+                      <span className="text-gray-500">設定已更新，點擊重新預覽</span>
+                    )}
+                    {!previewLoading && previewAnswer === 'pending' && (
+                      <span className="text-gray-500">正在生成預覽...</span>
+                    )}
+                    {!previewLoading && previewAnswer !== null && previewAnswer !== 'pending' && previewAnswer !== 'updated' && (
+                      <span className="whitespace-pre-wrap">{previewAnswer}</span>
+                    )}
+                    {!previewLoading && previewAnswer === null && (
+                      <span className="text-gray-500">點擊下方按鈕預覽 AI 回覆</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="border-t border-gray-200 p-2">
+                <div className="rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-400">
+                  輸入訊息（僅供預覽）
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 space-y-2">
+              <p className="text-xs font-medium text-gray-600">範例問題：</p>
+              <div className="flex flex-wrap gap-2">
+                {EXAMPLE_QUESTIONS.map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    onClick={() => handlePreviewReply(q)}
+                    className="rounded-full border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => handlePreviewReply()}
+                disabled={previewLoading}
+                className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                🔄 預覽 AI 回覆
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile: Collapsible Preview */}
+      <div className="mt-8 lg:hidden">
+        <button
+          type="button"
+          onClick={() => setPreviewOpen((o) => !o)}
+          className="w-full rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 px-4 py-3 text-left font-medium text-gray-900"
+        >
+          {previewOpen ? '▼ 收合 Live Preview' : '▶ 展開 Live Preview'}
+        </button>
+        {previewOpen && (
+          <div className="mt-2 rounded-xl bg-gradient-to-br from-indigo-50 to-purple-50 p-4 shadow-sm border border-indigo-100">
+            <div className="mx-auto max-w-sm rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden" style={{ height: '500px' }}>
+              <div className="bg-indigo-600 text-white px-4 py-3 flex items-center gap-2">
+                <span className="font-medium truncate">{storeName || '我的商店'}</span>
+                <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
+              </div>
+              <div className="h-[380px] overflow-y-auto p-4 space-y-3 bg-white">
+                <div className="flex justify-start">
+                  <div className="max-w-[85%] rounded-2xl rounded-tl-md bg-gray-100 text-gray-900 px-4 py-2 text-sm">{welcomeText}</div>
+                </div>
+                <div className="flex justify-end">
+                  <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-indigo-500 text-white px-4 py-2 text-sm">{previewQuestion}</div>
+                </div>
+                <div className="flex justify-start">
+                  <div className="max-w-[85%] rounded-2xl rounded-tl-md bg-gray-100 text-gray-900 px-4 py-2 text-sm">
+                    {previewLoading && (
+                      <span className="inline-flex gap-1">
+                        <span className="w-2 h-2 rounded-full bg-gray-500 animate-typing-dot" />
+                        <span className="w-2 h-2 rounded-full bg-gray-500 animate-typing-dot" />
+                        <span className="w-2 h-2 rounded-full bg-gray-500 animate-typing-dot" />
+                      </span>
+                    )}
+                    {!previewLoading && previewAnswer === 'updated' && <span className="text-gray-500">設定已更新，點擊重新預覽</span>}
+                    {!previewLoading && previewAnswer === 'pending' && <span className="text-gray-500">正在生成預覽...</span>}
+                    {!previewLoading && previewAnswer !== null && previewAnswer !== 'pending' && previewAnswer !== 'updated' && <span className="whitespace-pre-wrap">{previewAnswer}</span>}
+                    {!previewLoading && previewAnswer === null && <span className="text-gray-500">點擊下方按鈕預覽 AI 回覆</span>}
+                  </div>
+                </div>
+              </div>
+              <div className="border-t border-gray-200 p-2">
+                <div className="rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-400">輸入訊息（僅供預覽）</div>
+              </div>
+            </div>
+            <div className="mt-3 space-y-2">
+              <p className="text-xs font-medium text-gray-600">範例問題：</p>
+              <div className="flex flex-wrap gap-2">
+                {EXAMPLE_QUESTIONS.map((q) => (
+                  <button key={q} type="button" onClick={() => handlePreviewReply(q)} className="rounded-full border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700 hover:bg-gray-50">{q}</button>
+                ))}
+              </div>
+              <button type="button" onClick={() => handlePreviewReply()} disabled={previewLoading} className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">🔄 預覽 AI 回覆</button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
