@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { getNextPlanSlug } from '@/lib/plans';
 
 type Plan = {
   id: string;
@@ -34,6 +35,13 @@ type Payment = {
   created_at: string;
 };
 
+type BillingUsage = {
+  plan: string;
+  conversations: { used: number; limit: number; percentage: number };
+  knowledge: { used: number; limit: number; percentage: number };
+  billing_period: { start: string; end: string; days_remaining: number };
+};
+
 const PLAN_CARD_STYLE: Record<string, string> = {
   free: 'border-gray-200 bg-gray-50',
   basic: 'border-blue-200 bg-blue-50/30',
@@ -48,10 +56,13 @@ export default function BillingPage() {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [usage, setUsage] = useState<{ used: number; limit: number } | null>(null);
+  const [billingUsage, setBillingUsage] = useState<BillingUsage | null>(null);
   const [loading, setLoading] = useState(true);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
   const [paymentsPage, setPaymentsPage] = useState(0);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [displayConvPct, setDisplayConvPct] = useState(0);
+  const [displayKnowledgePct, setDisplayKnowledgePct] = useState(0);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -60,7 +71,7 @@ export default function BillingPage() {
         fetch('/api/plans'),
         fetch('/api/subscription'),
         fetch('/api/payments'),
-        fetch('/api/usage'),
+        fetch('/api/billing/usage'),
       ]);
       if (plansRes.ok) {
         const j = await plansRes.json();
@@ -76,7 +87,11 @@ export default function BillingPage() {
       }
       if (usageRes.ok) {
         const j = await usageRes.json();
-        setUsage({ used: j.used ?? 0, limit: j.limit ?? 100 });
+        setBillingUsage(j);
+        setUsage({
+          used: j.conversations?.used ?? 0,
+          limit: j.conversations?.limit === -1 ? Number.MAX_SAFE_INTEGER : (j.conversations?.limit ?? 100),
+        });
       }
     } finally {
       setLoading(false);
@@ -86,6 +101,19 @@ export default function BillingPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    if (billingUsage == null) return;
+    const convPct = billingUsage.conversations.limit === -1 ? 0 : Math.min(100, billingUsage.conversations.percentage);
+    const knowledgePct = billingUsage.knowledge.limit === -1 ? 0 : Math.min(100, billingUsage.knowledge.percentage);
+    const t = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setDisplayConvPct(convPct);
+        setDisplayKnowledgePct(knowledgePct);
+      });
+    });
+    return () => cancelAnimationFrame(t);
+  }, [billingUsage]);
 
   const currentPlanSlug = subscription?.plan
     ? (subscription.plan as Plan).slug
@@ -162,9 +190,122 @@ export default function BillingPage() {
     );
   }
 
+  const conv = billingUsage?.conversations ?? { used: 0, limit: 0, percentage: 0 };
+  const isUnlimitedConv = conv.limit === -1;
+  const nextPlanSlug = getNextPlanSlug(currentPlanSlug);
+  const nextPlanName = nextPlanSlug ? plans.find((p) => p.slug === nextPlanSlug)?.name ?? '更高方案' : null;
+
+  const barColor = (pct: number) =>
+    pct >= 100 ? 'bg-red-500' : pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-yellow-500' : 'bg-green-500';
+
   return (
     <div className="space-y-8">
       <h1 className="text-2xl font-bold text-gray-900">方案與計費</h1>
+
+      {/* 用量概覽 */}
+      <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">用量概覽</h2>
+
+        {/* 對話用量 */}
+        <div className="mb-6">
+          <p className="text-sm font-medium text-gray-700 mb-2">📊 本月對話用量</p>
+          <div className="h-3 w-full rounded-full bg-gray-200 overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-700 ${barColor(isUnlimitedConv ? 0 : conv.percentage)}`}
+              style={{ width: isUnlimitedConv ? '0%' : `${displayConvPct}%` }}
+            />
+          </div>
+          <p className="mt-1 text-sm text-gray-600">
+            {isUnlimitedConv
+              ? `已使用 ${conv.used} 則（無限制）`
+              : `已使用 ${conv.used} / ${conv.limit} 則${conv.percentage > 0 ? ` · ${conv.percentage}%` : ''}`}
+          </p>
+        </div>
+
+        {/* 知識庫用量 */}
+        <div className="mb-4">
+          <p className="text-sm font-medium text-gray-700 mb-2">📚 知識庫條目</p>
+          <div className="h-3 w-full rounded-full bg-gray-200 overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-700 ${barColor(
+                billingUsage?.knowledge.limit === -1 ? 0 : (billingUsage?.knowledge.percentage ?? 0)
+              )}`}
+              style={{
+                width: billingUsage?.knowledge.limit === -1 ? '0%' : `${displayKnowledgePct}%`,
+              }}
+            />
+          </div>
+          <p className="mt-1 text-sm text-gray-600">
+            {billingUsage?.knowledge.limit === -1
+              ? `已使用 ${billingUsage?.knowledge.used ?? 0} 條（無限制）`
+              : `已使用 ${billingUsage?.knowledge.used ?? 0} / ${billingUsage?.knowledge.limit ?? 0} 條${
+                  (billingUsage?.knowledge.percentage ?? 0) > 0 ? ` · ${billingUsage?.knowledge.percentage}%` : ''
+                }`}
+          </p>
+        </div>
+
+        {/* 帳單週期 */}
+        {billingUsage?.billing_period && (
+          <>
+            <p className="text-xs text-gray-500">
+              帳單週期：{billingUsage.billing_period.start} - {billingUsage.billing_period.end} ｜ 剩餘{' '}
+              {billingUsage.billing_period.days_remaining} 天
+            </p>
+            <p className="text-xs text-gray-400 mt-1">用量於每月 1 日重置</p>
+          </>
+        )}
+
+        {/* 超額警告 */}
+        {!isUnlimitedConv && conv.limit > 0 && (
+          <>
+            {conv.percentage >= 100 && (
+              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 flex flex-wrap items-center gap-3">
+                <span className="text-red-600">❌</span>
+                <p className="text-red-800 text-sm flex-1">
+                  已達到本月對話上限，AI 自動回覆已暫停。升級方案以恢復服務。
+                </p>
+                <button
+                  type="button"
+                  onClick={() => document.getElementById('plans-section')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+                >
+                  升級方案
+                </button>
+              </div>
+            )}
+            {conv.percentage >= 95 && conv.percentage < 100 && (
+              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 flex flex-wrap items-center gap-3">
+                <span className="text-red-600">🚨</span>
+                <p className="text-red-800 text-sm flex-1">
+                  即將達到對話上限！剩餘 {conv.limit - conv.used} 則，超出後將無法自動回覆
+                </p>
+                <button
+                  type="button"
+                  onClick={() => document.getElementById('plans-section')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+                >
+                  立即升級
+                </button>
+              </div>
+            )}
+            {conv.percentage >= 80 && conv.percentage < 95 && (
+              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 flex flex-wrap items-center gap-3">
+                <span className="text-amber-600">⚠️</span>
+                <p className="text-amber-800 text-sm flex-1">
+                  您已使用 {conv.percentage}% 的對話額度，建議升級到 {nextPlanName ?? '更高方案'} 以避免中斷
+                </p>
+                <button
+                  type="button"
+                  onClick={() => document.getElementById('plans-section')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700"
+                >
+                  升級方案
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </section>
 
       {/* 訂閱狀態區塊 */}
       <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">

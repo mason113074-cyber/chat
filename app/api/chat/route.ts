@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateReply } from '@/lib/openai';
 import { createClient } from '@/lib/supabase/server';
 import { searchKnowledgeForUser } from '@/lib/knowledge';
+import { getConversationUsageForUser } from '@/lib/billing-usage';
 
 const KNOWLEDGE_PREFIX = '\n\n以下是相關的知識庫資料，請優先參考這些資訊來回答：\n';
 
@@ -23,6 +24,14 @@ export async function POST(request: NextRequest) {
     let aiModel: string | null = null;
 
     if (user) {
+      const { limit, used } = await getConversationUsageForUser(supabase, user.id);
+      if (limit !== -1 && used >= limit) {
+        return NextResponse.json(
+          { error: '已達到本月對話上限，請升級方案' },
+          { status: 402 }
+        );
+      }
+
       const { data } = await supabase
         .from('users')
         .select('system_prompt, ai_model')

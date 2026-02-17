@@ -3,6 +3,8 @@ import { validateSignature, replyMessage, LineWebhookBody, LineWebhookEvent } fr
 import { generateReply } from '@/lib/openai';
 import { searchKnowledgeWithSources } from '@/lib/knowledge-search';
 import { getOrCreateContactByLineUserId, getUserSettings, insertConversationMessage } from '@/lib/supabase';
+import { getSupabaseAdmin } from '@/lib/supabase';
+import { getConversationUsageForUser } from '@/lib/billing-usage';
 
 const KNOWLEDGE_PREFIX = '\n\n以下是相關的知識庫資料，請優先參考這些資訊來回答：\n';
 
@@ -73,6 +75,13 @@ async function handleEvent(event: LineWebhookEvent): Promise<void> {
   }
 
   try {
+    const admin = getSupabaseAdmin();
+    const { limit, used } = await getConversationUsageForUser(admin, ownerUserId);
+    if (limit !== -1 && used >= limit) {
+      await replyMessage(replyToken, '很抱歉，本月對話額度已用完，請聯繫商家。');
+      return;
+    }
+
     const contact = await getOrCreateContactByLineUserId(lineUserId, ownerUserId);
 
     const { system_prompt: systemPrompt, ai_model: aiModel } = await getUserSettings(ownerUserId);
