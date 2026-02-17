@@ -40,6 +40,32 @@ export default function ConversationsPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [conversations]);
 
+  // 更新聯絡人列表並重新排序的輔助函數
+  const updateContactsList = (
+    contacts: Contact[],
+    contactId: string,
+    message: string,
+    created_at: string
+  ): Contact[] => {
+    const updated = contacts.map((contact) => {
+      if (contact.id === contactId) {
+        return {
+          ...contact,
+          lastMessage: message,
+          lastMessageTime: created_at,
+        };
+      }
+      return contact;
+    });
+    
+    // 重新排序，最新訊息的聯絡人排到最上面
+    return updated.sort((a, b) => {
+      if (!a.lastMessageTime) return 1;
+      if (!b.lastMessageTime) return -1;
+      return new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime();
+    });
+  };
+
   // 訂閱對話即時更新
   useEffect(() => {
     if (!selectedContactId) return;
@@ -57,28 +83,16 @@ export default function ConversationsPage() {
           filter: `contact_id=eq.${selectedContactId}`,
         },
         (payload) => {
-          setConversations((prev) => [...prev, payload.new as Conversation]);
+          const newConv = payload.new as Conversation;
+          setConversations((prev) => [...prev, newConv]);
           
           // 更新聯絡人列表的最新訊息
-          setContacts((prev) => {
-            const updated = prev.map((contact) => {
-              if (contact.id === selectedContactId) {
-                return {
-                  ...contact,
-                  lastMessage: (payload.new as Conversation).message,
-                  lastMessageTime: (payload.new as Conversation).created_at,
-                };
-              }
-              return contact;
-            });
-            
-            // 重新排序，最新訊息的聯絡人排到最上面
-            return updated.sort((a, b) => {
-              if (!a.lastMessageTime) return 1;
-              if (!b.lastMessageTime) return -1;
-              return new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime();
-            });
-          });
+          setContacts((prev) => updateContactsList(
+            prev,
+            selectedContactId,
+            newConv.message,
+            newConv.created_at
+          ));
         }
       )
       .subscribe();
@@ -91,17 +105,13 @@ export default function ConversationsPage() {
   // 訂閱新聯絡人
   useEffect(() => {
     const supabase = createClient();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
     
-    const fetchUserId = async () => {
+    const setupSubscription = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-      return user.id;
-    };
+      if (!user) return;
 
-    fetchUserId().then((userId) => {
-      if (!userId) return;
-
-      const channel = supabase
+      channel = supabase
         .channel('contacts:new')
         .on(
           'postgres_changes',
@@ -109,7 +119,7 @@ export default function ConversationsPage() {
             event: 'INSERT',
             schema: 'public',
             table: 'contacts',
-            filter: `user_id=eq.${userId}`,
+            filter: `user_id=eq.${user.id}`,
           },
           (payload) => {
             const newContact = payload.new as {
@@ -131,11 +141,15 @@ export default function ConversationsPage() {
           }
         )
         .subscribe();
+    };
 
-      return () => {
+    setupSubscription();
+
+    return () => {
+      if (channel) {
         supabase.removeChannel(channel);
-      };
-    });
+      }
+    };
   }, []);
 
   // 訂閱所有聯絡人的對話更新（用於更新聯絡人列表）
@@ -154,26 +168,13 @@ export default function ConversationsPage() {
         (payload) => {
           const newConv = payload.new as Conversation & { contact_id: string };
           
-          // 如果不是當前選中的聯絡人，更新聯絡人列表
-          setContacts((prev) => {
-            const updated = prev.map((contact) => {
-              if (contact.id === newConv.contact_id) {
-                return {
-                  ...contact,
-                  lastMessage: newConv.message,
-                  lastMessageTime: newConv.created_at,
-                };
-              }
-              return contact;
-            });
-            
-            // 重新排序
-            return updated.sort((a, b) => {
-              if (!a.lastMessageTime) return 1;
-              if (!b.lastMessageTime) return -1;
-              return new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime();
-            });
-          });
+          // 更新聯絡人列表
+          setContacts((prev) => updateContactsList(
+            prev,
+            newConv.contact_id,
+            newConv.message,
+            newConv.created_at
+          ));
         }
       )
       .subscribe();
