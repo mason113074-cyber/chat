@@ -7,9 +7,25 @@ type Contact = {
   id: string;
   name: string | null;
   line_user_id: string;
+  tags: string[];
   lastMessage: string;
   lastMessageTime: string;
 };
+
+type TagWithCount = { tag: string; count: number };
+
+const TAG_COLORS = [
+  'bg-indigo-100 text-indigo-800',
+  'bg-emerald-100 text-emerald-800',
+  'bg-amber-100 text-amber-800',
+  'bg-rose-100 text-rose-800',
+  'bg-sky-100 text-sky-800',
+  'bg-violet-100 text-violet-800',
+];
+function tagColor(tag: string): string {
+  const i = tag.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+  return TAG_COLORS[Math.abs(i) % TAG_COLORS.length];
+}
 
 type Conversation = {
   id: string;
@@ -20,10 +36,19 @@ type Conversation = {
 
 export default function ConversationsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [tagList, setTagList] = useState<TagWithCount[]>([]);
+  const [selectedTagFilters, setSelectedTagFilters] = useState<Set<string>>(new Set());
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const filteredContacts =
+    selectedTagFilters.size === 0
+      ? contacts
+      : contacts.filter((c) =>
+          c.tags.some((t) => selectedTagFilters.has(t))
+        );
 
   // 更新聯絡人列表並重新排序的輔助函數
   const updateContactsList = useCallback((
@@ -141,6 +166,7 @@ export default function ConversationsPage() {
                 id: newContact.id,
                 name: newContact.name,
                 line_user_id: newContact.line_user_id,
+                tags: [],
                 lastMessage: '尚無對話',
                 lastMessageTime: '',
               },
@@ -200,10 +226,10 @@ export default function ConversationsPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Get all contacts with their latest conversation
+    // Get all contacts with tags and their latest conversation
     const { data: contactsData } = await supabase
       .from('contacts')
-      .select('id, name, line_user_id')
+      .select('id, name, line_user_id, tags')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
@@ -227,6 +253,7 @@ export default function ConversationsPage() {
           id: contact.id,
           name: contact.name,
           line_user_id: contact.line_user_id,
+          tags: (contact.tags as string[] | null) ?? [],
           lastMessage: lastMsg?.message || '尚無對話',
           lastMessageTime: lastMsg?.created_at || '',
         };
@@ -241,6 +268,17 @@ export default function ConversationsPage() {
     });
 
     setContacts(contactsWithMessages);
+
+    // Load tag counts for filter
+    try {
+      const res = await fetch('/api/tags');
+      if (res.ok) {
+        const json = await res.json();
+        setTagList(json.tags ?? []);
+      }
+    } catch {
+      // ignore
+    }
     setLoading(false);
   }
 
@@ -268,32 +306,89 @@ export default function ConversationsPage() {
 
   return (
     <div>
-      {/* Mobile: Show only contact list */}
+      {/* Mobile: Tag filter + contact list */}
       <div className="lg:hidden">
         <h1 className="text-2xl font-bold text-gray-900 mb-4">對話紀錄</h1>
-        {contacts.length === 0 ? (
+        {/* Mobile tag filter */}
+        {(tagList.length > 0 || selectedTagFilters.size > 0) && (
+          <div className="mb-4 p-3 rounded-xl border border-gray-200 bg-white">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium text-gray-500">標籤篩選</span>
+              {selectedTagFilters.size > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedTagFilters(new Set())}
+                  className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                >
+                  全部對話
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {tagList.map(({ tag, count }) => {
+                const selected = selectedTagFilters.has(tag);
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => {
+                      setSelectedTagFilters((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(tag)) next.delete(tag);
+                        else next.add(tag);
+                        return next;
+                      });
+                    }}
+                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${selected ? tagColor(tag) + ' ring-1 ring-offset-1 ring-gray-300' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                  >
+                    {tag}
+                    <span className="opacity-80">({count})</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        {filteredContacts.length === 0 ? (
           <div className="rounded-xl border border-gray-200 bg-white px-6 py-16 text-center shadow-sm">
             <div className="flex flex-col items-center">
               <div className="rounded-full bg-indigo-100 w-20 h-20 flex items-center justify-center mb-4">
                 <span className="text-4xl">💬</span>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                尚無對話紀錄
-              </h3>
-              <p className="text-sm text-gray-600 mb-6 max-w-md">
-                當客戶透過 LINE 與 Bot 對話後，對話會顯示於此。
-              </p>
-              <a
-                href="/dashboard/settings"
-                className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
-              >
-                查看 LINE 設定教學
-              </a>
+              {contacts.length === 0 ? (
+                <>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    尚無對話紀錄
+                  </h3>
+                  <p className="text-sm text-gray-600 mb-6 max-w-md">
+                    當客戶透過 LINE 與 Bot 對話後，對話會顯示於此。
+                  </p>
+                  <a
+                    href="/dashboard/settings"
+                    className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+                  >
+                    查看 LINE 設定教學
+                  </a>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    無符合篩選的對話
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedTagFilters(new Set())}
+                    className="mt-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                  >
+                    全部對話
+                  </button>
+                </>
+              )}
             </div>
           </div>
         ) : (
           <div className="space-y-3">
-            {contacts.map((contact) => (
+            {filteredContacts.map((contact) => (
               <a
                 key={contact.id}
                 href={`/dashboard/conversations/${contact.id}`}
@@ -309,6 +404,21 @@ export default function ConversationsPage() {
                         ? contact.lastMessage.substring(0, 50) + '...'
                         : contact.lastMessage}
                     </p>
+                    {contact.tags.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {contact.tags.slice(0, 3).map((t) => (
+                          <span
+                            key={t}
+                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${tagColor(t)}`}
+                          >
+                            {t}
+                          </span>
+                        ))}
+                        {contact.tags.length > 3 && (
+                          <span className="text-xs text-gray-400">+{contact.tags.length - 3}</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                   {contact.lastMessageTime && (
                     <p className="text-xs text-gray-500 whitespace-nowrap">
@@ -332,26 +442,79 @@ export default function ConversationsPage() {
         <h1 className="text-2xl font-bold text-gray-900 mb-6">對話紀錄</h1>
         
         <div className="flex gap-6 h-[calc(100vh-12rem)]">
-          {/* Left: Contact list */}
+          {/* Left: Tag filter + Contact list */}
           <div className="w-80 flex-shrink-0">
             <div className="rounded-xl border border-gray-200 bg-white overflow-hidden h-full flex flex-col">
               <div className="p-4 border-b border-gray-200 bg-gray-50">
                 <h2 className="font-semibold text-gray-900">聯絡人</h2>
               </div>
-              
+              {/* Tag filter */}
+              <div className="p-3 border-b border-gray-100">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-gray-500">標籤篩選</span>
+                  {selectedTagFilters.size > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedTagFilters(new Set())}
+                      className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                    >
+                      全部對話
+                    </button>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {tagList.map(({ tag, count }) => {
+                    const selected = selectedTagFilters.has(tag);
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => {
+                          setSelectedTagFilters((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(tag)) next.delete(tag);
+                            else next.add(tag);
+                            return next;
+                          });
+                        }}
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${selected ? tagColor(tag) + ' ring-1 ring-offset-1 ring-gray-300' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+                      >
+                        {tag}
+                        <span className="opacity-80">({count})</span>
+                      </button>
+                    );
+                  })}
+                  {tagList.length === 0 && (
+                    <span className="text-xs text-gray-400">尚無標籤</span>
+                  )}
+                </div>
+              </div>
               <div className="flex-1 overflow-y-auto">
-                {contacts.length === 0 ? (
+                {filteredContacts.length === 0 ? (
                   <div className="p-6 text-center">
                     <div className="flex flex-col items-center py-8">
                       <div className="rounded-full bg-indigo-100 w-16 h-16 flex items-center justify-center mb-3">
                         <span className="text-3xl">👥</span>
                       </div>
-                      <p className="text-sm text-gray-600">尚無聯絡人對話</p>
+                      <p className="text-sm text-gray-600">
+                        {contacts.length === 0
+                          ? '尚無聯絡人對話'
+                          : '無符合篩選的對話'}
+                      </p>
+                      {contacts.length > 0 && selectedTagFilters.size > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedTagFilters(new Set())}
+                          className="mt-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                        >
+                          全部對話
+                        </button>
+                      )}
                     </div>
                   </div>
                 ) : (
                   <div className="divide-y divide-gray-100">
-                    {contacts.map((contact) => (
+                    {filteredContacts.map((contact) => (
                       <button
                         key={contact.id}
                         onClick={() => setSelectedContactId(contact.id)}
@@ -368,6 +531,21 @@ export default function ConversationsPage() {
                             ? contact.lastMessage.substring(0, 40) + '...'
                             : contact.lastMessage}
                         </p>
+                        {contact.tags.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {contact.tags.slice(0, 3).map((t) => (
+                              <span
+                                key={t}
+                                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${tagColor(t)}`}
+                              >
+                                {t}
+                              </span>
+                            ))}
+                            {contact.tags.length > 3 && (
+                              <span className="text-xs text-gray-400">+{contact.tags.length - 3}</span>
+                            )}
+                          </div>
+                        )}
                         {contact.lastMessageTime && (
                           <p className="mt-1 text-xs text-gray-500">
                             {new Date(contact.lastMessageTime).toLocaleString('zh-TW', {
