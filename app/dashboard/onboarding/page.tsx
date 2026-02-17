@@ -291,7 +291,7 @@ export default function OnboardingPage() {
                   value={storeName}
                   onChange={(e) => setStoreName(e.target.value)}
                   placeholder="例如：小明早餐店"
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                 />
               </div>
               <div>
@@ -302,7 +302,7 @@ export default function OnboardingPage() {
                   id="industry"
                   value={industry}
                   onChange={(e) => setIndustry(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                 >
                   <option value="">請選擇</option>
                   {INDUSTRIES.map((opt) => (
@@ -355,7 +355,7 @@ export default function OnboardingPage() {
                   value={lineChannelId}
                   onChange={(e) => setLineChannelId(e.target.value)}
                   placeholder="1234567890"
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 font-mono text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                 />
               </div>
               <div>
@@ -365,7 +365,7 @@ export default function OnboardingPage() {
                   value={lineChannelSecret}
                   onChange={(e) => setLineChannelSecret(e.target.value)}
                   placeholder="xxxxxxxx"
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 font-mono text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                 />
               </div>
               <div>
@@ -375,7 +375,7 @@ export default function OnboardingPage() {
                   value={lineChannelAccessToken}
                   onChange={(e) => setLineChannelAccessToken(e.target.value)}
                   placeholder="Bearer 或貼上 token"
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 font-mono text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                 />
               </div>
               <div className="flex flex-wrap items-center gap-3">
@@ -464,7 +464,7 @@ export default function OnboardingPage() {
                   setSelectedToneId(null);
                 }}
                 placeholder="例如：你是專業客服，用簡潔有禮的方式回覆..."
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
               />
             </div>
             <div className="mt-6">
@@ -537,7 +537,7 @@ export default function OnboardingPage() {
                   value={testMessage}
                   onChange={(e) => setTestMessage(e.target.value)}
                   placeholder="輸入測試內容"
-                  className="flex-1 min-w-[200px] rounded-lg border border-gray-300 px-3 py-2 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                  className="min-w-[200px] flex-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                 />
                 <button
                   type="button"
