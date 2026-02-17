@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/components/Toast';
 
 const STEPS = [
   { id: 1, title: '基本資訊', short: '步驟 1' },
@@ -47,6 +48,7 @@ type OnboardingStatus = {
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const toast = useToast();
   const [step, setStep] = useState(1);
   const [status, setStatus] = useState<OnboardingStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -191,14 +193,17 @@ export default function OnboardingPage() {
       if (!res.ok) {
         const msg = data.error ?? '儲存失敗';
         setError(msg);
+        alert('儲存失敗，請稍後再試');
         return;
       }
+      toast.show('設定完成！', 'success');
       // Full page navigation so middleware runs with updated onboarding_completed
       window.location.href = '/dashboard';
       return;
     } catch (err) {
       console.error('Onboarding complete error:', err);
       setError('網路錯誤，請稍後再試');
+      alert('儲存失敗，請稍後再試');
     } finally {
       setSaving(false);
     }

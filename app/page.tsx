@@ -271,12 +271,12 @@ export default function Home() {
                 </h3>
                 <ul className="mt-4 space-y-3">
                   <li>
-                    <a href="#" className="text-sm text-slate-300 hover:text-white transition-colors">
+                    <Link href="/#about" className="text-sm text-slate-300 hover:text-white transition-colors">
                       關於我們
-                    </a>
+                    </Link>
                   </li>
                   <li>
-                    <a href="#" className="text-sm text-slate-300 hover:text-white transition-colors">
+                    <a href="mailto:mason113074@gmail.com" className="text-sm text-slate-300 hover:text-white transition-colors">
                       聯絡我們
                     </a>
                   </li>
@@ -290,14 +290,14 @@ export default function Home() {
                 </h3>
                 <ul className="mt-4 space-y-3">
                   <li>
-                    <a href="#" className="text-sm text-slate-300 hover:text-white transition-colors">
+                    <span className="text-sm text-slate-300 opacity-50 cursor-not-allowed" title="即將推出">
                       Facebook
-                    </a>
+                    </span>
                   </li>
                   <li>
-                    <a href="#" className="text-sm text-slate-300 hover:text-white transition-colors">
+                    <span className="text-sm text-slate-300 opacity-50 cursor-not-allowed" title="即將推出">
                       Instagram
-                    </a>
+                    </span>
                   </li>
                 </ul>
               </div>

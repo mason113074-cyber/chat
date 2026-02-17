@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { useToast } from '@/components/Toast';
 
 const CATEGORIES = [
   { value: 'general', label: '其他' },
@@ -66,6 +67,7 @@ function parseCsv(content: string): { title: string; content: string; category: 
 }
 
 export default function KnowledgeBasePage() {
+  const toast = useToast();
   const [items, setItems] = useState<Item[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -143,6 +145,7 @@ export default function KnowledgeBasePage() {
           setModalOpen(false);
           fetchList();
           fetchStats();
+          toast.show('已更新', 'success');
         }
       } else {
         const res = await fetch('/api/knowledge-base', {
@@ -154,6 +157,7 @@ export default function KnowledgeBasePage() {
           setModalOpen(false);
           fetchList();
           fetchStats();
+          toast.show('已新增', 'success');
         }
       }
     } finally {
@@ -167,6 +171,7 @@ export default function KnowledgeBasePage() {
     if (res.ok) {
       fetchList();
       fetchStats();
+      toast.show('已刪除', 'success');
     }
   };
 
@@ -211,6 +216,7 @@ export default function KnowledgeBasePage() {
         setImportPreview([]);
         fetchList();
         fetchStats();
+        toast.show(`已匯入 ${importPreview.length} 筆`, 'success');
       }
     } finally {
       setImporting(false);

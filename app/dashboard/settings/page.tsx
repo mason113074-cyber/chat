@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-
-const TOAST_DURATION_MS = 3000;
+import { useToast } from '@/components/Toast';
 
 const DEFAULT_SYSTEM_PROMPT = `你是一位專業且友善的客服助理。
 
@@ -60,11 +59,11 @@ const TONE_PRESETS = {
 };
 
 export default function SettingsPage() {
+  const toast = useToast();
   const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  
+
   // AI 測試相關狀態
   const [testMessage, setTestMessage] = useState('');
   const [testReply, setTestReply] = useState('');
@@ -85,18 +84,14 @@ export default function SettingsPage() {
         }
       } catch (error) {
         console.error('載入設定失敗:', error);
-        showToast('載入設定失敗', 'error');
+        toast.show('載入設定失敗', 'error');
       } finally {
         setIsLoading(false);
       }
     }
     loadSystemPrompt();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const showToast = (message: string, type: 'success' | 'error') => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), TOAST_DURATION_MS);
-  };
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -111,10 +106,10 @@ export default function SettingsPage() {
         throw new Error('儲存失敗');
       }
 
-      showToast('✅ 已儲存', 'success');
+      toast.show('已儲存', 'success');
     } catch (error) {
       console.error('儲存失敗:', error);
-      showToast('儲存失敗，請稍後再試', 'error');
+      toast.show('儲存失敗，請稍後再試', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -122,7 +117,7 @@ export default function SettingsPage() {
 
   const handleReset = () => {
     setSystemPrompt(DEFAULT_SYSTEM_PROMPT);
-    showToast('已重置為預設值', 'success');
+    toast.show('已重置為預設值', 'success');
   };
 
   const handleToneSelect = (tone: keyof typeof TONE_PRESETS) => {
@@ -176,15 +171,6 @@ export default function SettingsPage() {
     <div>
       <h1 className="text-2xl font-bold text-gray-900">AI 助理設定</h1>
       <p className="mt-1 text-gray-600">管理您的 AI 客服助理設定與行為</p>
-
-      {/* Toast 通知 */}
-      {toast && (
-        <div className={`fixed top-4 right-4 z-50 rounded-lg px-4 py-3 shadow-lg ${
-          toast.type === 'success' ? 'bg-green-500' : 'bg-red-500'
-        } text-white`}>
-          {toast.message}
-        </div>
-      )}
 
       <div className="mt-8 space-y-6">
         {/* AI Model Information Card */}
