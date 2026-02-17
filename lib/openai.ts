@@ -17,9 +17,12 @@ function getOpenAIClient(): OpenAI {
   return openaiClient;
 }
 
+const DEFAULT_MODEL = 'gpt-4o-mini';
+
 export async function generateReply(
   message: string,
-  systemPrompt?: string | null
+  systemPrompt?: string | null,
+  model?: string | null
 ): Promise<string> {
   const openai = getOpenAIClient();
   try {
@@ -27,8 +30,10 @@ export async function generateReply(
       systemPrompt && systemPrompt.trim().length > 0
         ? systemPrompt.trim()
         : defaultSystemPrompt;
+    const modelId =
+      model && model.trim().length > 0 ? model.trim() : DEFAULT_MODEL;
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: modelId,
       messages: [
         {
           role: 'system',

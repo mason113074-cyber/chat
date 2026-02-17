@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateSignature, replyMessage, LineWebhookBody, LineWebhookEvent } from '@/lib/line';
 import { generateReply } from '@/lib/openai';
-import { getOrCreateContactByLineUserId, getUserSystemPrompt, insertConversationMessage } from '@/lib/supabase';
+import { getOrCreateContactByLineUserId, getUserSettings, insertConversationMessage } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
   try {
@@ -60,8 +60,8 @@ async function handleEvent(event: LineWebhookEvent): Promise<void> {
   try {
     const contact = await getOrCreateContactByLineUserId(lineUserId, ownerUserId);
 
-    const systemPrompt = await getUserSystemPrompt(ownerUserId);
-    const aiResponse = await generateReply(userMessage, systemPrompt);
+    const { system_prompt: systemPrompt, ai_model: aiModel } = await getUserSettings(ownerUserId);
+    const aiResponse = await generateReply(userMessage, systemPrompt, aiModel);
 
     await replyMessage(replyToken, aiResponse);
 

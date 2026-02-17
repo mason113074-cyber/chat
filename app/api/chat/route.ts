@@ -17,17 +17,19 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     let systemPrompt: string | null = null;
+    let aiModel: string | null = null;
 
     if (user) {
       const { data } = await supabase
         .from('users')
-        .select('system_prompt')
+        .select('system_prompt, ai_model')
         .eq('id', user.id)
         .maybeSingle();
       systemPrompt = data?.system_prompt ?? null;
+      aiModel = data?.ai_model ?? null;
     }
 
-    const content = await generateReply(message, systemPrompt);
+    const content = await generateReply(message, systemPrompt, aiModel);
     return NextResponse.json({ content });
   } catch (error) {
     console.error('Chat API error:', error);

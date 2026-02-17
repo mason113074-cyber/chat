@@ -50,6 +50,7 @@ export interface User {
   plan: string;
   line_channel_id: string | null;
   system_prompt?: string | null;
+  ai_model?: string | null;
   created_at?: string;
 }
 
@@ -163,4 +164,29 @@ export async function getUserSystemPrompt(userId: string): Promise<string | null
   }
 
   return data?.system_prompt ?? null;
+}
+
+export interface UserSettings {
+  system_prompt: string | null;
+  ai_model: string | null;
+}
+
+/** Fetch system_prompt and ai_model for a user (e.g. for webhook). */
+export async function getUserSettings(userId: string): Promise<UserSettings> {
+  const client = getSupabaseAdmin();
+  const { data, error } = await client
+    .from('users')
+    .select('system_prompt, ai_model')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error fetching user settings:', error);
+    return { system_prompt: null, ai_model: null };
+  }
+
+  return {
+    system_prompt: data?.system_prompt ?? null,
+    ai_model: data?.ai_model ?? null,
+  };
 }
