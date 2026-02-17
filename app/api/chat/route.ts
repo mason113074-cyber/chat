@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateReply } from '@/lib/openai';
+import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,7 +14,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const content = await generateReply(message);
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    let systemPrompt: string | null = null;
+
+    if (user) {
+      const { data } = await supabase
+        .from('users')
+        .select('system_prompt')
+        .eq('id', user.id)
+        .maybeSingle();
+      systemPrompt = data?.system_prompt ?? null;
+    }
+
+    const content = await generateReply(message, systemPrompt);
     return NextResponse.json({ content });
   } catch (error) {
     console.error('Chat API error:', error);

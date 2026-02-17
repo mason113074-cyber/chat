@@ -49,6 +49,7 @@ export interface User {
   email: string;
   plan: string;
   line_channel_id: string | null;
+  system_prompt?: string | null;
   created_at?: string;
 }
 
@@ -95,6 +96,7 @@ export async function getOrCreateContactByLineUserId(
   name?: string
 ): Promise<Contact> {
   const client = getSupabaseAdmin();
+
   const { data: existing } = await client
     .from('contacts')
     .select('*')
@@ -110,11 +112,20 @@ export async function getOrCreateContactByLineUserId(
     .select()
     .single();
 
-  if (error) {
-    console.error('Error creating contact:', error);
-    throw error;
+  if (!error) return inserted as Contact;
+
+  if (error.code === '23505') {
+    const { data: row } = await client
+      .from('contacts')
+      .select('*')
+      .eq('user_id', ownerUserId)
+      .eq('line_user_id', lineUserId)
+      .maybeSingle();
+    if (row) return row as Contact;
   }
-  return inserted as Contact;
+
+  console.error('Error creating contact:', error);
+  throw error;
 }
 
 /** Insert a single conversation message (user or assistant). */
@@ -135,4 +146,21 @@ export async function insertConversationMessage(
     throw error;
   }
   return data;
+}
+
+/** Fetch the system prompt for a specific user. */
+export async function getUserSystemPrompt(userId: string): Promise<string | null> {
+  const client = getSupabaseAdmin();
+  const { data, error } = await client
+    .from('users')
+    .select('system_prompt')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error fetching system prompt:', error);
+    return null;
+  }
+
+  return data?.system_prompt ?? null;
 }
