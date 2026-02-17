@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getAuthFromRequest } from '@/lib/auth-helper';
 
 const CATEGORIES = ['general', '常見問題', '產品資訊', '退換貨政策', '營業資訊', '其他'];
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: '未授權' }, { status: 401 });
+    const auth = await getAuthFromRequest(request);
+    let user = auth?.user ?? null;
+    const supabase = auth?.supabase ?? await createClient();
+    if (!user) {
+      const { data: { user: u } } = await supabase.auth.getUser();
+      if (!u) return NextResponse.json({ error: '未授權' }, { status: 401 });
+      user = u;
+    }
 
     const search = request.nextUrl.searchParams.get('search')?.trim() || '';
     const category = request.nextUrl.searchParams.get('category')?.trim() || '';
@@ -39,9 +45,14 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: '未授權' }, { status: 401 });
+    const auth = await getAuthFromRequest(request);
+    let user = auth?.user ?? null;
+    const supabase = auth?.supabase ?? await createClient();
+    if (!user) {
+      const { data: { user: u } } = await supabase.auth.getUser();
+      if (!u) return NextResponse.json({ error: '未授權' }, { status: 401 });
+      user = u;
+    }
 
     const body = await request.json();
     const title = typeof body.title === 'string' ? body.title.trim().slice(0, 200) : '';

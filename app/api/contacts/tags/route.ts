@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getAuthFromRequest } from '@/lib/auth-helper';
 import { DEFAULT_TAGS } from '@/lib/contact-tags';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await getAuthFromRequest(request);
+    let user = auth?.user ?? null;
+    const supabase = auth?.supabase ?? await createClient();
+    if (!user) {
+      const { data: { user: u } } = await supabase.auth.getUser();
+      if (!u) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      user = u;
+    }
 
     let { data: tags, error } = await supabase
       .from('contact_tags')
@@ -46,9 +52,14 @@ export async function POST(request: NextRequest) {
     const color = body?.color ?? 'gray';
     if (!name) return NextResponse.json({ error: 'name is required' }, { status: 400 });
 
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await getAuthFromRequest(request);
+    let user = auth?.user ?? null;
+    const supabase = auth?.supabase ?? await createClient();
+    if (!user) {
+      const { data: { user: u } } = await supabase.auth.getUser();
+      if (!u) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      user = u;
+    }
 
     const { data, error } = await supabase
       .from('contact_tags')

@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getAuthFromRequest } from '@/lib/auth-helper';
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: '未授權' }, { status: 401 });
+    const auth = await getAuthFromRequest(request);
+    let user = auth?.user ?? null;
+    const supabase = auth?.supabase ?? await createClient();
+    if (!user) {
+      const { data: { user: u } } = await supabase.auth.getUser();
+      if (!u) return NextResponse.json({ error: '未授權' }, { status: 401 });
+      user = u;
+    }
 
     const days = Math.min(90, Math.max(1, Number(request.nextUrl.searchParams.get('days')) || 30));
     const end = new Date();

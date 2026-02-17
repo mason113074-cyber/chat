@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getAuthFromRequest } from '@/lib/auth-helper';
 
 const INDUSTRIES = ['餐飲', '零售', '美業', '教育', '電商', '其他'];
 const AI_MODELS = ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo'];
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: '未授權' }, { status: 401 });
+    const auth = await getAuthFromRequest(request);
+    let user = auth?.user ?? null;
+    const supabase = auth?.supabase ?? await createClient();
+    if (!user) {
+      const { data: { user: u }, error: authError } = await supabase.auth.getUser();
+      if (authError || !u) return NextResponse.json({ error: '未授權' }, { status: 401 });
+      user = u;
     }
 
     const body = await request.json();

@@ -9,18 +9,15 @@ import { createClient, Session } from '@supabase/supabase-js';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const BASE = process.env.TEST_BASE_URL || 'http://localhost:3000';
-
-function loadEnvLocal(): void {
-  const envPath = path.resolve(process.cwd(), '.env.local');
-  if (!fs.existsSync(envPath)) return;
-  const content = fs.readFileSync(envPath, 'utf-8');
-  for (const line of content.split('\n')) {
-    const trimmed = line.trim();
+function parseEnvContent(content: string): void {
+  const normalized = content.replace(/\uFEFF/g, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  for (const line of normalized.split('\n')) {
+    const trimmed = line.trim().replace(/\0/g, '');
     if (trimmed.startsWith('#') || !trimmed.includes('=')) continue;
     const eq = trimmed.indexOf('=');
     const key = trimmed.slice(0, eq).trim();
     const value = trimmed.slice(eq + 1).trim();
+    if (!key) continue;
     if (value.startsWith('"') && value.endsWith('"')) {
       process.env[key] = value.slice(1, -1).replace(/\\n/g, '\n');
     } else if (value.startsWith("'") && value.endsWith("'")) {
@@ -31,34 +28,22 @@ function loadEnvLocal(): void {
   }
 }
 
+function loadEnvLocal(): void {
+  const envPath = path.resolve(process.cwd(), '.env.local');
+  if (!fs.existsSync(envPath)) return;
+  const buf = fs.readFileSync(envPath);
+  const isUtf16 = (buf[0] === 0xff && buf[1] === 0xfe) || (buf[0] === 0xfe && buf[1] === 0xff);
+  if (isUtf16) parseEnvContent(buf.toString('utf16le'));
+  parseEnvContent(buf.toString('utf-8'));
+}
+
 loadEnvLocal();
 
+const BASE = process.env.TEST_BASE_URL || 'http://localhost:3000';
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
 const TEST_EMAIL = process.env.TEST_USER_EMAIL ?? '';
 const TEST_PASSWORD = process.env.TEST_USER_PASSWORD ?? '';
-
-const STORAGE_KEY = 'supabase.auth.token';
-const MAX_CHUNK_SIZE = 3180;
-
-function toBase64URL(str: string): string {
-  return Buffer.from(str, 'utf-8').toString('base64url');
-}
-
-function getCookieHeader(session: Session | null): string {
-  if (!session) return '';
-  const raw = JSON.stringify(session);
-  const encoded = 'base64-' + toBase64URL(raw);
-  if (encoded.length <= MAX_CHUNK_SIZE) {
-    return `${STORAGE_KEY}=${encodeURIComponent(encoded)}`;
-  }
-  const chunks: string[] = [];
-  for (let i = 0; i < encoded.length; i += MAX_CHUNK_SIZE) {
-    const chunk = encoded.slice(i, i + MAX_CHUNK_SIZE);
-    chunks.push(`${STORAGE_KEY}.${chunks.length}=${encodeURIComponent(chunk)}`);
-  }
-  return chunks.join('; ');
-}
 
 async function getSession(): Promise<Session | null> {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !TEST_EMAIL || !TEST_PASSWORD) {
@@ -87,8 +72,8 @@ async function api(
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
-  if (session) {
-    headers['Cookie'] = getCookieHeader(session);
+  if (session?.access_token) {
+    headers['Authorization'] = `Bearer ${session.access_token}`;
   }
   const res = await fetch(url, {
     method,
@@ -97,7 +82,7 @@ async function api(
   });
   return {
     status: res.status,
-    json: () => res.json(),
+    json: () => res.json().catch(() => null),
   };
 }
 

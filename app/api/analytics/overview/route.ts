@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getAuthFromRequest } from '@/lib/auth-helper';
 
 function startOfMonth(d: Date) {
   return new Date(d.getFullYear(), d.getMonth(), 1);
@@ -9,11 +10,16 @@ function endOfMonth(d: Date) {
   return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: '未授權' }, { status: 401 });
+    const auth = await getAuthFromRequest(request);
+    let user = auth?.user ?? null;
+    const supabase = auth?.supabase ?? await createClient();
+    if (!user) {
+      const { data: { user: u } } = await supabase.auth.getUser();
+      if (!u) return NextResponse.json({ error: '未授權' }, { status: 401 });
+      user = u;
+    }
 
     const now = new Date();
     const thisStart = startOfMonth(now);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getAuthFromRequest } from '@/lib/auth-helper';
 import { searchKnowledgeWithSources } from '@/lib/knowledge-search';
 import { generateReply } from '@/lib/openai';
 
@@ -7,9 +8,14 @@ const KNOWLEDGE_PREFIX = '\n\n以下是相關的知識庫資料，請優先參�
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: '未授權' }, { status: 401 });
+    const auth = await getAuthFromRequest(request);
+    let user = auth?.user ?? null;
+    const supabase = auth?.supabase ?? await createClient();
+    if (!user) {
+      const { data: { user: u } } = await supabase.auth.getUser();
+      if (!u) return NextResponse.json({ error: '未授權' }, { status: 401 });
+      user = u;
+    }
 
     const body = await request.json();
     const question = typeof body?.question === 'string' ? body.question.trim() : '';

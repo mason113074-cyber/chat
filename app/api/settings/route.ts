@@ -1,20 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getAuthFromRequest } from '@/lib/auth-helper';
 
 const MIN_PROMPT_LENGTH = 10;
 const MAX_PROMPT_LENGTH = 5000;
 
 export async function GET(request: NextRequest) {
   try {
-    // 驗證用戶已登入
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: '未授權，請先登入' },
-        { status: 401 }
-      );
+    const auth = await getAuthFromRequest(request);
+    let user = auth?.user ?? null;
+    const supabase = auth?.supabase ?? await createClient();
+    if (!user) {
+      const { data: { user: u }, error: authError } = await supabase.auth.getUser();
+      if (authError || !u) return NextResponse.json({ error: '未授權，請先登入' }, { status: 401 });
+      user = u;
     }
 
     const { data, error } = await supabase
@@ -47,15 +46,13 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // 驗證用戶已登入
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: '未授權，請先登入' },
-        { status: 401 }
-      );
+    const auth = await getAuthFromRequest(request);
+    let user = auth?.user ?? null;
+    const supabase = auth?.supabase ?? await createClient();
+    if (!user) {
+      const { data: { user: u }, error: authError } = await supabase.auth.getUser();
+      if (authError || !u) return NextResponse.json({ error: '未授權，請先登入' }, { status: 401 });
+      user = u;
     }
 
     const body = await request.json();
