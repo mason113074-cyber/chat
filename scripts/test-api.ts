@@ -9,7 +9,7 @@ import { createClient, Session } from '@supabase/supabase-js';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const BASE = 'http://localhost:3000';
+const BASE = process.env.TEST_BASE_URL || 'http://localhost:3000';
 
 function loadEnvLocal(): void {
   const envPath = path.resolve(process.cwd(), '.env.local');
@@ -102,7 +102,7 @@ async function api(
 }
 
 async function main(): Promise<void> {
-  console.log('\n🧪 API 端對端測試 (localhost:3000)\n');
+  console.log('\n🧪 API 端對端測試 (' + BASE + ')\n');
 
   const session = await getSession();
   if (!session) {
@@ -113,7 +113,7 @@ async function main(): Promise<void> {
     const probe = await fetch(BASE + '/api/onboarding/status');
     probe.json().catch(() => {});
   } catch {
-    console.error('❌ 無法連線至 localhost:3000，請先執行 npm run dev\n');
+    console.error('❌ 無法連線至 ' + BASE + '，請先啟動服務或設定 TEST_BASE_URL\n');
     process.exit(1);
   }
 
