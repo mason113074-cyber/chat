@@ -187,12 +187,18 @@ export default function OnboardingPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ complete: true }),
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const data = await res.json();
-        setError(data.error ?? '儲存失敗');
+        const msg = data.error ?? '儲存失敗';
+        setError(msg);
         return;
       }
-      router.push('/dashboard');
+      // Full page navigation so middleware runs with updated onboarding_completed
+      window.location.href = '/dashboard';
+      return;
+    } catch (err) {
+      console.error('Onboarding complete error:', err);
+      setError('網路錯誤，請稍後再試');
     } finally {
       setSaving(false);
     }

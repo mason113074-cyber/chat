@@ -63,8 +63,11 @@ export async function POST(request: NextRequest) {
         .update({ onboarding_completed: true })
         .eq('id', user.id);
       if (updateError) {
-        console.error(updateError);
-        return NextResponse.json({ error: '儲存失敗' }, { status: 500 });
+        console.error('Onboarding complete update failed:', updateError);
+        return NextResponse.json(
+          { error: updateError.message ?? '儲存失敗' },
+          { status: 500 }
+        );
       }
       return NextResponse.json({ success: true });
     }
