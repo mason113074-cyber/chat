@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { FAQ } from './FAQ';
 
 const highlights = [
   { title: '全通路接入', desc: '串接 LINE 官方帳號、網站與 CRM，統一管理所有客戶對話。' },
@@ -235,11 +236,77 @@ export default function Home() {
               </div>
             </div>
           </section>
+
+          {/* FAQ Section */}
+          <FAQ />
         </main>
 
-        <footer className="border-t border-white/10 bg-slate-950/80 py-8">
-          <div className="mx-auto max-w-6xl px-4 text-center text-sm text-slate-300 sm:px-6">
-            © {new Date().getFullYear()} CustomerAIPro · AI 智能客服平台。
+        {/* Footer - 3 Column Layout */}
+        <footer className="border-t border-white/10 bg-slate-950/80 py-12">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <div className="grid gap-8 md:grid-cols-3">
+              {/* Product Column */}
+              <div>
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-white">
+                  產品
+                </h3>
+                <ul className="mt-4 space-y-3">
+                  <li>
+                    <Link href="/pricing" className="text-sm text-slate-300 hover:text-white transition-colors">
+                      功能特色
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/pricing" className="text-sm text-slate-300 hover:text-white transition-colors">
+                      方案定價
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Company Column */}
+              <div>
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-white">
+                  公司
+                </h3>
+                <ul className="mt-4 space-y-3">
+                  <li>
+                    <a href="#" className="text-sm text-slate-300 hover:text-white transition-colors">
+                      關於我們
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#" className="text-sm text-slate-300 hover:text-white transition-colors">
+                      聯絡我們
+                    </a>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Social Column */}
+              <div>
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-white">
+                  社群
+                </h3>
+                <ul className="mt-4 space-y-3">
+                  <li>
+                    <a href="#" className="text-sm text-slate-300 hover:text-white transition-colors">
+                      Facebook
+                    </a>
+                  </li>
+                  <li>
+                    <a href="#" className="text-sm text-slate-300 hover:text-white transition-colors">
+                      Instagram
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Copyright */}
+            <div className="mt-8 border-t border-white/10 pt-8 text-center text-sm text-slate-400">
+              © {new Date().getFullYear()} CustomerAIPro. All rights reserved.
+            </div>
           </div>
         </footer>
       </div>
