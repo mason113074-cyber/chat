@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 type Contact = {
@@ -8,9 +8,27 @@ type Contact = {
   name: string | null;
   line_user_id: string;
   tags: string[];
+  status?: 'pending' | 'resolved';
   lastMessage: string;
   lastMessageTime: string;
 };
+
+/** Highlight matching substring in text (case-insensitive). */
+function highlightMatch(text: string, query: string): React.ReactNode {
+  if (!query.trim()) return text;
+  const q = query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`(${q})`, 'gi');
+  const parts = text.split(re);
+  return parts.map((part, i) =>
+    i % 2 === 1 ? (
+      <mark key={i} className="bg-yellow-200 rounded px-0.5">
+        {part}
+      </mark>
+    ) : (
+      part
+    )
+  );
+}
 
 type TagWithCount = { tag: string; count: number };
 
@@ -34,10 +52,17 @@ type Conversation = {
   created_at: string;
 };
 
+type StatusFilter = 'all' | 'resolved' | 'pending';
+type DateRangeFilter = 'all' | 'today' | '7' | '30';
+
 export default function ConversationsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [tagList, setTagList] = useState<TagWithCount[]>([]);
   const [selectedTagFilters, setSelectedTagFilters] = useState<Set<string>>(new Set());
+  const [searchInput, setSearchInput] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [dateRangeFilter, setDateRangeFilter] = useState<DateRangeFilter>('all');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchLoading, setBatchLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -46,12 +71,56 @@ export default function ConversationsPage() {
   const [loading, setLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const filteredContacts =
+  // Debounce search 300ms
+  useEffect(() => {
+    const t = setTimeout(() => setSearchQuery(searchInput.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  const tagFilteredContacts =
     selectedTagFilters.size === 0
       ? contacts
       : contacts.filter((c) =>
           c.tags.some((t) => selectedTagFilters.has(t))
         );
+
+  const filteredContacts = useMemo(() => {
+    let list = tagFilteredContacts;
+
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (c) =>
+          (c.name ?? '').toLowerCase().includes(q) ||
+          (c.lastMessage ?? '').toLowerCase().includes(q)
+      );
+    }
+
+    if (statusFilter !== 'all') {
+      list = list.filter((c) => (c.status ?? 'pending') === statusFilter);
+    }
+
+    if (dateRangeFilter !== 'all') {
+      const now = Date.now();
+      const dayMs = 24 * 60 * 60 * 1000;
+      let start: number;
+      if (dateRangeFilter === 'today') {
+        const d = new Date();
+        d.setHours(0, 0, 0, 0);
+        start = d.getTime();
+      } else if (dateRangeFilter === '7') {
+        start = now - 7 * dayMs;
+      } else {
+        start = now - 30 * dayMs;
+      }
+      list = list.filter((c) => {
+        const t = c.lastMessageTime ? new Date(c.lastMessageTime).getTime() : 0;
+        return t >= start;
+      });
+    }
+
+    return list;
+  }, [tagFilteredContacts, searchQuery, statusFilter, dateRangeFilter]);
 
   const allFilteredSelected =
     filteredContacts.length > 0 &&
@@ -244,6 +313,7 @@ export default function ConversationsPage() {
                 name: newContact.name,
                 line_user_id: newContact.line_user_id,
                 tags: [],
+                status: 'pending',
                 lastMessage: '尚無對話',
                 lastMessageTime: '',
               },
@@ -303,10 +373,10 @@ export default function ConversationsPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Get all contacts with tags and their latest conversation
+    // Get all contacts with tags, status, and their latest conversation
     const { data: contactsData } = await supabase
       .from('contacts')
-      .select('id, name, line_user_id, tags')
+      .select('id, name, line_user_id, tags, status')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
@@ -331,6 +401,7 @@ export default function ConversationsPage() {
           name: contact.name,
           line_user_id: contact.line_user_id,
           tags: (contact.tags as string[] | null) ?? [],
+          status: (contact.status === 'resolved' ? 'resolved' : 'pending') as 'pending' | 'resolved',
           lastMessage: lastMsg?.message || '尚無對話',
           lastMessageTime: lastMsg?.created_at || '',
         };
@@ -383,9 +454,48 @@ export default function ConversationsPage() {
 
   return (
     <div>
-      {/* Mobile: Tag filter + contact list */}
+      {/* Mobile: Search + filters + contact list */}
       <div className="lg:hidden">
         <h1 className="text-2xl font-bold text-gray-900 mb-4">對話紀錄</h1>
+        {/* Search */}
+        <div className="mb-3">
+          <input
+            type="search"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="搜尋客戶名稱或訊息內容"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            aria-label="搜尋對話"
+          />
+        </div>
+        {/* Status + Date filters */}
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+          >
+            <option value="all">全部狀態</option>
+            <option value="resolved">已解決</option>
+            <option value="pending">未解決</option>
+          </select>
+          <div className="flex flex-wrap gap-1">
+            {(['today', '7', '30', 'all'] as const).map((range) => (
+              <button
+                key={range}
+                type="button"
+                onClick={() => setDateRangeFilter(range)}
+                className={`rounded-lg px-2.5 py-1 text-xs font-medium ${
+                  dateRangeFilter === range
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {range === 'today' ? '今天' : range === '7' ? '最近 7 天' : range === '30' ? '最近 30 天' : '全部'}
+              </button>
+            ))}
+          </div>
+        </div>
         {/* Mobile tag filter */}
         {(tagList.length > 0 || selectedTagFilters.size > 0) && (
           <div className="mb-4 p-3 rounded-xl border border-gray-200 bg-white">
@@ -450,14 +560,21 @@ export default function ConversationsPage() {
               ) : (
                 <>
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    無符合篩選的對話
+                    沒有符合條件的對話
                   </h3>
+                  <p className="text-sm text-gray-600 mb-4">嘗試調整搜尋或篩選條件</p>
                   <button
                     type="button"
-                    onClick={() => setSelectedTagFilters(new Set())}
-                    className="mt-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+                    onClick={() => {
+                      setSearchInput('');
+                      setSearchQuery('');
+                      setStatusFilter('all');
+                      setDateRangeFilter('all');
+                      setSelectedTagFilters(new Set());
+                    }}
+                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
                   >
-                    全部對話
+                    清除篩選
                   </button>
                 </>
               )}
@@ -465,6 +582,7 @@ export default function ConversationsPage() {
           </div>
         ) : (
           <div className="space-y-3">
+            <p className="text-sm text-gray-500">找到 {filteredContacts.length} 個對話</p>
             {/* Mobile batch toolbar */}
             {selectedIds.size > 0 && (
               <div className="rounded-xl border border-gray-200 bg-gray-100 p-3 flex flex-wrap items-center gap-2">
@@ -546,12 +664,15 @@ export default function ConversationsPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-gray-900">
-                        {contact.name || '未命名客戶'}
+                        {highlightMatch(contact.name || '未命名客戶', searchQuery)}
                       </p>
                       <p className="mt-1 text-sm text-gray-600 line-clamp-1">
-                        {contact.lastMessage.length > 50
-                          ? contact.lastMessage.substring(0, 50) + '...'
-                          : contact.lastMessage}
+                        {highlightMatch(
+                          contact.lastMessage.length > 50
+                            ? contact.lastMessage.substring(0, 50) + '...'
+                            : contact.lastMessage,
+                          searchQuery
+                        )}
                       </p>
                       {contact.tags.length > 0 && (
                         <div className="mt-2 flex flex-wrap gap-1">
@@ -597,6 +718,45 @@ export default function ConversationsPage() {
             <div className="rounded-xl border border-gray-200 bg-white overflow-hidden h-full flex flex-col">
               <div className="p-4 border-b border-gray-200 bg-gray-50">
                 <h2 className="font-semibold text-gray-900">聯絡人</h2>
+              </div>
+              {/* Search */}
+              <div className="p-3 border-b border-gray-100">
+                <input
+                  type="search"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  placeholder="搜尋客戶名稱或訊息內容"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  aria-label="搜尋對話"
+                />
+              </div>
+              {/* Status + Date filters */}
+              <div className="p-3 border-b border-gray-100 space-y-2">
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+                >
+                  <option value="all">全部狀態</option>
+                  <option value="resolved">已解決</option>
+                  <option value="pending">未解決</option>
+                </select>
+                <div className="flex flex-wrap gap-1">
+                  {(['today', '7', '30', 'all'] as const).map((range) => (
+                    <button
+                      key={range}
+                      type="button"
+                      onClick={() => setDateRangeFilter(range)}
+                      className={`rounded px-2 py-1 text-xs font-medium ${
+                        dateRangeFilter === range
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      {range === 'today' ? '今天' : range === '7' ? '7 天' : range === '30' ? '30 天' : '全部'}
+                    </button>
+                  ))}
+                </div>
               </div>
               {/* Tag filter */}
               <div className="p-3 border-b border-gray-100">
@@ -693,6 +853,11 @@ export default function ConversationsPage() {
                 </div>
               )}
               <div className="flex-1 overflow-y-auto">
+                {filteredContacts.length > 0 && (
+                  <div className="px-3 py-2 text-sm text-gray-500 border-b border-gray-100">
+                    找到 {filteredContacts.length} 個對話
+                  </div>
+                )}
                 {filteredContacts.length === 0 ? (
                   <div className="p-6 text-center">
                     <div className="flex flex-col items-center py-8">
@@ -702,15 +867,21 @@ export default function ConversationsPage() {
                       <p className="text-sm text-gray-600">
                         {contacts.length === 0
                           ? '尚無聯絡人對話'
-                          : '無符合篩選的對話'}
+                          : '沒有符合條件的對話'}
                       </p>
-                      {contacts.length > 0 && selectedTagFilters.size > 0 && (
+                      {contacts.length > 0 && (
                         <button
                           type="button"
-                          onClick={() => setSelectedTagFilters(new Set())}
+                          onClick={() => {
+                            setSearchInput('');
+                            setSearchQuery('');
+                            setStatusFilter('all');
+                            setDateRangeFilter('all');
+                            setSelectedTagFilters(new Set());
+                          }}
                           className="mt-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
                         >
-                          全部對話
+                          清除篩選
                         </button>
                       )}
                     </div>
@@ -752,12 +923,15 @@ export default function ConversationsPage() {
                           className="flex-1 min-w-0 text-left"
                         >
                         <p className="font-medium text-gray-900">
-                          {contact.name || '未命名客戶'}
+                          {highlightMatch(contact.name || '未命名客戶', searchQuery)}
                         </p>
                         <p className="mt-1 text-sm text-gray-600 line-clamp-1">
-                          {contact.lastMessage.length > 40
-                            ? contact.lastMessage.substring(0, 40) + '...'
-                            : contact.lastMessage}
+                          {highlightMatch(
+                            contact.lastMessage.length > 40
+                              ? contact.lastMessage.substring(0, 40) + '...'
+                              : contact.lastMessage,
+                            searchQuery
+                          )}
                         </p>
                         {contact.tags.length > 0 && (
                           <div className="mt-2 flex flex-wrap gap-1">
