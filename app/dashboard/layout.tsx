@@ -54,6 +54,12 @@ export default async function DashboardLayout({
               數據分析
             </Link>
             <Link
+              href="/dashboard/knowledge-base"
+              className="text-gray-600 hover:text-gray-900 font-medium"
+            >
+              知識庫
+            </Link>
+            <Link
               href="/settings"
               className="text-gray-600 hover:text-gray-900 font-medium"
             >

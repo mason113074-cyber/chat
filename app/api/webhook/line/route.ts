@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateSignature, replyMessage, LineWebhookBody, LineWebhookEvent } from '@/lib/line';
 import { generateReply } from '@/lib/openai';
+import { searchKnowledgeForUser } from '@/lib/knowledge';
 import { getOrCreateContactByLineUserId, getUserSettings, insertConversationMessage } from '@/lib/supabase';
+
+const KNOWLEDGE_PREFIX = '\n\n以下是相關的知識庫資料，請優先參考這些資訊來回答：\n';
 
 export async function POST(request: NextRequest) {
   try {
@@ -61,7 +64,11 @@ async function handleEvent(event: LineWebhookEvent): Promise<void> {
     const contact = await getOrCreateContactByLineUserId(lineUserId, ownerUserId);
 
     const { system_prompt: systemPrompt, ai_model: aiModel } = await getUserSettings(ownerUserId);
-    const aiResponse = await generateReply(userMessage, systemPrompt, aiModel);
+    const knowledgeText = await searchKnowledgeForUser(ownerUserId, userMessage, 3, 2000);
+    const fullSystemPrompt = knowledgeText
+      ? (systemPrompt?.trim() ?? '') + KNOWLEDGE_PREFIX + knowledgeText
+      : systemPrompt;
+    const aiResponse = await generateReply(userMessage, fullSystemPrompt, aiModel);
 
     await replyMessage(replyToken, aiResponse);
 
