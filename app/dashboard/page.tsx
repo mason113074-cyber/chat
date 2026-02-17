@@ -6,39 +6,32 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  // Get all contact IDs for this user
-  const { data: contactIds } = await supabase
-    .from('contacts')
-    .select('id')
-    .eq('user_id', user.id);
-  const ids = (contactIds ?? []).map((c) => c.id);
-
   // 1. Total contacts count
   const { count: contactsCount } = await supabase
     .from('contacts')
     .select('*', { count: 'exact', head: true })
     .eq('user_id', user.id);
 
-  // 2. Total conversations count
-  const { count: conversationsCount } =
-    ids.length > 0
-      ? await supabase
-          .from('conversations')
-          .select('*', { count: 'exact', head: true })
-          .in('contact_id', ids)
-      : { count: 0 };
+  // 2. Get all contacts with their conversations for statistics
+  const { data: contactsWithConversations } = await supabase
+    .from('contacts')
+    .select('id, conversations(id, created_at)')
+    .eq('user_id', user.id);
 
-  // 3. Today's conversations count
+  // 計算總對話數
+  const conversationsCount = (contactsWithConversations || []).reduce(
+    (total, contact) => total + ((contact.conversations as unknown as { id: string; created_at: string }[]) || []).length,
+    0
+  );
+
+  // 3. 計算今日對話數
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const { count: todayConversationsCount } =
-    ids.length > 0
-      ? await supabase
-          .from('conversations')
-          .select('*', { count: 'exact', head: true })
-          .in('contact_id', ids)
-          .gte('created_at', today.toISOString())
-      : { count: 0 };
+  const todayConversationsCount = (contactsWithConversations || []).reduce((total, contact) => {
+    const conversations = (contact.conversations as unknown as { id: string; created_at: string }[]) || [];
+    const todayConvs = conversations.filter((conv) => new Date(conv.created_at) >= today);
+    return total + todayConvs.length;
+  }, 0);
 
   // 4. New contacts this week
   const weekAgo = new Date();
@@ -49,16 +42,13 @@ export default async function DashboardPage() {
     .eq('user_id', user.id)
     .gte('created_at', weekAgo.toISOString());
 
-  // Get recent 5 conversations
-  const { data: recentConversations } =
-    ids.length > 0
-      ? await supabase
-          .from('conversations')
-          .select('id, message, created_at, contacts(name, line_user_id, id)')
-          .in('contact_id', ids)
-          .order('created_at', { ascending: false })
-          .limit(5)
-      : { data: [] };
+  // 5. Get recent 5 conversations
+  const { data: recentConversations } = await supabase
+    .from('conversations')
+    .select('id, message, created_at, contacts!inner(name, line_user_id, id, user_id)')
+    .eq('contacts.user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(5);
 
   type ConversationRow = {
     id: string;

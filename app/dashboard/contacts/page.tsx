@@ -6,13 +6,19 @@ export default async function ContactsPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
+  // ✅ 使用關聯查詢一次取得所有資料，避免 N+1 問題
   const { data: contacts } = await supabase
     .from('contacts')
-    .select('id, line_user_id, name, created_at')
+    .select(`
+      id,
+      line_user_id,
+      name,
+      created_at,
+      conversations(id, created_at)
+    `)
     .eq('user_id', user.id)
     .order('created_at', { ascending: false });
 
-  // Get conversation counts and last interaction for each contact
   type ContactWithStats = {
     id: string;
     name: string | null;
@@ -22,33 +28,31 @@ export default async function ContactsPage() {
     lastInteraction: string | null;
   };
 
-  const contactsWithStats: ContactWithStats[] = await Promise.all(
-    (contacts || []).map(async (contact) => {
-      // Get conversation count
-      const { count } = await supabase
-        .from('conversations')
-        .select('*', { count: 'exact', head: true })
-        .eq('contact_id', contact.id);
-
-      // Get last conversation
-      const { data: lastConv } = await supabase
-        .from('conversations')
-        .select('created_at')
-        .eq('contact_id', contact.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      return {
-        id: contact.id,
-        name: contact.name,
-        line_user_id: contact.line_user_id,
-        created_at: contact.created_at,
-        conversationCount: count || 0,
-        lastInteraction: lastConv?.created_at || null,
-      };
-    })
-  );
+  // 在前端計算每個 contact 的對話數和最後互動時間
+  const contactsWithStats: ContactWithStats[] = (contacts || []).map((contact) => {
+    const conversations = (contact.conversations as { id: string; created_at: string }[]) || [];
+    
+    // 計算對話數量
+    const conversationCount = conversations.length;
+    
+    // 找出最後互動時間（最新的對話）
+    let lastInteraction: string | null = null;
+    if (conversations.length > 0) {
+      const sortedConversations = [...conversations].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      lastInteraction = sortedConversations[0].created_at;
+    }
+    
+    return {
+      id: contact.id,
+      name: contact.name,
+      line_user_id: contact.line_user_id,
+      created_at: contact.created_at,
+      conversationCount,
+      lastInteraction,
+    };
+  });
 
   return (
     <div>
