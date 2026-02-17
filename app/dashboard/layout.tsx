@@ -48,6 +48,12 @@ export default async function DashboardLayout({
               {'\u65B9\u6848\u8207\u8A08\u8CBB'}
             </Link>
             <Link
+              href="/dashboard/analytics"
+              className="text-gray-600 hover:text-gray-900 font-medium"
+            >
+              數據分析
+            </Link>
+            <Link
               href="/settings"
               className="text-gray-600 hover:text-gray-900 font-medium"
             >
