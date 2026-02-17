@@ -1,80 +1,275 @@
-import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
+'use client';
 
-export default async function ConversationsPage() {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+import { useEffect, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
 
-  const { data: conversations } = await supabase
-    .from('conversations')
-    .select('id, contact_id, message, role, created_at, contacts(name, line_user_id)')
-    .order('created_at', { ascending: false })
-    .limit(200);
+type Contact = {
+  id: string;
+  name: string | null;
+  line_user_id: string;
+  lastMessage: string;
+  lastMessageTime: string;
+};
 
-  type Row = {
-    id: string;
-    contact_id: string;
-    message: string;
-    role: string;
-    created_at: string;
-    contacts: { name: string | null; line_user_id: string } | null;
-  };
-  const byContact = new Map<
-    string,
-    { name: string; line_user_id: string; lastMessage: string; lastAt: string }
-  >();
-  for (const row of (conversations ?? []) as unknown as Row[]) {
-    const contactId = row.contact_id;
-    if (!byContact.has(contactId)) {
-      const contact = row.contacts;
-      byContact.set(contactId, {
-        name: contact?.name ?? '—',
-        line_user_id: contact?.line_user_id ?? '',
-        lastMessage: row.message.substring(0, 80) + (row.message.length > 80 ? '…' : ''),
-        lastAt: row.created_at,
-      });
+type Conversation = {
+  id: string;
+  message: string;
+  role: string;
+  created_at: string;
+};
+
+export default function ConversationsPage() {
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadContacts();
+  }, []);
+
+  useEffect(() => {
+    if (selectedContactId) {
+      loadConversations(selectedContactId);
     }
+  }, [selectedContactId]);
+
+  async function loadContacts() {
+    const supabase = createClient();
+    
+    // Get user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    // Get all contacts with their latest conversation
+    const { data: contactsData } = await supabase
+      .from('contacts')
+      .select('id, name, line_user_id')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (!contactsData) {
+      setLoading(false);
+      return;
+    }
+
+    // For each contact, get the latest message
+    const contactsWithMessages = await Promise.all(
+      contactsData.map(async (contact) => {
+        const { data: lastMsg } = await supabase
+          .from('conversations')
+          .select('message, created_at')
+          .eq('contact_id', contact.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        return {
+          id: contact.id,
+          name: contact.name,
+          line_user_id: contact.line_user_id,
+          lastMessage: lastMsg?.message || '尚無對話',
+          lastMessageTime: lastMsg?.created_at || '',
+        };
+      })
+    );
+
+    // Sort by last message time
+    contactsWithMessages.sort((a, b) => {
+      if (!a.lastMessageTime) return 1;
+      if (!b.lastMessageTime) return -1;
+      return new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime();
+    });
+
+    setContacts(contactsWithMessages);
+    setLoading(false);
   }
 
-  const threads = Array.from(byContact.entries()).map(([contactId, info]) => ({
-    contactId,
-    ...info,
-  }));
+  async function loadConversations(contactId: string) {
+    const supabase = createClient();
+    
+    const { data } = await supabase
+      .from('conversations')
+      .select('id, message, role, created_at')
+      .eq('contact_id', contactId)
+      .order('created_at', { ascending: true });
+
+    setConversations(data || []);
+  }
+
+  const selectedContact = contacts.find((c) => c.id === selectedContactId);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-gray-500">載入中...</div>
+      </div>
+    );
+  }
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900">對話紀錄</h1>
-      <p className="mt-1 text-gray-600">依聯絡人顯示最近對話</p>
-
-      <div className="mt-8 space-y-4">
-        {threads.length === 0 ? (
+      {/* Mobile: Show only contact list */}
+      <div className="lg:hidden">
+        <h1 className="text-2xl font-bold text-gray-900 mb-4">對話紀錄</h1>
+        {contacts.length === 0 ? (
           <div className="rounded-xl border border-gray-200 bg-white px-6 py-12 text-center text-gray-500">
             尚無對話紀錄。當客戶透過 LINE 與 Bot 對話後，會顯示於此。
           </div>
         ) : (
-          threads.map((t) => (
-            <Link
-              key={t.contactId}
-              href="#"
-              className="block rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-indigo-200 hover:shadow-md"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-gray-900">
-                    {t.name} <span className="font-mono text-xs text-gray-500">({t.line_user_id})</span>
-                  </p>
-                  <p className="mt-1 text-sm text-gray-600 line-clamp-1">
-                    {t.lastMessage}
-                  </p>
+          <div className="space-y-3">
+            {contacts.map((contact) => (
+              <a
+                key={contact.id}
+                href={`/dashboard/conversations/${contact.id}`}
+                className="block rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-indigo-200 hover:shadow-md transition-all"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-900">
+                      {contact.name || '未命名客戶'}
+                    </p>
+                    <p className="mt-1 text-sm text-gray-600 line-clamp-1">
+                      {contact.lastMessage.length > 50
+                        ? contact.lastMessage.substring(0, 50) + '...'
+                        : contact.lastMessage}
+                    </p>
+                  </div>
+                  {contact.lastMessageTime && (
+                    <p className="text-xs text-gray-500 whitespace-nowrap">
+                      {new Date(contact.lastMessageTime).toLocaleString('zh-TW', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  )}
                 </div>
-                <p className="text-sm text-gray-500">
-                  {new Date(t.lastAt).toLocaleString('zh-TW')}
-                </p>
-              </div>
-            </Link>
-          ))
+              </a>
+            ))}
+          </div>
         )}
+      </div>
+
+      {/* Desktop: Two-column layout */}
+      <div className="hidden lg:block">
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">對話紀錄</h1>
+        
+        <div className="flex gap-6 h-[calc(100vh-12rem)]">
+          {/* Left: Contact list */}
+          <div className="w-80 flex-shrink-0">
+            <div className="rounded-xl border border-gray-200 bg-white overflow-hidden h-full flex flex-col">
+              <div className="p-4 border-b border-gray-200 bg-gray-50">
+                <h2 className="font-semibold text-gray-900">聯絡人</h2>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto">
+                {contacts.length === 0 ? (
+                  <div className="p-6 text-center text-gray-500 text-sm">
+                    尚無聯絡人對話
+                  </div>
+                ) : (
+                  <div className="divide-y divide-gray-100">
+                    {contacts.map((contact) => (
+                      <button
+                        key={contact.id}
+                        onClick={() => setSelectedContactId(contact.id)}
+                        className={`
+                          w-full text-left p-4 hover:bg-gray-50 transition-colors
+                          ${selectedContactId === contact.id ? 'bg-indigo-50' : ''}
+                        `}
+                      >
+                        <p className="font-medium text-gray-900">
+                          {contact.name || '未命名客戶'}
+                        </p>
+                        <p className="mt-1 text-sm text-gray-600 line-clamp-1">
+                          {contact.lastMessage.length > 40
+                            ? contact.lastMessage.substring(0, 40) + '...'
+                            : contact.lastMessage}
+                        </p>
+                        {contact.lastMessageTime && (
+                          <p className="mt-1 text-xs text-gray-500">
+                            {new Date(contact.lastMessageTime).toLocaleString('zh-TW', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </p>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Conversation view */}
+          <div className="flex-1 min-w-0">
+            <div className="rounded-xl border border-gray-200 bg-white overflow-hidden h-full flex flex-col">
+              {!selectedContactId ? (
+                <div className="flex-1 flex items-center justify-center text-gray-500">
+                  請選擇一個對話
+                </div>
+              ) : (
+                <>
+                  {/* Header */}
+                  <div className="p-4 border-b border-gray-200 bg-gray-50">
+                    <h2 className="font-semibold text-gray-900">
+                      {selectedContact?.name || '未命名客戶'}
+                    </h2>
+                  </div>
+
+                  {/* Messages */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    {conversations.length === 0 ? (
+                      <div className="text-center text-gray-500 py-8">
+                        尚無對話內容
+                      </div>
+                    ) : (
+                      conversations.map((conv) => (
+                        <div
+                          key={conv.id}
+                          className={`flex ${conv.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                        >
+                          <div
+                            className={`
+                              max-w-[70%] rounded-2xl px-4 py-2
+                              ${
+                                conv.role === 'user'
+                                  ? 'bg-green-100 text-gray-900'
+                                  : 'bg-gray-100 text-gray-900'
+                              }
+                            `}
+                          >
+                            <p className="text-sm whitespace-pre-wrap break-words">
+                              {conv.message}
+                            </p>
+                            <p
+                              className={`
+                                mt-1 text-xs
+                                ${conv.role === 'user' ? 'text-gray-600' : 'text-gray-500'}
+                              `}
+                            >
+                              {new Date(conv.created_at).toLocaleString('zh-TW', {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </p>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
