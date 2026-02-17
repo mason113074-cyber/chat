@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 type Contact = {
@@ -23,6 +23,7 @@ export default function ConversationsPage() {
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadContacts();
@@ -33,6 +34,154 @@ export default function ConversationsPage() {
       loadConversations(selectedContactId);
     }
   }, [selectedContactId]);
+
+  // 自動捲動到最新訊息
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [conversations]);
+
+  // 訂閱對話即時更新
+  useEffect(() => {
+    if (!selectedContactId) return;
+    
+    const supabase = createClient();
+    
+    const channel = supabase
+      .channel(`conversations:${selectedContactId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'conversations',
+          filter: `contact_id=eq.${selectedContactId}`,
+        },
+        (payload) => {
+          setConversations((prev) => [...prev, payload.new as Conversation]);
+          
+          // 更新聯絡人列表的最新訊息
+          setContacts((prev) => {
+            const updated = prev.map((contact) => {
+              if (contact.id === selectedContactId) {
+                return {
+                  ...contact,
+                  lastMessage: (payload.new as Conversation).message,
+                  lastMessageTime: (payload.new as Conversation).created_at,
+                };
+              }
+              return contact;
+            });
+            
+            // 重新排序，最新訊息的聯絡人排到最上面
+            return updated.sort((a, b) => {
+              if (!a.lastMessageTime) return 1;
+              if (!b.lastMessageTime) return -1;
+              return new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime();
+            });
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedContactId]);
+
+  // 訂閱新聯絡人
+  useEffect(() => {
+    const supabase = createClient();
+    
+    const fetchUserId = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      return user.id;
+    };
+
+    fetchUserId().then((userId) => {
+      if (!userId) return;
+
+      const channel = supabase
+        .channel('contacts:new')
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'contacts',
+            filter: `user_id=eq.${userId}`,
+          },
+          (payload) => {
+            const newContact = payload.new as {
+              id: string;
+              name: string | null;
+              line_user_id: string;
+            };
+            
+            setContacts((prev) => [
+              {
+                id: newContact.id,
+                name: newContact.name,
+                line_user_id: newContact.line_user_id,
+                lastMessage: '尚無對話',
+                lastMessageTime: '',
+              },
+              ...prev,
+            ]);
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    });
+  }, []);
+
+  // 訂閱所有聯絡人的對話更新（用於更新聯絡人列表）
+  useEffect(() => {
+    const supabase = createClient();
+    
+    const channel = supabase
+      .channel('conversations:all')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'conversations',
+        },
+        (payload) => {
+          const newConv = payload.new as Conversation & { contact_id: string };
+          
+          // 如果不是當前選中的聯絡人，更新聯絡人列表
+          setContacts((prev) => {
+            const updated = prev.map((contact) => {
+              if (contact.id === newConv.contact_id) {
+                return {
+                  ...contact,
+                  lastMessage: newConv.message,
+                  lastMessageTime: newConv.created_at,
+                };
+              }
+              return contact;
+            });
+            
+            // 重新排序
+            return updated.sort((a, b) => {
+              if (!a.lastMessageTime) return 1;
+              if (!b.lastMessageTime) return -1;
+              return new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime();
+            });
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   async function loadContacts() {
     const supabase = createClient();
@@ -258,40 +407,43 @@ export default function ConversationsPage() {
                         <p className="text-gray-600 text-sm">尚無對話內容</p>
                       </div>
                     ) : (
-                      conversations.map((conv) => (
-                        <div
-                          key={conv.id}
-                          className={`flex ${conv.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                        >
+                      <>
+                        {conversations.map((conv) => (
                           <div
-                            className={`
-                              max-w-[70%] rounded-2xl px-4 py-2
-                              ${
-                                conv.role === 'user'
-                                  ? 'bg-green-100 text-gray-900'
-                                  : 'bg-gray-100 text-gray-900'
-                              }
-                            `}
+                            key={conv.id}
+                            className={`flex ${conv.role === 'user' ? 'justify-end' : 'justify-start'}`}
                           >
-                            <p className="text-sm whitespace-pre-wrap break-words">
-                              {conv.message}
-                            </p>
-                            <p
+                            <div
                               className={`
-                                mt-1 text-xs
-                                ${conv.role === 'user' ? 'text-gray-600' : 'text-gray-500'}
+                                max-w-[70%] rounded-2xl px-4 py-2
+                                ${
+                                  conv.role === 'user'
+                                    ? 'bg-green-100 text-gray-900'
+                                    : 'bg-gray-100 text-gray-900'
+                                }
                               `}
                             >
-                              {new Date(conv.created_at).toLocaleString('zh-TW', {
-                                month: 'short',
-                                day: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                            </p>
+                              <p className="text-sm whitespace-pre-wrap break-words">
+                                {conv.message}
+                              </p>
+                              <p
+                                className={`
+                                  mt-1 text-xs
+                                  ${conv.role === 'user' ? 'text-gray-600' : 'text-gray-500'}
+                                `}
+                              >
+                                {new Date(conv.created_at).toLocaleString('zh-TW', {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                      ))
+                        ))}
+                        <div ref={messagesEndRef} />
+                      </>
                     )}
                   </div>
                 </>
