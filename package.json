@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:api": "npx tsx scripts/test-api.ts"
   },
   "dependencies": {
     "@line/bot-sdk": "^9.4.0",
