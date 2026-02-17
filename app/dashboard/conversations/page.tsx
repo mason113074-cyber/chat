@@ -113,8 +113,24 @@ export default function ConversationsPage() {
       <div className="lg:hidden">
         <h1 className="text-2xl font-bold text-gray-900 mb-4">對話紀錄</h1>
         {contacts.length === 0 ? (
-          <div className="rounded-xl border border-gray-200 bg-white px-6 py-12 text-center text-gray-500">
-            尚無對話紀錄。當客戶透過 LINE 與 Bot 對話後，會顯示於此。
+          <div className="rounded-xl border border-gray-200 bg-white px-6 py-16 text-center shadow-sm">
+            <div className="flex flex-col items-center">
+              <div className="rounded-full bg-indigo-100 w-20 h-20 flex items-center justify-center mb-4">
+                <span className="text-4xl">💬</span>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                尚無對話紀錄
+              </h3>
+              <p className="text-sm text-gray-600 mb-6 max-w-md">
+                當客戶透過 LINE 與 Bot 對話後，對話會顯示於此。
+              </p>
+              <a
+                href="/dashboard/settings"
+                className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+              >
+                查看 LINE 設定教學
+              </a>
+            </div>
           </div>
         ) : (
           <div className="space-y-3">
@@ -166,8 +182,13 @@ export default function ConversationsPage() {
               
               <div className="flex-1 overflow-y-auto">
                 {contacts.length === 0 ? (
-                  <div className="p-6 text-center text-gray-500 text-sm">
-                    尚無聯絡人對話
+                  <div className="p-6 text-center">
+                    <div className="flex flex-col items-center py-8">
+                      <div className="rounded-full bg-indigo-100 w-16 h-16 flex items-center justify-center mb-3">
+                        <span className="text-3xl">👥</span>
+                      </div>
+                      <p className="text-sm text-gray-600">尚無聯絡人對話</p>
+                    </div>
                   </div>
                 ) : (
                   <div className="divide-y divide-gray-100">
@@ -210,8 +231,13 @@ export default function ConversationsPage() {
           <div className="flex-1 min-w-0">
             <div className="rounded-xl border border-gray-200 bg-white overflow-hidden h-full flex flex-col">
               {!selectedContactId ? (
-                <div className="flex-1 flex items-center justify-center text-gray-500">
-                  請選擇一個對話
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="rounded-full bg-indigo-100 w-20 h-20 flex items-center justify-center mx-auto mb-4">
+                      <span className="text-4xl">💬</span>
+                    </div>
+                    <p className="text-gray-600">請選擇一個對話</p>
+                  </div>
                 </div>
               ) : (
                 <>
@@ -225,8 +251,11 @@ export default function ConversationsPage() {
                   {/* Messages */}
                   <div className="flex-1 overflow-y-auto p-4 space-y-4">
                     {conversations.length === 0 ? (
-                      <div className="text-center text-gray-500 py-8">
-                        尚無對話內容
+                      <div className="text-center py-12">
+                        <div className="rounded-full bg-indigo-100 w-16 h-16 flex items-center justify-center mx-auto mb-3">
+                          <span className="text-3xl">💬</span>
+                        </div>
+                        <p className="text-gray-600 text-sm">尚無對話內容</p>
                       </div>
                     ) : (
                       conversations.map((conv) => (

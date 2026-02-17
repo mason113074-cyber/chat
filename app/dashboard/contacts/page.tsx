@@ -57,8 +57,18 @@ export default async function ContactsPage() {
 
       <div className="mt-8">
         {!contactsWithStats || contactsWithStats.length === 0 ? (
-          <div className="rounded-xl border border-gray-200 bg-white px-6 py-12 text-center text-gray-500">
-            還沒有客戶資料，當客戶透過 LINE 發訊息後會自動建立
+          <div className="rounded-xl border border-gray-200 bg-white px-6 py-16 text-center shadow-sm">
+            <div className="flex flex-col items-center">
+              <div className="rounded-full bg-indigo-100 w-20 h-20 flex items-center justify-center mb-4">
+                <span className="text-4xl">👥</span>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                還沒有客戶
+              </h3>
+              <p className="text-sm text-gray-600 max-w-md">
+                當客戶透過 LINE 發送第一則訊息後，會自動建立聯絡人並顯示於此。
+              </p>
+            </div>
           </div>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
