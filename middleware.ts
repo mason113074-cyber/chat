@@ -40,6 +40,21 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Redirect to onboarding if not completed (dashboard only, allow /dashboard/onboarding)
+  if (user && request.nextUrl.pathname.startsWith('/dashboard') && request.nextUrl.pathname !== '/dashboard/onboarding' && !request.nextUrl.pathname.startsWith('/dashboard/onboarding/')) {
+    const { data: row } = await supabase
+      .from('users')
+      .select('onboarding_completed')
+      .eq('id', user.id)
+      .maybeSingle();
+    const completed = row?.onboarding_completed === true;
+    if (!completed) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/dashboard/onboarding';
+      return NextResponse.redirect(url);
+    }
+  }
+
   return response;
 }
 
