@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 const DAYS_OPTIONS = [7, 14, 30, 90] as const;
 
@@ -26,6 +27,21 @@ type HourlyPoint = { hour: number; count: number };
 type TopQuestion = { keyword: string; count: number; percentage: number };
 type TopContact = { contactId: string; name: string | null; lineUserId: string; count: number; lastAt: string | null };
 type Quality = { avgReplyLength: number | null; aiModel: string | null };
+
+type Resolution = {
+  total_conversations: number;
+  ai_resolved: number;
+  needs_human: number;
+  resolution_rate: number;
+  unresolved_questions: {
+    id: string;
+    contact_id: string;
+    contact_name: string;
+    last_message: string;
+    created_at: string;
+    status: string;
+  }[];
+};
 
 function LineChart({ data, width = 400, height = 200 }: { data: TrendPoint[]; width?: number; height?: number }) {
   if (data.length === 0) return <div className="flex h-[200px] items-center justify-center text-gray-400 text-sm">尚無數據</div>;
@@ -92,7 +108,49 @@ function BarChart({ data, width = 400, height = 200 }: { data: HourlyPoint[]; wi
   );
 }
 
+function ResolutionRing({ aiResolved, needsHuman, size = 80 }: { aiResolved: number; needsHuman: number; size?: number }) {
+  const total = aiResolved + needsHuman;
+  const circumference = 2 * Math.PI * (size / 2 - 4);
+  const greenDash = total > 0 ? (aiResolved / total) * circumference : 0;
+  const orangeDash = total > 0 ? (needsHuman / total) * circumference : circumference;
+  return (
+    <svg width={size} height={size} className="shrink-0">
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={size / 2 - 4}
+        fill="none"
+        stroke="#e5e7eb"
+        strokeWidth={6}
+      />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={size / 2 - 4}
+        fill="none"
+        stroke="#22c55e"
+        strokeWidth={6}
+        strokeDasharray={`${greenDash} ${circumference - greenDash}`}
+        strokeDashoffset={0}
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+      />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={size / 2 - 4}
+        fill="none"
+        stroke="#f97316"
+        strokeWidth={6}
+        strokeDasharray={`${orangeDash} ${circumference - orangeDash}`}
+        strokeDashoffset={-greenDash}
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+      />
+    </svg>
+  );
+}
+
 export default function AnalyticsPage() {
+  const router = useRouter();
   const [days, setDays] = useState<number>(30);
   const [overview, setOverview] = useState<Overview | null>(null);
   const [trends, setTrends] = useState<TrendPoint[]>([]);
@@ -100,18 +158,20 @@ export default function AnalyticsPage() {
   const [topQuestions, setTopQuestions] = useState<TopQuestion[]>([]);
   const [topContacts, setTopContacts] = useState<TopContact[]>([]);
   const [quality, setQuality] = useState<Quality | null>(null);
+  const [resolution, setResolution] = useState<Resolution | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [overviewRes, trendsRes, hourlyRes, questionsRes, contactsRes, qualityRes] = await Promise.all([
+      const [overviewRes, trendsRes, hourlyRes, questionsRes, contactsRes, qualityRes, resolutionRes] = await Promise.all([
         fetch('/api/analytics/overview'),
         fetch(`/api/analytics/trends?days=${days}`),
         fetch(`/api/analytics/hourly?days=${days}`),
         fetch(`/api/analytics/top-questions?days=${days}&limit=10`),
         fetch(`/api/analytics/top-contacts?days=${days}&limit=10`),
         fetch(`/api/analytics/quality?days=${days}`),
+        fetch(`/api/analytics/resolution?days=${days}`),
       ]);
       if (overviewRes.ok) setOverview(await overviewRes.json());
       if (trendsRes.ok) {
@@ -131,6 +191,7 @@ export default function AnalyticsPage() {
         setTopContacts(j.items ?? []);
       }
       if (qualityRes.ok) setQuality(await qualityRes.json());
+      if (resolutionRes.ok) setResolution(await resolutionRes.json());
     } finally {
       setLoading(false);
     }
@@ -188,8 +249,28 @@ export default function AnalyticsPage() {
         </div>
       ) : (
         <>
-          {/* 4 stat cards - overview uses "本月" */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Suggestion banners */}
+          {resolution && resolution.total_conversations > 0 && resolution.resolution_rate < 70 && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 flex flex-wrap items-center gap-3">
+              <span className="text-amber-700">💡</span>
+              <p className="text-amber-800 text-sm">建議增加知識庫內容來提升自動解決率</p>
+              <Link href="/dashboard/knowledge-base" className="rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700">
+                前往知識庫
+              </Link>
+            </div>
+          )}
+          {resolution && resolution.unresolved_questions.length > 10 && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 flex flex-wrap items-center gap-3">
+              <span className="text-red-600">⚠️</span>
+              <p className="text-red-800 text-sm">有 {resolution.needs_human} 個問題需要人工處理</p>
+              <Link href="/dashboard/conversations" className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700">
+                查看對話
+              </Link>
+            </div>
+          )}
+
+          {/* 5 stat cards - overview uses "本月", resolution uses days */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
               <div className="flex items-center gap-2 text-gray-500">
                 <span className="text-lg">💬</span>
@@ -223,6 +304,83 @@ export default function AnalyticsPage() {
               </div>
               <p className="mt-2 text-2xl font-bold text-gray-900">{overview?.thisMonth.newContacts ?? 0}</p>
               {overview && changeEl(overview.change.newContacts, '')}
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm flex flex-col">
+              <div className="flex items-center gap-2 text-gray-500">
+                <span className="text-lg">✅</span>
+                <span className="text-sm">AI 自動解決率</span>
+              </div>
+              <div className="mt-2 flex items-center gap-3">
+                <ResolutionRing
+                  aiResolved={resolution?.ai_resolved ?? 0}
+                  needsHuman={resolution?.needs_human ?? 0}
+                  size={64}
+                />
+                <div>
+                  <p className="text-2xl font-bold text-gray-900">{resolution?.resolution_rate ?? 0}%</p>
+                  <p className="text-xs text-gray-500">AI 解決 {resolution?.ai_resolved ?? 0} 則 / 需人工 {resolution?.needs_human ?? 0} 則</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Unresolved questions */}
+          <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <h2 className="border-b border-gray-100 px-4 py-3 text-lg font-semibold text-gray-900">⚠️ 需要關注的問題</h2>
+            <div className="overflow-x-auto">
+              {!resolution?.unresolved_questions?.length ? (
+                <div className="px-4 py-8 text-center text-gray-500">🎉 太棒了！目前沒有需要人工處理的問題</div>
+              ) : (
+                <>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 text-left text-gray-600">
+                        <th className="px-4 py-2">客戶名稱</th>
+                        <th className="px-4 py-2">問題內容</th>
+                        <th className="px-4 py-2">時間</th>
+                        <th className="px-4 py-2">狀態</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {resolution.unresolved_questions.map((q) => (
+                        <tr
+                          key={q.id}
+                          className="border-t border-gray-100 cursor-pointer hover:bg-gray-50"
+                          onClick={() => router.push(`/dashboard/conversations/${q.contact_id}`)}
+                        >
+                          <td className="px-4 py-2">
+                            <Link href={`/dashboard/conversations/${q.contact_id}`} className="font-medium text-indigo-600 hover:underline" onClick={(e) => e.stopPropagation()}>
+                              {q.contact_name || '未命名'}
+                            </Link>
+                          </td>
+                          <td className="px-4 py-2 text-gray-700 max-w-[280px] truncate" title={q.last_message}>
+                            {q.last_message.slice(0, 80)}{q.last_message.length > 80 ? '…' : ''}
+                          </td>
+                          <td className="px-4 py-2 text-gray-500">{new Date(q.created_at).toLocaleString('zh-TW')}</td>
+                          <td className="px-4 py-2">
+                            <span
+                              className={
+                                q.status === 'needs_human'
+                                  ? 'rounded-full bg-orange-100 px-2 py-0.5 text-xs text-orange-800'
+                                  : 'rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-800'
+                              }
+                            >
+                              {q.status === 'needs_human' ? '需人工' : q.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {resolution.needs_human > 20 && (
+                    <div className="border-t border-gray-100 px-4 py-3 text-center">
+                      <Link href="/dashboard/conversations" className="text-sm font-medium text-indigo-600 hover:underline">
+                        查看全部
+                      </Link>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
 

@@ -168,12 +168,17 @@ export async function getOrCreateContactByLineUserId(
 export async function insertConversationMessage(
   contactId: string,
   message: string,
-  role: 'user' | 'assistant' | 'system'
+  role: 'user' | 'assistant' | 'system',
+  options?: { status?: string; resolved_by?: string; is_resolved?: boolean }
 ) {
   const client = getSupabaseAdmin();
+  const row: Record<string, unknown> = { contact_id: contactId, message, role };
+  if (options?.status != null) row.status = options.status;
+  if (options?.resolved_by != null) row.resolved_by = options.resolved_by;
+  if (options?.is_resolved != null) row.is_resolved = options.is_resolved;
   const { data, error } = await client
     .from('conversations')
-    .insert([{ contact_id: contactId, message, role }])
+    .insert([row])
     .select()
     .single();
 

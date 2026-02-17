@@ -1,10 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { validateSignature, replyMessage, LineWebhookBody, LineWebhookEvent } from '@/lib/line';
 import { generateReply } from '@/lib/openai';
-import { searchKnowledgeForUser } from '@/lib/knowledge';
+import { searchKnowledgeWithSources } from '@/lib/knowledge-search';
 import { getOrCreateContactByLineUserId, getUserSettings, insertConversationMessage } from '@/lib/supabase';
 
 const KNOWLEDGE_PREFIX = '\n\n以下是相關的知識庫資料，請優先參考這些資訊來回答：\n';
+
+const NEEDS_HUMAN_KEYWORDS = /不確定|無法回答|請聯繫|請聯絡|抱歉我不清楚|抱歉我無法|轉人工|真人客服/;
+
+function computeResolution(
+  sourcesLength: number,
+  aiReply: string
+): { status: string; resolved_by: string; is_resolved: boolean } {
+  if (sourcesLength === 0 || NEEDS_HUMAN_KEYWORDS.test(aiReply)) {
+    return { status: 'needs_human', resolved_by: 'unresolved', is_resolved: false };
+  }
+  return { status: 'ai_handled', resolved_by: 'ai', is_resolved: true };
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -64,7 +76,12 @@ async function handleEvent(event: LineWebhookEvent): Promise<void> {
     const contact = await getOrCreateContactByLineUserId(lineUserId, ownerUserId);
 
     const { system_prompt: systemPrompt, ai_model: aiModel } = await getUserSettings(ownerUserId);
-    const knowledgeText = await searchKnowledgeForUser(ownerUserId, userMessage, 3, 2000);
+    const { text: knowledgeText, sources } = await searchKnowledgeWithSources(
+      ownerUserId,
+      userMessage,
+      3,
+      2000
+    );
     const fullSystemPrompt = knowledgeText
       ? (systemPrompt?.trim() ?? '') + KNOWLEDGE_PREFIX + knowledgeText
       : systemPrompt;
@@ -73,7 +90,12 @@ async function handleEvent(event: LineWebhookEvent): Promise<void> {
     await replyMessage(replyToken, aiResponse);
 
     await insertConversationMessage(contact.id, userMessage, 'user');
-    await insertConversationMessage(contact.id, aiResponse, 'assistant');
+    const resolution = computeResolution(sources.length, aiResponse);
+    await insertConversationMessage(contact.id, aiResponse, 'assistant', {
+      status: resolution.status,
+      resolved_by: resolution.resolved_by,
+      is_resolved: resolution.is_resolved,
+    });
 
     console.log('Successfully processed message:', {
       contactId: contact.id,
