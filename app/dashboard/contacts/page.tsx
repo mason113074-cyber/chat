@@ -20,7 +20,7 @@ export default async function ContactsPage() {
     .order('created_at', { ascending: false });
 
   type Conversation = { id: string; created_at: string };
-  
+
   type ContactWithStats = {
     id: string;
     name: string | null;

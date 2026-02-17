@@ -47,7 +47,7 @@ export default async function DashboardPage() {
   // 5. Get recent 5 conversations
   const { data: recentConversations } = await supabase
     .from('conversations')
-    .select('id, message, created_at, contacts!inner(name, line_user_id, id, user_id)')
+    .select('id, message, created_at, contacts!inner(name, line_user_id, id)')
     .eq('contacts.user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(5);
