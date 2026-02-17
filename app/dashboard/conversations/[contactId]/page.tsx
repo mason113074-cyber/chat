@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 
 type Contact = {
@@ -27,38 +27,38 @@ export default function ConversationDetailPage() {
   const [notFound, setNotFound] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const loadData = useCallback(async () => {
-    const supabase = createClient();
-
-    // Get contact info
-    const { data: contactData } = await supabase
-      .from('contacts')
-      .select('id, name, line_user_id')
-      .eq('id', contactId)
-      .single();
-
-    if (!contactData) {
-      setNotFound(true);
-      setLoading(false);
-      return;
-    }
-
-    setContact(contactData);
-
-    // Get all conversations for this contact
-    const { data: conversationsData } = await supabase
-      .from('conversations')
-      .select('id, message, role, created_at')
-      .eq('contact_id', contactId)
-      .order('created_at', { ascending: true });
-
-    setConversations(conversationsData || []);
-    setLoading(false);
-  }, [contactId]);
-
   useEffect(() => {
+    const loadData = async () => {
+      const supabase = createClient();
+
+      // Get contact info
+      const { data: contactData } = await supabase
+        .from('contacts')
+        .select('id, name, line_user_id')
+        .eq('id', contactId)
+        .single();
+
+      if (!contactData) {
+        setNotFound(true);
+        setLoading(false);
+        return;
+      }
+
+      setContact(contactData);
+
+      // Get all conversations for this contact
+      const { data: conversationsData } = await supabase
+        .from('conversations')
+        .select('id, message, role, created_at')
+        .eq('contact_id', contactId)
+        .order('created_at', { ascending: true });
+
+      setConversations(conversationsData || []);
+      setLoading(false);
+    };
+
     loadData();
-  }, [loadData]);
+  }, [contactId]);
 
   // 自動捲動到最新訊息
   useEffect(() => {

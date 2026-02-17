@@ -106,10 +106,11 @@ export default function ConversationsPage() {
   useEffect(() => {
     const supabase = createClient();
     let channel: ReturnType<typeof supabase.channel> | null = null;
+    let isMounted = true;
     
     const setupSubscription = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user || !isMounted) return;
 
       channel = supabase
         .channel('contacts:new')
@@ -146,6 +147,7 @@ export default function ConversationsPage() {
     setupSubscription();
 
     return () => {
+      isMounted = false;
       if (channel) {
         supabase.removeChannel(channel);
       }
