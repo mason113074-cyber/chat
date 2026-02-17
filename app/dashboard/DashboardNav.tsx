@@ -15,7 +15,13 @@ const NAV_ITEMS = [
   { href: '/dashboard/settings', label: '設定' },
 ] as const;
 
-export function DashboardNav({ userEmail }: { userEmail: string }) {
+export function DashboardNav({
+  userEmail,
+  onOpenSearch,
+}: {
+  userEmail: string;
+  onOpenSearch?: () => void;
+}) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [needsHumanCount, setNeedsHumanCount] = useState(0);
@@ -58,6 +64,17 @@ export function DashboardNav({ userEmail }: { userEmail: string }) {
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-6">
+          {onOpenSearch && (
+            <button
+              type="button"
+              onClick={onOpenSearch}
+              className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900 font-medium"
+            >
+              <span>🔍</span>
+              <span>搜尋</span>
+              <span className="text-xs text-gray-400 font-normal">⌘K</span>
+            </button>
+          )}
           {NAV_ITEMS.map((item) => (
             <Link
               key={item.href}
@@ -79,15 +96,26 @@ export function DashboardNav({ userEmail }: { userEmail: string }) {
           <SignOutButton />
         </nav>
 
-        {/* Mobile hamburger */}
-        <button
-          type="button"
-          onClick={() => setMobileOpen((o) => !o)}
-          className="md:hidden rounded-lg p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
-          aria-label="開啟選單"
-        >
-          <span className="text-xl">☰</span>
-        </button>
+        <div className="md:hidden flex items-center gap-1">
+          {onOpenSearch && (
+            <button
+              type="button"
+              onClick={onOpenSearch}
+              className="rounded-lg p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+              aria-label="搜尋"
+            >
+              <span className="text-xl">🔍</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setMobileOpen((o) => !o)}
+            className="rounded-lg p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            aria-label="開啟選單"
+          >
+            <span className="text-xl">☰</span>
+          </button>
+        </div>
       </div>
 
       {/* Mobile menu overlay */}
