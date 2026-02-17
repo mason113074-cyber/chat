@@ -38,6 +38,9 @@ export default function ConversationsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [tagList, setTagList] = useState<TagWithCount[]>([]);
   const [selectedTagFilters, setSelectedTagFilters] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchLoading, setBatchLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,6 +52,80 @@ export default function ConversationsPage() {
       : contacts.filter((c) =>
           c.tags.some((t) => selectedTagFilters.has(t))
         );
+
+  const allFilteredSelected =
+    filteredContacts.length > 0 &&
+    filteredContacts.every((c) => selectedIds.has(c.id));
+
+  function toggleSelectAll() {
+    if (allFilteredSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        filteredContacts.forEach((c) => next.delete(c.id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        filteredContacts.forEach((c) => next.add(c.id));
+        return next;
+      });
+    }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function runBatch(
+    action: 'resolve' | 'unresolve' | 'delete' | 'add_tag' | 'remove_tag',
+    tag?: string
+  ) {
+    if (selectedIds.size === 0) return;
+    setBatchLoading(true);
+    setSuccessMessage(null);
+    try {
+      const body: { action: string; conversationIds: string[]; tag?: string } = {
+        action,
+        conversationIds: Array.from(selectedIds),
+      };
+      if (tag !== undefined) body.tag = tag;
+      const res = await fetch('/api/conversations/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSuccessMessage(data.error || '操作失敗');
+        return;
+      }
+      setSuccessMessage(data.message || '完成');
+      setSelectedIds(new Set());
+      await loadContacts();
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } finally {
+      setBatchLoading(false);
+    }
+  }
+
+  function handleBatchDelete() {
+    const n = selectedIds.size;
+    if (n === 0) return;
+    if (!confirm(`確定要刪除 ${n} 個對話嗎？此操作無法復原`)) return;
+    runBatch('delete');
+  }
+
+  function handleBatchAddTag() {
+    const tag = window.prompt('請輸入要新增的標籤名稱');
+    if (tag == null || tag.trim() === '') return;
+    runBatch('add_tag', tag.trim());
+  }
 
   // 更新聯絡人列表並重新排序的輔助函數
   const updateContactsList = useCallback((
@@ -388,50 +465,123 @@ export default function ConversationsPage() {
           </div>
         ) : (
           <div className="space-y-3">
+            {/* Mobile batch toolbar */}
+            {selectedIds.size > 0 && (
+              <div className="rounded-xl border border-gray-200 bg-gray-100 p-3 flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium text-gray-700">已選 {selectedIds.size} 個對話</span>
+                <button
+                  type="button"
+                  onClick={() => runBatch('resolve')}
+                  disabled={batchLoading}
+                  className="rounded px-2 py-1 text-xs font-medium bg-white border border-gray-300"
+                >
+                  標記為已解決
+                </button>
+                <button
+                  type="button"
+                  onClick={() => runBatch('unresolve')}
+                  disabled={batchLoading}
+                  className="rounded px-2 py-1 text-xs font-medium bg-white border border-gray-300"
+                >
+                  標記為未解決
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBatchDelete}
+                  disabled={batchLoading}
+                  className="rounded px-2 py-1 text-xs font-medium bg-white border border-red-200 text-red-700"
+                >
+                  批次刪除
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBatchAddTag}
+                  disabled={batchLoading}
+                  className="rounded px-2 py-1 text-xs font-medium bg-white border border-gray-300"
+                >
+                  批次新增標籤
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedIds(new Set())}
+                  disabled={batchLoading}
+                  className="rounded px-2 py-1 text-xs font-medium text-indigo-600"
+                >
+                  取消選擇
+                </button>
+              </div>
+            )}
+            {successMessage && (
+              <div className="rounded-xl bg-green-50 text-green-800 text-sm p-3 border border-green-100">
+                {successMessage}
+              </div>
+            )}
+            <div className="flex items-center gap-3 p-2 rounded-xl bg-gray-50 border border-gray-200">
+              <input
+                type="checkbox"
+                checked={allFilteredSelected}
+                onChange={toggleSelectAll}
+                className="h-4 w-4 rounded border-gray-300 text-indigo-600"
+                aria-label="全選/取消全選"
+              />
+              <span className="text-xs text-gray-500">全選/取消全選</span>
+            </div>
             {filteredContacts.map((contact) => (
-              <a
+              <div
                 key={contact.id}
-                href={`/dashboard/conversations/${contact.id}`}
-                className="block rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-indigo-200 hover:shadow-md transition-all"
+                className="flex items-start gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900">
-                      {contact.name || '未命名客戶'}
-                    </p>
-                    <p className="mt-1 text-sm text-gray-600 line-clamp-1">
-                      {contact.lastMessage.length > 50
-                        ? contact.lastMessage.substring(0, 50) + '...'
-                        : contact.lastMessage}
-                    </p>
-                    {contact.tags.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {contact.tags.slice(0, 3).map((t) => (
-                          <span
-                            key={t}
-                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${tagColor(t)}`}
-                          >
-                            {t}
-                          </span>
-                        ))}
-                        {contact.tags.length > 3 && (
-                          <span className="text-xs text-gray-400">+{contact.tags.length - 3}</span>
-                        )}
-                      </div>
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(contact.id)}
+                  onChange={() => toggleSelect(contact.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-indigo-600"
+                  aria-label={`選擇 ${contact.name || '未命名'}`}
+                />
+                <a
+                  href={`/dashboard/conversations/${contact.id}`}
+                  className="flex-1 min-w-0"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900">
+                        {contact.name || '未命名客戶'}
+                      </p>
+                      <p className="mt-1 text-sm text-gray-600 line-clamp-1">
+                        {contact.lastMessage.length > 50
+                          ? contact.lastMessage.substring(0, 50) + '...'
+                          : contact.lastMessage}
+                      </p>
+                      {contact.tags.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {contact.tags.slice(0, 3).map((t) => (
+                            <span
+                              key={t}
+                              className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${tagColor(t)}`}
+                            >
+                              {t}
+                            </span>
+                          ))}
+                          {contact.tags.length > 3 && (
+                            <span className="text-xs text-gray-400">+{contact.tags.length - 3}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    {contact.lastMessageTime && (
+                      <p className="text-xs text-gray-500 whitespace-nowrap">
+                        {new Date(contact.lastMessageTime).toLocaleString('zh-TW', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </p>
                     )}
                   </div>
-                  {contact.lastMessageTime && (
-                    <p className="text-xs text-gray-500 whitespace-nowrap">
-                      {new Date(contact.lastMessageTime).toLocaleString('zh-TW', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </p>
-                  )}
-                </div>
-              </a>
+                </a>
+              </div>
             ))}
           </div>
         )}
@@ -489,6 +639,59 @@ export default function ConversationsPage() {
                   )}
                 </div>
               </div>
+              {/* Batch toolbar */}
+              {selectedIds.size > 0 && (
+                <div className="border-b border-gray-200 bg-gray-100 px-3 py-2 flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                    已選 {selectedIds.size} 個對話
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => runBatch('resolve')}
+                    disabled={batchLoading}
+                    className="rounded px-2 py-1 text-xs font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    標記為已解決
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => runBatch('unresolve')}
+                    disabled={batchLoading}
+                    className="rounded px-2 py-1 text-xs font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    標記為未解決
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBatchDelete}
+                    disabled={batchLoading}
+                    className="rounded px-2 py-1 text-xs font-medium bg-white border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    批次刪除
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBatchAddTag}
+                    disabled={batchLoading}
+                    className="rounded px-2 py-1 text-xs font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    批次新增標籤
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedIds(new Set())}
+                    disabled={batchLoading}
+                    className="rounded px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 disabled:opacity-50"
+                  >
+                    取消選擇
+                  </button>
+                </div>
+              )}
+              {successMessage && (
+                <div className="px-3 py-2 bg-green-50 text-green-800 text-sm border-b border-green-100">
+                  {successMessage}
+                </div>
+              )}
               <div className="flex-1 overflow-y-auto">
                 {filteredContacts.length === 0 ? (
                   <div className="p-6 text-center">
@@ -514,15 +717,40 @@ export default function ConversationsPage() {
                   </div>
                 ) : (
                   <div className="divide-y divide-gray-100">
+                    <div
+                      className="flex items-center gap-3 p-3 border-b border-gray-100 bg-gray-50/80"
+                      role="row"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={allFilteredSelected}
+                        onChange={toggleSelectAll}
+                        className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        aria-label="全選/取消全選"
+                      />
+                      <span className="text-xs text-gray-500">全選/取消全選</span>
+                    </div>
                     {filteredContacts.map((contact) => (
-                      <button
+                      <div
                         key={contact.id}
-                        onClick={() => setSelectedContactId(contact.id)}
                         className={`
-                          w-full text-left p-4 hover:bg-gray-50 transition-colors
+                          flex items-start gap-3 w-full text-left p-4 hover:bg-gray-50 transition-colors
                           ${selectedContactId === contact.id ? 'bg-indigo-50' : ''}
                         `}
                       >
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(contact.id)}
+                          onChange={() => toggleSelect(contact.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          aria-label={`選擇 ${contact.name || '未命名'}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setSelectedContactId(contact.id)}
+                          className="flex-1 min-w-0 text-left"
+                        >
                         <p className="font-medium text-gray-900">
                           {contact.name || '未命名客戶'}
                         </p>
@@ -556,7 +784,8 @@ export default function ConversationsPage() {
                             })}
                           </p>
                         )}
-                      </button>
+                        </button>
+                      </div>
                     ))}
                   </div>
                 )}

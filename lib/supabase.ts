@@ -60,6 +60,7 @@ export interface Contact {
   line_user_id: string;
   name: string | null;
   tags: string[];
+  status?: 'pending' | 'resolved';
   created_at?: string;
 }
 
