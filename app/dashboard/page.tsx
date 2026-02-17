@@ -136,8 +136,24 @@ export default async function DashboardPage() {
         </div>
 
         {!recentConversations || recentConversations.length === 0 ? (
-          <div className="rounded-xl border border-gray-200 bg-white px-6 py-12 text-center text-gray-500">
-            尚無對話紀錄。當客戶透過 LINE 與 Bot 對話後，會顯示於此。
+          <div className="rounded-xl border border-gray-200 bg-white px-6 py-16 text-center shadow-sm">
+            <div className="flex flex-col items-center">
+              <div className="rounded-full bg-indigo-100 w-20 h-20 flex items-center justify-center mb-4">
+                <span className="text-4xl">💬</span>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                尚無對話紀錄
+              </h3>
+              <p className="text-sm text-gray-600 mb-6 max-w-md">
+                當客戶透過 LINE 與 Bot 對話後，最近的對話會顯示於此。
+              </p>
+              <a
+                href="/dashboard/settings"
+                className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+              >
+                查看 LINE 設定教學
+              </a>
+            </div>
           </div>
         ) : (
           <div className="space-y-3">
