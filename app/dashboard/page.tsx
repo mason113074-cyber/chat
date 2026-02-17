@@ -6,6 +6,8 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
+  type Conversation = { id: string; created_at: string };
+
   // 1. Total contacts count
   const { count: contactsCount } = await supabase
     .from('contacts')
@@ -20,7 +22,7 @@ export default async function DashboardPage() {
 
   // 計算總對話數
   const conversationsCount = (contactsWithConversations || []).reduce(
-    (total, contact) => total + ((contact.conversations as unknown as { id: string; created_at: string }[]) || []).length,
+    (total, contact) => total + ((contact.conversations as Conversation[]) || []).length,
     0
   );
 
@@ -28,7 +30,7 @@ export default async function DashboardPage() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const todayConversationsCount = (contactsWithConversations || []).reduce((total, contact) => {
-    const conversations = (contact.conversations as unknown as { id: string; created_at: string }[]) || [];
+    const conversations = (contact.conversations as Conversation[]) || [];
     const todayConvs = conversations.filter((conv) => new Date(conv.created_at) >= today);
     return total + todayConvs.length;
   }, 0);

@@ -19,6 +19,8 @@ export default async function ContactsPage() {
     .eq('user_id', user.id)
     .order('created_at', { ascending: false });
 
+  type Conversation = { id: string; created_at: string };
+  
   type ContactWithStats = {
     id: string;
     name: string | null;
@@ -30,18 +32,17 @@ export default async function ContactsPage() {
 
   // 在前端計算每個 contact 的對話數和最後互動時間
   const contactsWithStats: ContactWithStats[] = (contacts || []).map((contact) => {
-    const conversations = (contact.conversations as { id: string; created_at: string }[]) || [];
+    const conversations = (contact.conversations as Conversation[]) || [];
     
     // 計算對話數量
     const conversationCount = conversations.length;
     
-    // 找出最後互動時間（最新的對話）
+    // 找出最後互動時間（最新的對話）- 使用 reduce 找最大值，避免排序
     let lastInteraction: string | null = null;
     if (conversations.length > 0) {
-      const sortedConversations = [...conversations].sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-      lastInteraction = sortedConversations[0].created_at;
+      lastInteraction = conversations.reduce((latest, conv) => {
+        return new Date(conv.created_at) > new Date(latest) ? conv.created_at : latest;
+      }, conversations[0].created_at);
     }
     
     return {
