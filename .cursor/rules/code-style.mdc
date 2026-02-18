@@ -1,0 +1,15 @@
+---
+rule_type: always
+---
+
+# Code Style Rules
+
+- 使用 TypeScript strict mode
+- React 元件用 function component + hooks
+- 避免 any 類型，明確定義 interface
+- API 回傳統一用 NextResponse.json()
+- 錯誤處理統一用 try/catch + console.error
+- 環境變數只從 process.env 讀取，不要 hardcode
+- import 順序：React/Next → 第三方 → 本地元件 → 本地工具 → 類型
+- 檔案命名：元件用 PascalCase，工具用 camelCase
+- CSS 用 Tailwind CSS utility classes

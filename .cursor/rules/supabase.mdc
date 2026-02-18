@@ -1,0 +1,12 @@
+---
+rule_type: context
+globs: ["**/api/**", "**/lib/supabase*", "**/supabase/**"]
+---
+
+# Supabase Rules
+
+- 用 createRouteHandlerClient 建立 server-side client
+- 所有 API 都要先驗證 session（Cookie 或 Bearer token）
+- 敏感操作用 SUPABASE_SERVICE_ROLE_KEY（server 端）
+- 前端只用 NEXT_PUBLIC_SUPABASE_ANON_KEY
+- Migration 檔案放在 supabase/migrations/，編號從 010 繼續

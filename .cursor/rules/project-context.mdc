@@ -1,0 +1,40 @@
+---
+rule_type: always
+---
+
+# CustomerAIPro Project Context
+
+- 產品：CustomerAIPro — AI 智能客服 SaaS
+- GitHub Repo：mason113074-cyber/chat
+- 正式網址：https://www.customeraipro.com
+- 技術：Next.js 16 (App Router) + Supabase + OpenAI GPT-4o-mini
+- 語言：TypeScript，UI 全繁體中文
+- 部署：Railway（自動從 main 分支部署）
+- 資料庫：Supabase PostgreSQL + Auth + RLS
+- 聊天整合：LINE Messaging API（Webhook）
+
+## 開發規範
+- 所有 UI 文字使用繁體中文
+- API 路由放在 /app/api/ 下
+- 使用 Supabase Auth（Cookie + Bearer token 雙認證）
+- 元件使用 shadcn/ui
+- Commit 訊息格式：類型: 簡短描述（如 "Fix: xxx" "Sprint5: xxx"）
+- 環境變數參考 .env.example，不要 hardcode
+
+## API 端點（共 15 個）
+- Onboarding: /api/onboarding/status, /api/onboarding/save
+- Knowledge Base: /api/knowledge-base, /api/knowledge-base/test, /api/knowledge-base/[id]
+- Analytics: /api/analytics/overview, /api/analytics/trends, /api/analytics/resolution
+- Billing: /api/billing/usage
+- Conversations: /api/conversations/counts, /api/conversations/[id]/status
+- Contacts: /api/contacts, /api/contacts/tags, /api/contacts/[id]/tags
+- Settings: /api/settings, /api/settings/preview
+- Search: /api/search
+- Chat: /api/chat
+- LINE Webhook: /api/webhook/line
+
+## 方案限制（lib/plans.ts）
+- Free：50 對話/月、10 知識庫
+- Basic：500 對話/月、100 知識庫
+- Pro：5000 對話/月、500 知識庫
+- Enterprise：無限
