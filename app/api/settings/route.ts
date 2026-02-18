@@ -42,10 +42,13 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Error fetching settings:', error);
-      return NextResponse.json(
-        { error: '無法讀取設定' },
-        { status: 500 }
-      );
+      // 查詢失敗時仍回傳預設值，讓設定頁可載入（例如 production 尚未跑完 migrations）
+      return NextResponse.json({
+        systemPrompt: null,
+        aiModel: 'gpt-4o-mini',
+        storeName: null,
+        quickReplies: [],
+      });
     }
 
     const quickReplies = Array.isArray(data?.quick_replies) ? data.quick_replies : [];
