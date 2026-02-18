@@ -229,7 +229,7 @@
 
 **效能優化**
 
-- **雙層快取**（lib/cache.ts）：Memory + Vercel KV，getCached / deleteCached / deleteCachedPattern  
+- **雙層快取**（lib/cache.ts）：Memory + Upstash Redis，getCached / deleteCached / deleteCachedPattern  
 - **User settings cache**：10 min TTL，設定更新時 invalidate  
 - **Knowledge base 搜尋快取**：5 min TTL，知識庫異動時 clearKnowledgeCache  
 - **Analytics cache**（lib/analytics-cache.ts）：10 min TTL，新對話時 invalidate  
@@ -238,7 +238,7 @@
 **架構改進**
 
 - lib/openai.ts 重寫：lazy client、預算／重試／用量／fallback 整合  
-- 環境變數：.env.example 補齊 OPENAI_*、KV_REST_API_* 說明  
+- 環境變數：.env.example 補齊 OPENAI_*、UPSTASH_REDIS_REST_* 說明  
 
 **功能擴充（同 commit）**
 
@@ -275,7 +275,7 @@
 
 ### 新增服務 (Phase 2.5)
 
-- **Vercel KV / Upstash Redis**：冪等、rate limit、各類快取（未設定時記憶體 fallback）  
+- **Upstash Redis**：冪等、rate limit、各類快取（未設定時記憶體 fallback）  
 - **Lemon Squeezy**：計劃中（訂閱與金流）  
 
 ### 開發工具
@@ -311,7 +311,7 @@
 | 2026-02-17 | 引入 GitHub Copilot Agent| 加速開發與優化       | 多個 PR 快速完成     |
 | 2026-02-17 | 計畫採用 Lemon Squeezy   | 降低金流門檻、加速上線 | Terms/Privacy 已就緒 |
 | 2026-02-18 | 實施技術債務優化         | 生產環境穩定性       | 安全、可靠、效能提升 |
-| 2026-02-18 | 採用 Vercel KV / Upstash | 分散式狀態與快取     | 支援多實例、冪等與限流 |
+| 2026-02-18 | 採用 Upstash Redis     | 分散式狀態與快取     | 支援多實例、冪等與限流 |
 | 2026-02-18 | 部署遷移至 Vercel        | 取代 Railway         | 單一部署、文件更新   |
 
 ---
@@ -337,7 +337,7 @@
 
 ### Phase 4：生產環境優化
 
-- [ ] Vercel 上設定 KV_REST_API_*（或 Redis 整合）  
+- [ ] Vercel 上設定 UPSTASH_REDIS_REST_URL、UPSTASH_REDIS_REST_TOKEN（選用）  
 - [ ] 環境變數與監控、日誌、錯誤追蹤（如 Sentry）  
 
 ### Phase 5：Beta 與發布

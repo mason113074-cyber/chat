@@ -11,7 +11,10 @@
     "test:ui": "playwright test",
     "test:ui:headed": "playwright test --headed",
     "test:ui:report": "playwright show-report",
-    "test:ui:headed:prod": "cross-env TEST_BASE_URL=https://www.customeraipro.com playwright test --headed"
+    "test:ui:headed:prod": "cross-env TEST_BASE_URL=https://www.customeraipro.com playwright test --headed",
+    "test:e2e:prod": "cross-env TEST_BASE_URL=https://www.customeraipro.com playwright test e2e/full-flow-production.spec.ts --project=chromium --workers=1",
+    "test:e2e:prod:headed": "cross-env TEST_BASE_URL=https://www.customeraipro.com playwright test e2e/full-flow-production.spec.ts --project=chromium --workers=1 --headed",
+    "check-connections": "npx tsx scripts/check-connections.ts"
   },
   "dependencies": {
     "@line/bot-sdk": "^9.4.0",
@@ -33,6 +36,7 @@
     "eslint": "^8.57.0",
     "eslint-config-next": "14.2.15",
     "postcss": "^8.4.47",
+    "shebang-command": "^2.0.0",
     "tailwindcss": "^3.4.13",
     "tsx": "^4.21.0",
     "typescript": "^5.6.2"

@@ -487,23 +487,23 @@ export default function SettingsPage() {
             <h2 className="text-lg font-semibold text-gray-900 mb-3">Live Preview</h2>
             <div className="mx-auto max-w-sm rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden" style={{ height: '500px' }}>
               <div className="bg-indigo-600 text-white px-4 py-3 flex items-center gap-2">
-                <span className="font-medium truncate">{storeName || '我的商店'}</span>
+                <span className="font-medium text-base truncate">{storeName || '我的商店'}</span>
                 <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" title="線上" />
               </div>
-              <div className="h-[380px] overflow-y-auto p-4 space-y-3 bg-white">
+              <div className="h-[380px] overflow-y-auto p-4 space-y-3 bg-white [&_.quick-reply-btn]:text-base [&_.quick-reply-btn]:font-medium [&_.quick-reply-btn]:text-gray-800">
                 <div className="flex justify-start">
-                  <div className="max-w-[85%] rounded-2xl rounded-tl-md bg-gray-100 text-gray-900 px-4 py-2 text-sm">
+                  <div className="max-w-[85%] rounded-2xl rounded-tl-md bg-gray-200 text-gray-900 px-4 py-2.5 text-base font-medium leading-snug">
                     {welcomeText}
                   </div>
                 </div>
                 <QuickReplies items={quickReplies} onSelect={(query) => handlePreviewReply(query)} />
                 <div className="flex justify-end">
-                  <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-indigo-500 text-white px-4 py-2 text-sm">
+                  <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-indigo-500 text-white px-4 py-2.5 text-base font-medium leading-snug">
                     {previewQuestion}
                   </div>
                 </div>
                 <div className="flex justify-start">
-                  <div className="max-w-[85%] rounded-2xl rounded-tl-md bg-gray-100 text-gray-900 px-4 py-2 text-sm">
+                  <div className="max-w-[85%] rounded-2xl rounded-tl-md bg-gray-200 text-gray-900 px-4 py-2.5 text-base font-medium leading-snug">
                     {previewLoading && (
                       <span className="inline-flex gap-1">
                         <span className="w-2 h-2 rounded-full bg-gray-500 animate-typing-dot" />
@@ -512,35 +512,35 @@ export default function SettingsPage() {
                       </span>
                     )}
                     {!previewLoading && previewAnswer === 'updated' && (
-                      <span className="text-gray-500">設定已更新，點擊重新預覽</span>
+                      <span className="text-gray-600">設定已更新，點擊重新預覽</span>
                     )}
                     {!previewLoading && previewAnswer === 'pending' && (
-                      <span className="text-gray-500">正在生成預覽...</span>
+                      <span className="text-gray-600">正在生成預覽...</span>
                     )}
                     {!previewLoading && previewAnswer !== null && previewAnswer !== 'pending' && previewAnswer !== 'updated' && (
                       <span className="whitespace-pre-wrap">{previewAnswer}</span>
                     )}
                     {!previewLoading && previewAnswer === null && (
-                      <span className="text-gray-500">點擊下方按鈕預覽 AI 回覆</span>
+                      <span className="text-gray-600">點擊下方按鈕預覽 AI 回覆</span>
                     )}
                   </div>
                 </div>
               </div>
               <div className="border-t border-gray-200 p-2">
-                <div className="rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-400">
+                <div className="rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-base text-gray-600">
                   輸入訊息（僅供預覽）
                 </div>
               </div>
             </div>
             <div className="mt-3 space-y-2">
-              <p className="text-xs font-medium text-gray-600">範例問題：</p>
+              <p className="text-sm font-medium text-gray-700">範例問題：</p>
               <div className="flex flex-wrap gap-2">
                 {EXAMPLE_QUESTIONS.map((q) => (
                   <button
                     key={q}
                     type="button"
                     onClick={() => handlePreviewReply(q)}
-                    className="rounded-full border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                    className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-800 font-medium hover:bg-gray-50"
                   >
                     {q}
                   </button>
@@ -572,19 +572,19 @@ export default function SettingsPage() {
           <div className="mt-2 rounded-xl bg-gradient-to-br from-indigo-50 to-purple-50 p-4 shadow-sm border border-indigo-100">
             <div className="mx-auto max-w-sm rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden" style={{ height: '500px' }}>
               <div className="bg-indigo-600 text-white px-4 py-3 flex items-center gap-2">
-                <span className="font-medium truncate">{storeName || '我的商店'}</span>
+                <span className="font-medium text-base truncate">{storeName || '我的商店'}</span>
                 <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
               </div>
-              <div className="h-[380px] overflow-y-auto p-4 space-y-3 bg-white">
+              <div className="h-[380px] overflow-y-auto p-4 space-y-3 bg-white [&_.quick-reply-btn]:text-base [&_.quick-reply-btn]:font-medium [&_.quick-reply-btn]:text-gray-800">
                 <div className="flex justify-start">
-                  <div className="max-w-[85%] rounded-2xl rounded-tl-md bg-gray-100 text-gray-900 px-4 py-2 text-sm">{welcomeText}</div>
+                  <div className="max-w-[85%] rounded-2xl rounded-tl-md bg-gray-200 text-gray-900 px-4 py-2.5 text-base font-medium leading-snug">{welcomeText}</div>
                 </div>
                 <QuickReplies items={quickReplies} onSelect={(query) => handlePreviewReply(query)} />
                 <div className="flex justify-end">
-                  <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-indigo-500 text-white px-4 py-2 text-sm">{previewQuestion}</div>
+                  <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-indigo-500 text-white px-4 py-2.5 text-base font-medium leading-snug">{previewQuestion}</div>
                 </div>
                 <div className="flex justify-start">
-                  <div className="max-w-[85%] rounded-2xl rounded-tl-md bg-gray-100 text-gray-900 px-4 py-2 text-sm">
+                  <div className="max-w-[85%] rounded-2xl rounded-tl-md bg-gray-200 text-gray-900 px-4 py-2.5 text-base font-medium leading-snug">
                     {previewLoading && (
                       <span className="inline-flex gap-1">
                         <span className="w-2 h-2 rounded-full bg-gray-500 animate-typing-dot" />
@@ -592,22 +592,22 @@ export default function SettingsPage() {
                         <span className="w-2 h-2 rounded-full bg-gray-500 animate-typing-dot" />
                       </span>
                     )}
-                    {!previewLoading && previewAnswer === 'updated' && <span className="text-gray-500">設定已更新，點擊重新預覽</span>}
-                    {!previewLoading && previewAnswer === 'pending' && <span className="text-gray-500">正在生成預覽...</span>}
+                    {!previewLoading && previewAnswer === 'updated' && <span className="text-gray-600">設定已更新，點擊重新預覽</span>}
+                    {!previewLoading && previewAnswer === 'pending' && <span className="text-gray-600">正在生成預覽...</span>}
                     {!previewLoading && previewAnswer !== null && previewAnswer !== 'pending' && previewAnswer !== 'updated' && <span className="whitespace-pre-wrap">{previewAnswer}</span>}
-                    {!previewLoading && previewAnswer === null && <span className="text-gray-500">點擊下方按鈕預覽 AI 回覆</span>}
+                    {!previewLoading && previewAnswer === null && <span className="text-gray-600">點擊下方按鈕預覽 AI 回覆</span>}
                   </div>
                 </div>
               </div>
               <div className="border-t border-gray-200 p-2">
-                <div className="rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-400">輸入訊息（僅供預覽）</div>
+                <div className="rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-base text-gray-600">輸入訊息（僅供預覽）</div>
               </div>
             </div>
             <div className="mt-3 space-y-2">
-              <p className="text-xs font-medium text-gray-600">範例問題：</p>
+              <p className="text-sm font-medium text-gray-700">範例問題：</p>
               <div className="flex flex-wrap gap-2">
                 {EXAMPLE_QUESTIONS.map((q) => (
-                  <button key={q} type="button" onClick={() => handlePreviewReply(q)} className="rounded-full border border-gray-300 bg-white px-3 py-1 text-xs text-gray-700 hover:bg-gray-50">{q}</button>
+                  <button key={q} type="button" onClick={() => handlePreviewReply(q)} className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-800 font-medium hover:bg-gray-50">{q}</button>
                 ))}
               </div>
               <button type="button" onClick={() => handlePreviewReply()} disabled={previewLoading} className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">🔄 預覽 AI 回覆</button>

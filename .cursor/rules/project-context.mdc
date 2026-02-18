@@ -10,8 +10,9 @@ alwaysApply: true
 - 正式網址：https://www.customeraipro.com
 - 技術：Next.js 16 (App Router) + Supabase + OpenAI GPT-4o-mini
 - 語言：TypeScript，UI 全繁體中文
-- 部署：Railway（自動從 main 分支部署）
+- 部署：**Vercel**（連線 GitHub repo，push main 自動部署）
 - 資料庫：Supabase PostgreSQL + Auth + RLS
+- Redis：Upstash Redis（選用；冪等、rate limit、快取；未設定時記憶體 fallback）
 - 聊天整合：LINE Messaging API（Webhook）
 
 ## 開發規範

@@ -1,54 +1,90 @@
 # CustomerAIPro 部署與環境 FAQ
 
-依專案**實際檔案與設定**整理。
+四端連通：**GitHub → Vercel → Supabase + Upstash Redis**。環境變數在本地用 `.env.local`，正式環境在 Vercel 後台設定。
 
 ---
 
-## 1. 部署平台
+## 1. 連通關係（一致且邏輯順序）
 
-- **正式環境**：**Vercel**（已由 Railway 遷移）。
-- **資料庫與認證**：**Supabase**（未變更）。
-- 若本地 `.env.local` 仍留有 `RAILWAY_PRIVATE_DOMAIN`，可刪除，已不再使用。
+| 端 | 角色 | 說明 |
+|----|------|------|
+| **GitHub** | 程式碼來源 | Repo：`mason113074-cyber/chat`，主要分支 `main`。 |
+| **Vercel** | 部署與託管 | 連線上述 GitHub repo，push `main` 即觸發 build + 部署。正式網址：www.customeraipro.com。 |
+| **Supabase** | 資料庫與認證 | 專案建立於 Supabase，URL/Key 在 **Vercel 與本地** 都要設（見下方變數表）。 |
+| **Upstash Redis** | 冪等／限流／快取 | 選用。未設定時使用記憶體 fallback（單實例可運作；多實例建議必設）。 |
 
----
-
-## 2. 網址 www.customeraipro.com
-
-- **正式站網址**：www.customeraipro.com（見 `package.json` 的 `test:ui:headed:prod`）。
-- **指向**：DNS 應指向 **Vercel** 專案（與 Vercel 後台綁定網域一致）。
+**邏輯流程**：程式碼在 GitHub → Vercel 從 GitHub 拉 main 建置並部署 → 建置／執行時讀取 Vercel 上的環境變數 → 後端連線 Supabase（必備）與 Upstash Redis（選用）。
 
 ---
 
-## 3. Redis（Upstash）
+## 2. 網址與 DNS
 
-- **程式使用**：`@upstash/redis`，並讀取 **`UPSTASH_REDIS_REST_URL`**、**`UPSTASH_REDIS_REST_TOKEN`**（見 `lib/cache.ts`、`lib/idempotency.ts`、`lib/rate-limit.ts`）。
-- **用途**：冪等（idempotency）、rate limit、各類快取；未設定時使用記憶體 fallback（單實例可運作，多實例建議一定要設）。
-- **變數在哪設定**：
-  - **.env.example**：已列出 `UPSTASH_REDIS_REST_URL`、`UPSTASH_REDIS_REST_TOKEN`（註解範例）。
-  - **Vercel（正式環境）**：專案 → Settings → Environment Variables，手動新增或透過 Upstash 整合注入。
-  - **本地**：在 `.env.local` 手動加入（不要提交到 Git）。
+- **正式站**：https://www.customeraipro.com  
+- **DNS**：指向 Vercel 專案（在 Vercel 後台綁定網域）。  
+- **本機**：`npm run dev` → http://localhost:3000  
 
 ---
 
-## 4. 技術債務改動（idempotency、rate-limit、cache 等）
+## 3. 環境變數（一覽）
 
-- 已合併至 **main** 並推送到 GitHub。
-- **Vercel** 會從 main 自動部署；上線後請在 Vercel 專案中設定 **`UPSTASH_REDIS_REST_URL`**、**`UPSTASH_REDIS_REST_TOKEN`**，冪等與 rate limit 才會在正式環境使用 Redis；未設定時會使用記憶體 fallback（單實例可運作，多實例建議一定要設）。
+以下變數名稱在 **.env.example**、**Vercel 後台**、**本機 .env.local** 中請保持一致。
+
+| 用途 | 變數名稱 | 必填 | 說明 |
+|------|----------|------|------|
+| **Supabase** | `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Supabase 專案 URL |
+| | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | 匿名（公開）金鑰 |
+| | `SUPABASE_SERVICE_ROLE_KEY` | ✅ | 服務角色金鑰（後端用） |
+| **LINE** | `LINE_CHANNEL_SECRET` | 用 LINE 時 | Webhook 驗簽 |
+| | `LINE_CHANNEL_ACCESS_TOKEN` | 用 LINE 時 | 發送訊息 |
+| | `LINE_OWNER_USER_ID` | 用 LINE 時 | 綁定後台擁有者 |
+| **OpenAI** | `OPENAI_API_KEY` | ✅ | AI 回覆 |
+| | `OPENAI_MONTHLY_BUDGET`、`OPENAI_TIMEOUT_MS` 等 | 選用 | 見 .env.example |
+| **Upstash Redis** | `UPSTASH_REDIS_REST_URL` | 選用 | 未設則記憶體 fallback |
+| | `UPSTASH_REDIS_REST_TOKEN` | 選用 | 同上 |
+| **站點** | `NEXT_PUBLIC_SITE_URL` | 建議 | 正式站設為 https://www.customeraipro.com |
+
+- **本地**：複製 `.env.example` 為 `.env.local`，依上表填入（不要提交 .env.local）。  
+- **Vercel**：專案 → Settings → Environment Variables，依上表新增（Production/Preview 依需求勾選）。  
 
 ---
 
-## 5. 專案資訊確認
+## 4. Redis（Upstash）
 
-| 項目 | 內容 |
-|------|------|
-| **GitHub repo** | `mason113074-cyber/chat`（依你提供的資訊） |
-| **主要分支** | **main**（技術債務改動已合併） |
-| **package.json 部署相關指令** | **沒有** `deploy` 指令。現有 scripts：`dev`、`build`、`start`、`lint`、`test:api`、`test:ui`、`test:ui:headed`、`test:ui:report`、`test:ui:headed:prod`。部署由 **Vercel** 從 GitHub main 自動執行 `build` + `start`。 |
+- **程式**：`lib/cache.ts`、`lib/idempotency.ts`、`lib/rate-limit.ts` 讀取 **`UPSTASH_REDIS_REST_URL`**、**`UPSTASH_REDIS_REST_TOKEN`**。  
+- **用途**：冪等、rate limit、快取；未設定時使用記憶體 fallback。  
+- **設定處**：.env.example 有註解範例；Vercel 後台手動新增或透過 Upstash 整合；本機在 .env.local。  
+
+> 專案**僅使用 Upstash Redis** 與上述兩個變數，沒有使用 Vercel KV 或 `KV_REST_API_*`。
+
+---
+
+## 5. 部署流程（無需手動 deploy 指令）
+
+1. 程式碼 push 到 GitHub `main`。  
+2. Vercel 自動觸發 build（`npm run build`）並部署。  
+3. 環境變數在 Vercel 後台已設好即可（Supabase、LINE、OpenAI 必填；Upstash 選填）。  
+
+`package.json` 沒有 `deploy` 指令；部署完全由 Vercel 從 GitHub 自動執行。
+
+---
+
+## 6. 連通檢查腳本
+
+本機可驗證四端與環境變數是否正確：
+
+```bash
+npm run check-connections
+```
+
+會檢查：Vercel 環境、GitHub remote、Supabase 變數與 Auth 連線、Upstash 變數（若已設）與 REST 連線。
 
 ---
 
 ## 快速對照
 
-- **部署平台**：**Vercel**（正式環境）；**Supabase**（資料庫與認證，未變更）。
-- **www.customeraipro.com**：正式站網址，DNS 指向 Vercel。
-- **Redis**：`UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` 在 **Vercel** 專案 Environment Variables 中設定；本地在 `.env.local`。
+| 項目 | 內容 |
+|------|------|
+| **GitHub** | mason113074-cyber/chat，分支 main |
+| **Vercel** | 連線上述 repo，push main 即部署；正式站 www.customeraipro.com |
+| **Supabase** | 必填三變數；本地 .env.local、正式 Vercel 後台 |
+| **Upstash Redis** | 選填兩變數；同上；未設則記憶體 fallback |

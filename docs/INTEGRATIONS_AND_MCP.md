@@ -60,7 +60,13 @@ Settings → MCP → confirm “vercel” and “supabase” show as connected (
 
 ---
 
-## 4. Env Checklist
+## 4. 連通檢查
+
+本機可執行 `npm run check-connections` 驗證 **GitHub**（remote）、**Vercel**（環境）、**Supabase**（變數與 Auth）、**Upstash Redis**（變數與 REST）是否一致且連通。詳見 `docs/DEPLOYMENT_AND_ENV_FAQ.md`。
+
+---
+
+## 5. Env Checklist
 
 **Production (Vercel)**  
 - [ ] `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`  
@@ -74,7 +80,7 @@ Settings → MCP → confirm “vercel” and “supabase” show as connected (
 
 ---
 
-## 5. Dependencies (package.json)
+## 6. Dependencies (package.json)
 
 - **Supabase**: `@supabase/ssr`, `@supabase/supabase-js`
 - **LINE**: `@line/bot-sdk`

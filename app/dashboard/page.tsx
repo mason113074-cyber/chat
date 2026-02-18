@@ -152,7 +152,7 @@ export default async function DashboardPage() {
             {(recentConversations as unknown as ConversationRow[]).map((conv) => (
               <Link
                 key={conv.id}
-                href={`/dashboard/conversations`}
+                href={conv.contacts?.id ? `/dashboard/conversations/${conv.contacts.id}` : '/dashboard/conversations'}
                 className="block rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-indigo-200 hover:shadow-md transition-all"
               >
                 <div className="flex items-start justify-between gap-4">

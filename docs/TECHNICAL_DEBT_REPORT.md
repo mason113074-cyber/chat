@@ -28,7 +28,7 @@
 
 - **目的**：防止同一 LINE 事件被重複處理（例如網路重試、LINE 重送）。
 - **實作**：
-  - 使用 **Vercel KV（Upstash Redis）** 儲存事件 ID，TTL **1 小時**。
+  - 使用 **Upstash Redis** 儲存事件 ID，TTL **1 小時**。
   - 開發環境無 KV 時使用 **記憶體 fallback**，避免本地開發需額外設定。
 - **Event ID 優先順序**：
   1. `webhookEventId`（LINE 提供）
@@ -58,9 +58,9 @@
 ### 2.3 環境變數
 
 ```bash
-# Vercel KV（Upstash Redis）- 生產環境建議設定
-KV_REST_API_URL=https://xxx.upstash.io
-KV_REST_API_TOKEN=xxx
+# Upstash Redis - 生產環境建議設定
+UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
+UPSTASH_REDIS_REST_TOKEN=xxx
 ```
 
 未設定時，冪等與 rate limit 皆使用記憶體 fallback，適合單機／開發；多實例部署請務必設定 KV。
@@ -114,7 +114,7 @@ OPENAI_MONTHLY_BUDGET=100 # 選填，美金/月
 ### 4.1 通用快取層 `lib/cache.ts`
 
 - **介面**：`getCached`、`setCached`、`deleteCached`、`deleteCachedPattern`。
-- **儲存**：**記憶體 + Vercel KV**（雙層）；KV 未設定時僅用記憶體，build/本地無需 KV。
+- **儲存**：**記憶體 + Upstash Redis**（雙層）；未設定 Upstash 時僅用記憶體，build/本地無需 KV。
 - **TTL**：以秒為單位，可依呼叫端指定；預設 300 秒。
 - **Pattern 刪除**：KV 使用 `keys(pattern)` + `del`；記憶體以 glob 轉 regex 比對 key，定期 `cleanupMemoryCache`（每 5 分鐘）清理過期項目。
 
@@ -172,7 +172,7 @@ OPENAI_MONTHLY_BUDGET=100 # 選填，美金/月
 
 | 變數 | 用途 | 必填 |
 |------|------|------|
-| `KV_REST_API_URL` / `KV_REST_API_TOKEN` | 冪等、Rate limit、各類快取（生產建議） | 否（有記憶體 fallback） |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | 冪等、Rate limit、各類快取（生產建議） | 否（有記憶體 fallback） |
 | `OPENAI_API_KEY` | OpenAI 呼叫 | 是 |
 | `OPENAI_TIMEOUT_MS` | 單次請求逾時（ms） | 否（預設 30000） |
 | `OPENAI_MAX_RETRIES` | 可重試錯誤之重試次數 | 否（預設 2） |
