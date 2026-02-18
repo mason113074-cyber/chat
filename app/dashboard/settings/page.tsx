@@ -238,9 +238,9 @@ export default function SettingsPage() {
           <p className="mt-1 text-sm text-gray-600">選擇回覆使用的模型</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {AI_MODELS.map((id) => (
-              <label key={id} className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 cursor-pointer has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50">
+              <label key={id} className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 cursor-pointer has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-600 has-[:checked]:text-white">
                 <input type="radio" name="ai_model" value={id} checked={aiModel === id} onChange={() => setAiModel(id)} className="text-indigo-600" />
-                <span className="text-sm font-medium">{id}</span>
+                <span className="text-sm font-medium text-gray-700">{id}</span>
               </label>
             ))}
           </div>
@@ -258,20 +258,23 @@ export default function SettingsPage() {
             <p className="text-sm font-medium text-gray-700 mb-2">快速選擇語氣：</p>
             <div className="flex flex-wrap gap-2">
               <button
+                type="button"
                 onClick={() => handleToneSelect('friendly')}
-                className="rounded-full border border-gray-300 bg-white px-3 py-1 text-sm hover:border-indigo-500 hover:bg-indigo-50 transition-colors"
+                className="rounded-full border border-gray-300 bg-white px-3 py-1 text-sm text-gray-700 hover:border-indigo-500 hover:bg-indigo-50 hover:text-indigo-900 transition-colors"
               >
                 😊 親切友善
               </button>
               <button
+                type="button"
                 onClick={() => handleToneSelect('professional')}
-                className="rounded-full border border-gray-300 bg-white px-3 py-1 text-sm hover:border-indigo-500 hover:bg-indigo-50 transition-colors"
+                className="rounded-full border border-gray-300 bg-white px-3 py-1 text-sm text-gray-700 hover:border-indigo-500 hover:bg-indigo-50 hover:text-indigo-900 transition-colors"
               >
                 💼 專業正式
               </button>
               <button
+                type="button"
                 onClick={() => handleToneSelect('concise')}
-                className="rounded-full border border-gray-300 bg-white px-3 py-1 text-sm hover:border-indigo-500 hover:bg-indigo-50 transition-colors"
+                className="rounded-full border border-gray-300 bg-white px-3 py-1 text-sm text-gray-700 hover:border-indigo-500 hover:bg-indigo-50 hover:text-indigo-900 transition-colors"
               >
                 ⚡ 簡潔快速
               </button>
