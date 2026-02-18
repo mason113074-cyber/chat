@@ -1,7 +1,9 @@
 /**
  * Rate limiting (e.g. for LINE webhook) using fixed 60s window.
- * Uses Vercel KV when configured; in-memory fallback otherwise.
+ * Uses Upstash Redis when configured; in-memory fallback otherwise.
  */
+
+import { Redis } from '@upstash/redis';
 
 const RATE_LIMIT_WINDOW = 60; // 60 秒
 const MAX_REQUESTS_PER_WINDOW = 20; // 每分鐘最多 20 次
@@ -9,21 +11,35 @@ const PREFIX = 'ratelimit:line:';
 
 const memoryCounts = new Map<string, { count: number; windowStart: number }>();
 
-function isKvConfigured(): boolean {
-  return !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+let redis: Redis | null = null;
+
+function getRedis(): Redis | null {
+  if (redis !== null) return redis;
+  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    redis = new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    });
+  }
+  return redis;
 }
 
-async function kvCheck(identifier: string): Promise<{ allowed: boolean; remaining: number; resetAt: Date }> {
-  const { kv } = await import('@vercel/kv');
+function isRedisConfigured(): boolean {
+  return !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+}
+
+async function redisCheck(identifier: string): Promise<{ allowed: boolean; remaining: number; resetAt: Date }> {
+  const client = getRedis();
+  if (!client) throw new Error('Redis not configured');
   const key = `${PREFIX}${identifier}`;
   const now = Date.now();
   const windowStart = Math.floor(now / (RATE_LIMIT_WINDOW * 1000));
   const rateLimitKey = `${key}:${windowStart}`;
 
-  const current = await kv.incr(rateLimitKey);
+  const current = await client.incr(rateLimitKey);
 
   if (current === 1) {
-    await kv.expire(rateLimitKey, RATE_LIMIT_WINDOW);
+    await client.expire(rateLimitKey, RATE_LIMIT_WINDOW);
   }
 
   const remaining = Math.max(0, MAX_REQUESTS_PER_WINDOW - current);
@@ -60,11 +76,11 @@ export async function checkRateLimit(identifier: string): Promise<{
   remaining: number;
   resetAt: Date;
 }> {
-  if (isKvConfigured()) {
+  if (isRedisConfigured()) {
     try {
-      return await kvCheck(identifier);
+      return await redisCheck(identifier);
     } catch (e) {
-      console.error('[rate-limit] KV failed, allowing request', e);
+      console.error('[rate-limit] Redis failed, allowing request', e);
       return {
         allowed: true,
         remaining: MAX_REQUESTS_PER_WINDOW,
