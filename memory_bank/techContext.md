@@ -7,8 +7,8 @@
 - 聊天整合：LINE Messaging API（Webhook）
 - UI 元件：shadcn/ui + Tailwind CSS
 - 語言：TypeScript
-- 部署：Railway（從 GitHub main 分支自動部署）
-- 網域：GoDaddy → DNS 指向 Railway
+- 部署：Vercel（從 GitHub main 分支自動部署）
+- 網域：GoDaddy → DNS 指向 Vercel
 
 ## 資料庫 Migration
 - 001~009：基礎表 + conversations status 欄位
