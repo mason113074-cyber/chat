@@ -2,7 +2,9 @@ import OpenAI from 'openai';
 import { classifyOpenAIError, getFallbackMessage } from './openai-error-handler';
 import { retryWithBackoff } from './retry';
 import { calculateCost, trackTokenUsage, checkTokenBudget } from './openai-usage';
-import { filterAIOutput, logFilterEvent } from './ai-output-filter';
+import { detectSensitiveKeywords } from './security/sensitive-keywords';
+import { generateSecurePrompt, getSafetyFallbackResponse } from './security/secure-prompt';
+import { filterAIOutput, logFilterEvent } from './security/output-filter';
 
 let openaiInstance: OpenAI | null = null;
 
@@ -33,14 +35,30 @@ export async function generateReply(
   userMessage: string,
   systemPrompt?: string | null,
   model?: string | null,
-  userId?: string
+  userId?: string,
+  contactId?: string // 用於安全日誌
 ): Promise<string> {
   const modelId = model?.trim() || DEFAULT_MODEL;
-  const prompt =
+  const basePrompt =
     systemPrompt?.trim() && systemPrompt.trim().length > 0
       ? systemPrompt.trim()
       : defaultSystemPrompt;
 
+  // === 安全防護 Step 1：檢查使用者輸入 ===
+  const riskDetection = detectSensitiveKeywords(userMessage);
+
+  if (riskDetection.riskLevel === 'high') {
+    console.warn('[Security] High-risk input detected, returning safety fallback:', {
+      keywords: riskDetection.keywords,
+      userId,
+      contactId,
+    });
+
+    // 對於極高風險的問題，直接返回安全回覆，不呼叫 AI
+    return getSafetyFallbackResponse(riskDetection.keywords);
+  }
+
+  // === Token Budget 檢查（保留原有邏輯）===
   if (userId) {
     const budget = await checkTokenBudget(userId);
     if (!budget.withinBudget) {
@@ -49,13 +67,22 @@ export async function generateReply(
     }
   }
 
+  // === 安全防護 Step 2：生成安全強化的 Prompt ===
+  const securePrompt = generateSecurePrompt({
+    baseSystemPrompt: basePrompt,
+    userMessage,
+    riskLevel: riskDetection.riskLevel,
+    detectedKeywords: riskDetection.keywords,
+  });
+
   try {
+    // === 呼叫 OpenAI API（保留原有重試邏輯）===
     const completion = await retryWithBackoff(
       async () => {
         return await getOpenAI().chat.completions.create({
           model: modelId,
           messages: [
-            { role: 'system' as const, content: prompt },
+            { role: 'system' as const, content: securePrompt },
             { role: 'user' as const, content: userMessage },
           ],
           temperature: 0.7,
@@ -72,13 +99,19 @@ export async function generateReply(
       }
     );
 
-    let reply = completion.choices?.[0]?.message?.content ?? '無法生成回覆';
-    const filterResult = await filterAIOutput(reply);
-    if (!filterResult.isSafe) {
-      reply = filterResult.filteredResponse;
-      await logFilterEvent(filterResult, { userId, userMessage });
-    }
+    const rawReply = completion.choices?.[0]?.message?.content ?? '無法生成回覆';
 
+    // === 安全防護 Step 3：過濾 AI 輸出 ===
+    const filterResult = await filterAIOutput(rawReply);
+
+    // 記錄過濾事件
+    await logFilterEvent(filterResult, {
+      userId,
+      contactId,
+      userMessage,
+    });
+
+    // === Token 使用追蹤（保留原有邏輯）===
     if (userId && completion.usage) {
       const cost = calculateCost(
         modelId,
@@ -93,7 +126,8 @@ export async function generateReply(
       });
     }
 
-    return reply;
+    // 返回過濾後的安全回覆
+    return filterResult.filteredResponse;
   } catch (error) {
     console.error('[OpenAI] generateReply error:', error);
 

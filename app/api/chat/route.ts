@@ -3,8 +3,7 @@ import { generateReply } from '@/lib/openai';
 import { createClient } from '@/lib/supabase/server';
 import { searchKnowledgeForUser } from '@/lib/knowledge';
 import { getConversationUsageForUser } from '@/lib/billing-usage';
-import { detectSensitiveKeywords } from '@/lib/sensitive-keywords';
-import { generateSecurePrompt } from '@/lib/secure-prompt';
+import { detectSensitiveKeywords } from '@/lib/security/sensitive-keywords';
 
 const KNOWLEDGE_PREFIX = '\n\n以下是相關的知識庫資料，請優先參考這些資訊來回答：\n';
 const SENSITIVE_CONTENT_ERROR = '此問題涉及敏感內容，建議聯繫人工客服。';
@@ -57,11 +56,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const secureSystemPrompt = generateSecurePrompt({
-      baseSystemPrompt: systemPrompt?.trim() ?? '',
-      userMessage: message,
-    });
-    const content = await generateReply(message, secureSystemPrompt, aiModel);
+    const content = await generateReply(message, systemPrompt, aiModel);
     return NextResponse.json({ content });
   } catch (error) {
     console.error('Chat API error:', error);

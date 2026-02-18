@@ -9,8 +9,7 @@ import { autoTagContact } from '@/lib/auto-tag';
 import { isProcessed, markAsProcessed } from '@/lib/idempotency';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { invalidateAnalyticsCache } from '@/lib/analytics-cache';
-import { detectSensitiveKeywords } from '@/lib/sensitive-keywords';
-import { generateSecurePrompt } from '@/lib/secure-prompt';
+import { detectSensitiveKeywords } from '@/lib/security/sensitive-keywords';
 
 const KNOWLEDGE_PREFIX = '\n\n以下是相關的知識庫資料，請優先參考這些資訊來回答：\n';
 const SENSITIVE_CONTENT_REPLY = '此問題涉及敏感內容，建議聯繫人工客服。';
@@ -178,14 +177,16 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
       3,
       2000
     );
-    const baseSystemPrompt = knowledgeText
+    const fullSystemPrompt = knowledgeText
       ? (systemPrompt?.trim() ?? '') + KNOWLEDGE_PREFIX + knowledgeText
       : systemPrompt ?? '';
-    const fullSystemPrompt = generateSecurePrompt({
-      baseSystemPrompt,
-      userMessage: userMessage,
-    });
-    const aiResponse = await generateReply(userMessage, fullSystemPrompt, aiModel, ownerUserId);
+    const aiResponse = await generateReply(
+      userMessage,
+      fullSystemPrompt,
+      aiModel,
+      ownerUserId,
+      contact.id
+    );
 
     await replyMessage(replyToken, aiResponse);
 
