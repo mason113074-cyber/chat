@@ -10,7 +10,8 @@
     "test:api": "npx tsx scripts/test-api.ts",
     "test:ui": "playwright test",
     "test:ui:headed": "playwright test --headed",
-    "test:ui:report": "playwright show-report"
+    "test:ui:report": "playwright show-report",
+    "test:ui:headed:prod": "cross-env TEST_BASE_URL=https://www.customeraipro.com playwright test --headed"
   },
   "dependencies": {
     "@line/bot-sdk": "^9.4.0",
@@ -22,6 +23,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
     "@playwright/test": "^1.58.2",
     "@types/node": "^20.16.0",
     "@types/react": "^18.3.8",
