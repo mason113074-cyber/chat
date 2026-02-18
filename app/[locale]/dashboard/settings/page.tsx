@@ -114,9 +114,12 @@ export default function SettingsPage() {
     }, 10000);
     async function load() {
       try {
-        const response = await fetch('/api/settings');
-        if (!response.ok) throw new Error('無法載入設定');
-        const data = await response.json();
+        const response = await fetch('/api/settings', { credentials: 'include' });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const message = (data && typeof data.error === 'string') ? data.error : '無法載入設定';
+          throw new Error(message);
+        }
         if (cancelled) return;
         if (data.systemPrompt) setSystemPrompt(data.systemPrompt);
         if (data.storeName != null) setStoreName(data.storeName || '');

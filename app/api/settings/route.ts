@@ -8,12 +8,29 @@ const MAX_PROMPT_LENGTH = 5000;
 
 export async function GET(request: NextRequest) {
   try {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      return NextResponse.json(
+        { error: '伺服器設定不完整，請聯繫管理員' },
+        { status: 503 }
+      );
+    }
     const auth = await getAuthFromRequest(request);
     let user = auth?.user ?? null;
-    const supabase = auth?.supabase ?? await createClient();
+    let supabase;
+    try {
+      supabase = auth?.supabase ?? await createClient();
+    } catch (e) {
+      console.error('Settings API createClient error:', e);
+      return NextResponse.json(
+        { error: '無法連線至資料服務，請稍後再試' },
+        { status: 503 }
+      );
+    }
     if (!user) {
       const { data: { user: u }, error: authError } = await supabase.auth.getUser();
-      if (authError || !u) return NextResponse.json({ error: '未授權，請先登入' }, { status: 401 });
+      if (authError || !u) {
+        return NextResponse.json({ error: '未授權，請先登入' }, { status: 401 });
+      }
       user = u;
     }
 
