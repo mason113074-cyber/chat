@@ -1,5 +1,6 @@
 ---
-rule_type: always
+description: "TypeScript、React、Next.js API 與 Tailwind 的程式碼風格與慣例，撰寫或修改程式碼時請遵循"
+alwaysApply: true
 ---
 
 # Code Style Rules

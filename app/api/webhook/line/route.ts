@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { validateSignature, replyMessage, LineWebhookBody, LineWebhookEvent } from '@/lib/line';
 import { generateReply } from '@/lib/openai';
 import { searchKnowledgeWithSources } from '@/lib/knowledge-search';
-import { getOrCreateContactByLineUserId, getUserSettings, insertConversationMessage } from '@/lib/supabase';
+import { getOrCreateContactByLineUserId, getUserSettings, insertConversationMessage, type Contact } from '@/lib/supabase';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getConversationUsageForUser } from '@/lib/billing-usage';
 import { autoTagContact } from '@/lib/auto-tag';
@@ -160,6 +160,7 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
     return;
   }
 
+  let contact: Contact | null = null;
   try {
     const admin = getSupabaseAdmin();
     const { limit, used } = await getConversationUsageForUser(admin, ownerUserId);
@@ -168,7 +169,7 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
       return;
     }
 
-    const contact = await getOrCreateContactByLineUserId(lineUserId, ownerUserId);
+    contact = await getOrCreateContactByLineUserId(lineUserId, ownerUserId);
 
     const { system_prompt: systemPrompt, ai_model: aiModel } = await getUserSettings(ownerUserId);
     const { text: knowledgeText, sources } = await searchKnowledgeWithSources(
@@ -185,7 +186,7 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
       fullSystemPrompt,
       aiModel,
       ownerUserId,
-      contact.id
+      contact.id // 新增：傳入 contact.id 用於安全日誌
     );
 
     await replyMessage(replyToken, aiResponse);
@@ -213,6 +214,8 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
     console.error('[LINE webhook] Event error', {
       requestId,
       eventId: getEventId(event),
+      contactId: contact?.id ?? undefined,
+      lineUserId,
       error: error instanceof Error ? error.message : String(error),
     });
     try {
