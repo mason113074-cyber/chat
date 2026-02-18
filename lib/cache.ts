@@ -55,18 +55,27 @@ export async function getCached<T>(
     return memCached as T;
   }
 
-  // 2. Check Redis
+  // 2. Check Redis (Upstash may auto-deserialize JSON; string primitives come back as "hello" not '"hello"')
   try {
     const redisClient = getRedis();
     if (redisClient) {
-      const raw = await redisClient.get<string>(key);
+      const raw = await redisClient.get(key);
       if (raw !== null && raw !== undefined) {
         try {
-          const cached = typeof raw === 'string' ? (JSON.parse(raw) as T) : raw;
+          let cached: T;
+          if (typeof raw === 'string') {
+            try {
+              cached = JSON.parse(raw) as T;
+            } catch {
+              cached = raw as T; // already deserialized by Upstash (e.g. string primitive)
+            }
+          } else {
+            cached = raw as T;
+          }
           setToMemory(key, cached, ttl);
           return cached;
         } catch {
-          // Invalid JSON stored, treat as miss
+          // unexpected format, treat as miss
         }
       }
     }
