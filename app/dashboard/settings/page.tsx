@@ -240,7 +240,7 @@ export default function SettingsPage() {
             {AI_MODELS.map((id) => (
               <label key={id} className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 cursor-pointer has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-600 has-[:checked]:text-white">
                 <input type="radio" name="ai_model" value={id} checked={aiModel === id} onChange={() => setAiModel(id)} className="text-indigo-600" />
-                <span className="text-sm font-medium text-gray-700">{id}</span>0">{id}</span>
+                <span className="text-sm font-medium text-gray-700">{id}</span>
               </label>
             ))}
           </div>
