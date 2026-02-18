@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useToast } from '@/components/Toast';
+import { QuickReplies } from '@/app/components/QuickReplies';
+import type { QuickReply } from '@/lib/types';
 
 const DEFAULT_SYSTEM_PROMPT = `你是一位專業且友善的客服助理。
 
@@ -65,11 +67,18 @@ const EXAMPLE_QUESTIONS = [
   '如何退換貨？',
 ];
 
+const DEFAULT_QUICK_REPLIES: QuickReply[] = [
+  { id: '1', text: '📦 查詢訂單狀態', enabled: true },
+  { id: '2', text: '💰 運費怎麼計算？', enabled: true },
+  { id: '3', text: '🔄 如何退換貨？', enabled: true },
+];
+
 export default function SettingsPage() {
   const toast = useToast();
   const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT);
   const [storeName, setStoreName] = useState('');
   const [aiModel, setAiModel] = useState<string>('gpt-4o-mini');
+  const [quickReplies, setQuickReplies] = useState<QuickReply[]>(DEFAULT_QUICK_REPLIES);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -96,6 +105,11 @@ export default function SettingsPage() {
         if (data.systemPrompt) setSystemPrompt(data.systemPrompt);
         if (data.storeName != null) setStoreName(data.storeName || '');
         if (data.aiModel) setAiModel(data.aiModel);
+        if (Array.isArray(data.quickReplies) && data.quickReplies.length > 0) {
+          const padded: QuickReply[] = [...data.quickReplies];
+          while (padded.length < 5) padded.push({ id: `slot-${padded.length}`, text: '', enabled: true });
+          setQuickReplies(padded.slice(0, 5));
+        }
       } catch (error) {
         console.error('載入設定失敗:', error);
         toast.show('載入設定失敗', 'error');
@@ -118,7 +132,12 @@ export default function SettingsPage() {
       const response = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ systemPrompt, storeName, aiModel }),
+        body: JSON.stringify({
+          systemPrompt,
+          storeName,
+          aiModel,
+          quickReplies: quickReplies.filter((r) => r.text.trim()).slice(0, 5),
+        }),
       });
       if (!response.ok) throw new Error('儲存失敗');
       toast.show('已儲存', 'success');
@@ -238,11 +257,56 @@ export default function SettingsPage() {
           <p className="mt-1 text-sm text-gray-600">選擇回覆使用的模型</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {AI_MODELS.map((id) => (
-              <label key={id} className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 cursor-pointer has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-600 has-[:checked]:text-white">
+              <label key={id} className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 cursor-pointer text-gray-700 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50 has-[:checked]:text-indigo-900">
                 <input type="radio" name="ai_model" value={id} checked={aiModel === id} onChange={() => setAiModel(id)} className="text-indigo-600" />
-                <span className="text-sm font-medium text-gray-700">{id}</span>0">{id}</span>
+                <span className="text-sm font-medium">{id}</span>
               </label>
             ))}
+          </div>
+        </div>
+
+        {/* 快捷回覆按鈕 */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900">快捷回覆按鈕</h2>
+          <p className="mt-1 text-sm text-gray-600">自訂 3～5 個常見問題，會顯示在 Widget 開場時供用戶點擊（儲存時一併更新）</p>
+          <div className="mt-4 space-y-3">
+            {(() => {
+              const padded: QuickReply[] = [...quickReplies];
+              while (padded.length < 5) padded.push({ id: `slot-${padded.length}`, text: '', enabled: true });
+              return padded.slice(0, 5).map((item, index) => (
+                <div key={item.id} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={item.enabled}
+                    aria-label={`常見問題 ${index + 1} 啟用`}
+                    onChange={() => {
+                      setQuickReplies((prev) => {
+                        const p = [...prev];
+                        while (p.length < 5) p.push({ id: `slot-${p.length}`, text: '', enabled: true });
+                        p[index] = { ...p[index], enabled: !p[index].enabled };
+                        return p.slice(0, 5);
+                      });
+                    }}
+                    className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <input
+                    type="text"
+                    value={item.text}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setQuickReplies((prev) => {
+                        const p = [...prev];
+                        while (p.length < 5) p.push({ id: `slot-${p.length}`, text: '', enabled: true });
+                        p[index] = { ...p[index], text: v };
+                        return p.slice(0, 5);
+                      });
+                    }}
+                    placeholder={`常見問題 ${index + 1}`}
+                    className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-20"
+                  />
+                </div>
+              ));
+            })()}
           </div>
         </div>
 
@@ -420,6 +484,7 @@ export default function SettingsPage() {
                     {welcomeText}
                   </div>
                 </div>
+                <QuickReplies items={quickReplies} onSelect={(query) => handlePreviewReply(query)} />
                 <div className="flex justify-end">
                   <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-indigo-500 text-white px-4 py-2 text-sm">
                     {previewQuestion}
@@ -502,6 +567,7 @@ export default function SettingsPage() {
                 <div className="flex justify-start">
                   <div className="max-w-[85%] rounded-2xl rounded-tl-md bg-gray-100 text-gray-900 px-4 py-2 text-sm">{welcomeText}</div>
                 </div>
+                <QuickReplies items={quickReplies} onSelect={(query) => handlePreviewReply(query)} />
                 <div className="flex justify-end">
                   <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-indigo-500 text-white px-4 py-2 text-sm">{previewQuestion}</div>
                 </div>

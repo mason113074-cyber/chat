@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAuthFromRequest } from '@/lib/auth-helper';
+import { clearKnowledgeCache } from '@/lib/knowledge-search';
 
 const CATEGORIES = ['general', '常見問題', '產品資訊', '退換貨政策', '營業資訊', '其他'];
 
@@ -42,6 +43,7 @@ export async function PUT(
       console.error(error);
       return NextResponse.json({ error: '更新失敗' }, { status: 500 });
     }
+    await clearKnowledgeCache(user.id);
     return NextResponse.json({ item: data });
   } catch (e) {
     console.error(e);
@@ -74,6 +76,7 @@ export async function DELETE(
       console.error(error);
       return NextResponse.json({ error: '刪除失敗' }, { status: 500 });
     }
+    await clearKnowledgeCache(user.id);
     return NextResponse.json({ success: true });
   } catch (e) {
     console.error(e);

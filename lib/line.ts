@@ -62,10 +62,12 @@ export async function replyMessage(
   }
 }
 
-// LINE webhook event types
+// LINE webhook event types (see https://developers.line.biz/en/docs/messaging-api/receiving-messages)
 export interface LineWebhookEvent {
   type: string;
   replyToken?: string;
+  webhookEventId?: string;
+  deliveryContext?: { isRedelivery?: boolean };
   source: {
     type: string;
     userId?: string;

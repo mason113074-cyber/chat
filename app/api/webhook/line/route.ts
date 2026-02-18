@@ -6,10 +6,22 @@ import { getOrCreateContactByLineUserId, getUserSettings, insertConversationMess
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getConversationUsageForUser } from '@/lib/billing-usage';
 import { autoTagContact } from '@/lib/auto-tag';
+import { isProcessed, markAsProcessed } from '@/lib/idempotency';
+import { checkRateLimit } from '@/lib/rate-limit';
+import { invalidateAnalyticsCache } from '@/lib/analytics-cache';
 
 const KNOWLEDGE_PREFIX = '\n\n以下是相關的知識庫資料，請優先參考這些資訊來回答：\n';
 
 const NEEDS_HUMAN_KEYWORDS = /不確定|無法回答|請聯繫|請聯絡|抱歉我不清楚|抱歉我無法|轉人工|真人客服/;
+
+/** Stable id for idempotency: prefer webhookEventId, then message.id, then replyToken. */
+function getEventId(event: LineWebhookEvent): string {
+  return (
+    event.webhookEventId ??
+    event.message?.id ??
+    (event.replyToken ? `token:${event.replyToken}` : `ts:${event.timestamp}:${event.source?.userId ?? 'unknown'}`)
+  );
+}
 
 function computeResolution(
   sourcesLength: number,
@@ -22,12 +34,15 @@ function computeResolution(
 }
 
 export async function POST(request: NextRequest) {
+  const start = Date.now();
+  const requestId = `line-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
   try {
     const body = await request.text();
     const signature = request.headers.get('x-line-signature');
 
     if (!validateSignature(body, signature)) {
-      console.error('Invalid LINE signature');
+      console.warn('[LINE webhook] Invalid signature', { requestId });
       return NextResponse.json(
         { error: 'Invalid signature' },
         { status: 401 }
@@ -35,15 +50,35 @@ export async function POST(request: NextRequest) {
     }
 
     const webhookBody: LineWebhookBody = JSON.parse(body);
-    const events = webhookBody.events;
+    const events = webhookBody.events ?? [];
 
-    for (const event of events) {
-      await handleEvent(event);
+    if (events.length === 0) {
+      return NextResponse.json({ success: true });
     }
 
+    const eventIds = events.map(getEventId);
+    console.info('[LINE webhook] Request', {
+      requestId,
+      eventCount: events.length,
+      eventIds: eventIds.slice(0, 5),
+      destination: webhookBody.destination,
+    });
+
+    for (const event of events) {
+      await handleEvent(event, requestId);
+    }
+
+    console.info('[LINE webhook] Success', {
+      requestId,
+      durationMs: Date.now() - start,
+    });
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Webhook error:', error);
+    console.error('[LINE webhook] Error', {
+      requestId,
+      durationMs: Date.now() - start,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -51,7 +86,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function handleEvent(event: LineWebhookEvent): Promise<void> {
+async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<void> {
   if (event.type !== 'message' || !event.message || event.message.type !== 'text') {
     return;
   }
@@ -61,6 +96,23 @@ async function handleEvent(event: LineWebhookEvent): Promise<void> {
   const lineUserId = event.source.userId;
 
   if (!userMessage || !replyToken || !lineUserId) {
+    return;
+  }
+
+  const eventId = getEventId(event);
+  if (await isProcessed(eventId)) {
+    console.info('[LINE webhook] Duplicate event skipped', { requestId, eventId });
+    return;
+  }
+
+  const { allowed: rateLimitOk, remaining, resetAt } = await checkRateLimit(lineUserId);
+  if (!rateLimitOk) {
+    console.warn('[LINE webhook] Rate limit exceeded', { requestId, lineUserId, remaining, resetAt: resetAt.toISOString() });
+    try {
+      await replyMessage(replyToken, '您發送訊息的頻率過高，請稍後再試。');
+    } catch {
+      // ignore
+    }
     return;
   }
 
@@ -95,7 +147,7 @@ async function handleEvent(event: LineWebhookEvent): Promise<void> {
     const fullSystemPrompt = knowledgeText
       ? (systemPrompt?.trim() ?? '') + KNOWLEDGE_PREFIX + knowledgeText
       : systemPrompt;
-    const aiResponse = await generateReply(userMessage, fullSystemPrompt, aiModel);
+    const aiResponse = await generateReply(userMessage, fullSystemPrompt, aiModel, ownerUserId);
 
     await replyMessage(replyToken, aiResponse);
 
@@ -108,14 +160,22 @@ async function handleEvent(event: LineWebhookEvent): Promise<void> {
     });
 
     void autoTagContact(contact.id, ownerUserId, userMessage);
+    void invalidateAnalyticsCache(ownerUserId);
 
-    console.log('Successfully processed message:', {
+    await markAsProcessed(eventId);
+
+    console.info('[LINE webhook] Event processed', {
+      requestId,
+      eventId,
       contactId: contact.id,
       lineUserId,
-      aiResponse: aiResponse.substring(0, 50) + '...',
     });
   } catch (error) {
-    console.error('Error handling event:', error);
+    console.error('[LINE webhook] Event error', {
+      requestId,
+      eventId: getEventId(event),
+      error: error instanceof Error ? error.message : String(error),
+    });
     try {
       await replyMessage(
         replyToken,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAuthFromRequest } from '@/lib/auth-helper';
+import { invalidateUserSettingsCache } from '@/lib/supabase';
 
 const MIN_PROMPT_LENGTH = 10;
 const MAX_PROMPT_LENGTH = 5000;
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('users')
-      .select('system_prompt, ai_model, store_name')
+      .select('system_prompt, ai_model, store_name, quick_replies')
       .eq('id', user.id)
       .single();
 
@@ -30,10 +31,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const quickReplies = Array.isArray(data?.quick_replies) ? data.quick_replies : [];
+
     return NextResponse.json({
       systemPrompt: data?.system_prompt ?? null,
       aiModel: data?.ai_model ?? 'gpt-4o-mini',
       storeName: data?.store_name ?? null,
+      quickReplies,
     });
   } catch (error) {
     console.error('Settings GET API error:', error);
@@ -56,7 +60,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { systemPrompt, storeName, aiModel } = body;
+    const { systemPrompt, storeName, aiModel, quickReplies } = body;
 
     if (typeof systemPrompt !== 'string') {
       return NextResponse.json(
@@ -79,10 +83,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const updates: { system_prompt: string; store_name?: string | null; ai_model?: string } = { system_prompt: systemPrompt };
+    const updates: {
+      system_prompt: string;
+      store_name?: string | null;
+      ai_model?: string;
+      quick_replies?: unknown;
+    } = { system_prompt: systemPrompt };
     if (typeof storeName === 'string') updates.store_name = storeName.trim().slice(0, 100) || null;
     if (typeof aiModel === 'string' && ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo'].includes(aiModel)) {
       updates.ai_model = aiModel;
+    }
+    if (Array.isArray(quickReplies)) {
+      const valid = quickReplies
+        .filter(
+          (r: unknown) =>
+            r !== null &&
+            typeof r === 'object' &&
+            'id' in r &&
+            'text' in r &&
+            'enabled' in r &&
+            typeof (r as { id: unknown }).id === 'string' &&
+            typeof (r as { text: unknown }).text === 'string' &&
+            typeof (r as { enabled: unknown }).enabled === 'boolean'
+        )
+        .slice(0, 5)
+        .map((r: { id: string; text: string; enabled: boolean }) => ({
+          id: String(r.id),
+          text: String(r.text).slice(0, 100),
+          enabled: Boolean(r.enabled),
+        }));
+      updates.quick_replies = valid;
     }
 
     const { error } = await supabase
@@ -97,6 +127,8 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    await invalidateUserSettingsCache(user.id);
 
     return NextResponse.json({ 
       success: true,

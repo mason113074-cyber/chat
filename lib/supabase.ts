@@ -1,4 +1,9 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import type { QuickReply } from './types';
+import { getCached, deleteCached } from './cache';
+
+const USER_SETTINGS_CACHE_TTL = 600; // 10 分鐘
+const USER_SETTINGS_CACHE_PREFIX = 'user_settings:';
 
 // Lazy initialization to avoid build-time errors
 let supabaseInstance: SupabaseClient | null = null;
@@ -44,6 +49,8 @@ export { getSupabase as supabase, getSupabaseAdmin as supabaseAdmin };
 
 // --- Phase 1 schema types ---
 
+export type { QuickReply } from './types';
+
 export interface User {
   id: string;
   email: string;
@@ -51,6 +58,7 @@ export interface User {
   line_channel_id: string | null;
   system_prompt?: string | null;
   ai_model?: string | null;
+  quick_replies?: QuickReply[] | null;
   created_at?: string;
 }
 
@@ -211,22 +219,35 @@ export interface UserSettings {
   ai_model: string | null;
 }
 
-/** Fetch system_prompt and ai_model for a user (e.g. for webhook). */
+/** Fetch system_prompt and ai_model for a user (e.g. for webhook). Cached 10 min. */
 export async function getUserSettings(userId: string): Promise<UserSettings> {
-  const client = getSupabaseAdmin();
-  const { data, error } = await client
-    .from('users')
-    .select('system_prompt, ai_model')
-    .eq('id', userId)
-    .maybeSingle();
+  const cacheKey = USER_SETTINGS_CACHE_PREFIX + userId;
 
-  if (error) {
-    console.error('Error fetching user settings:', error);
-    return { system_prompt: null, ai_model: null };
-  }
+  return getCached(
+    cacheKey,
+    async () => {
+      const client = getSupabaseAdmin();
+      const { data, error } = await client
+        .from('users')
+        .select('system_prompt, ai_model')
+        .eq('id', userId)
+        .maybeSingle();
 
-  return {
-    system_prompt: data?.system_prompt ?? null,
-    ai_model: data?.ai_model ?? null,
-  };
+      if (error) {
+        console.error('Error fetching user settings:', error);
+        return { system_prompt: null, ai_model: null };
+      }
+
+      return {
+        system_prompt: data?.system_prompt ?? null,
+        ai_model: data?.ai_model ?? null,
+      };
+    },
+    { ttl: USER_SETTINGS_CACHE_TTL }
+  );
+}
+
+/** 更新使用者設定後呼叫，清除該使用者的設定快取 */
+export async function invalidateUserSettingsCache(userId: string): Promise<void> {
+  await deleteCached(USER_SETTINGS_CACHE_PREFIX + userId);
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { clearKnowledgeCache } from '@/lib/knowledge-search';
 
 const CATEGORIES = ['general', '常見問題', '產品資訊', '退換貨政策', '營業資訊', '其他'];
 
@@ -46,6 +47,7 @@ export async function POST(request: NextRequest) {
       console.error(error);
       return NextResponse.json({ error: '匯入失敗' }, { status: 500 });
     }
+    await clearKnowledgeCache(user.id);
     return NextResponse.json({ imported: data?.length ?? toInsert.length, ids: data?.map((x) => x.id) ?? [] });
   } catch (e) {
     console.error(e);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAuthFromRequest } from '@/lib/auth-helper';
+import { clearKnowledgeCache } from '@/lib/knowledge-search';
 
 const CATEGORIES = ['general', '常見問題', '產品資訊', '退換貨政策', '營業資訊', '其他'];
 
@@ -72,6 +73,7 @@ export async function POST(request: NextRequest) {
       console.error(error);
       return NextResponse.json({ error: '新增失敗' }, { status: 500 });
     }
+    await clearKnowledgeCache(user.id);
     return NextResponse.json({ item: data }, { status: 201 });
   } catch (e) {
     console.error(e);
