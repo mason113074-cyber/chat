@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { TAG_COLORS } from '@/lib/contact-tags';
+import { EmptyState } from '@/components/EmptyState';
 
 type Tag = { id: string; name: string; color: string };
 type ContactTag = { id: string; name: string; color: string; assigned_by: string };
@@ -15,6 +16,8 @@ type Contact = {
   lastInteraction: string | null;
   tags: ContactTag[];
 };
+
+const ITEMS_PER_PAGE = 20;
 
 const COLOR_CLASS: Record<string, string> = {
   red: 'bg-red-100 text-red-800',
@@ -34,6 +37,8 @@ export default function ContactsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
   const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set());
   const [openPopoverId, setOpenPopoverId] = useState<string | null>(null);
   const [manageOpen, setManageOpen] = useState(false);
@@ -61,13 +66,41 @@ export default function ContactsPage() {
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([fetchContacts(), fetchTags()]).finally(() => setLoading(false));
+    setError(null);
+    const timeoutId = setTimeout(() => {
+      setLoading((prev) => {
+        if (prev) {
+          setError('載入超時，請重新整理頁面或聯繫客服');
+          return false;
+        }
+        return prev;
+      });
+    }, 10000);
+    Promise.all([fetchContacts(), fetchTags()])
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : '載入失敗');
+      })
+      .finally(() => {
+        clearTimeout(timeoutId);
+        setLoading(false);
+      });
   }, [fetchContacts, fetchTags]);
 
   const filteredContacts =
     selectedTagIds.size === 0
       ? contacts
       : contacts.filter((c) => selectedTagIds.size > 0 && [...selectedTagIds].every((tid) => c.tags.some((t) => t.id === tid)));
+
+  const totalPages = Math.max(1, Math.ceil(filteredContacts.length / ITEMS_PER_PAGE));
+  const paginatedContacts = filteredContacts.slice(
+    (page - 1) * ITEMS_PER_PAGE,
+    page * ITEMS_PER_PAGE
+  );
+
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    setPage(1);
+  }, [selectedTagIds]);
 
   function toggleTagFilter(tagId: string) {
     setSelectedTagIds((prev) => {
@@ -171,8 +204,30 @@ export default function ContactsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <p className="text-gray-500">載入中...</p>
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto" />
+          <p className="mt-3 text-gray-600">載入中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="text-center max-w-md">
+          <div className="text-red-600 text-6xl mb-4">⚠</div>
+          <h2 className="text-xl font-semibold mb-2">載入失敗</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
+          >
+            重新載入
+          </button>
+        </div>
       </div>
     );
   }
@@ -182,7 +237,7 @@ export default function ContactsPage() {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">客戶管理</h1>
-          <p className="mt-1 text-gray-600">來自 LINE 與其他管道之聯絡人</p>
+          <p className="mt-1 text-gray-600">共 {filteredContacts.length} 位聯絡人</p>
         </div>
         <button
           type="button"
@@ -223,18 +278,15 @@ export default function ContactsPage() {
 
       <div className="mt-8">
         {!contacts.length ? (
-          <div className="rounded-xl border border-gray-200 bg-white px-6 py-16 text-center shadow-sm">
-            <div className="flex flex-col items-center">
-              <div className="rounded-full bg-indigo-100 w-20 h-20 flex items-center justify-center mb-4">
-                <span className="text-4xl">👥</span>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">還沒有客戶</h3>
-              <p className="text-sm text-gray-600 max-w-md">
-                當客戶透過 LINE 發送第一則訊息後，會自動建立聯絡人並顯示於此。
-              </p>
-            </div>
+          <div className="rounded-xl border border-gray-200 bg-white px-6 py-16 shadow-sm">
+            <EmptyState
+              icon="👥"
+              title="還沒有客戶"
+              description="當客戶透過 LINE 發送第一則訊息後，會自動建立聯絡人並顯示於此。"
+            />
           </div>
         ) : (
+          <>
           <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -248,7 +300,7 @@ export default function ContactsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
-                {filteredContacts.map((c) => (
+                {paginatedContacts.map((c) => (
                   <tr key={c.id} className="hover:bg-gray-50 transition-colors">
                     <td className="whitespace-nowrap px-6 py-4">
                       <Link
@@ -342,6 +394,30 @@ export default function ContactsPage() {
               </tbody>
             </table>
           </div>
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3 bg-gray-50">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                上一頁
+              </button>
+              <span className="text-sm text-gray-600">
+                第 {page} / 共 {totalPages} 頁（顯示 {(page - 1) * ITEMS_PER_PAGE + 1} - {Math.min(page * ITEMS_PER_PAGE, filteredContacts.length)}）
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                下一頁
+              </button>
+            </div>
+          )}
+          </>
         )}
       </div>
 

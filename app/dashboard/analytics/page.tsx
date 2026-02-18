@@ -160,9 +160,20 @@ export default function AnalyticsPage() {
   const [quality, setQuality] = useState<Quality | null>(null);
   const [resolution, setResolution] = useState<Resolution | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
+    setError(null);
+    const timeoutId = setTimeout(() => {
+      setLoading((prev) => {
+        if (prev) {
+          setError('載入超時，請重新整理頁面或聯繫客服');
+          return false;
+        }
+        return prev;
+      });
+    }, 10000);
     try {
       const [overviewRes, trendsRes, hourlyRes, questionsRes, contactsRes, qualityRes, resolutionRes] = await Promise.all([
         fetch('/api/analytics/overview'),
@@ -192,7 +203,10 @@ export default function AnalyticsPage() {
       }
       if (qualityRes.ok) setQuality(await qualityRes.json());
       if (resolutionRes.ok) setResolution(await resolutionRes.json());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '載入失敗');
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   }, [days]);
@@ -239,7 +253,27 @@ export default function AnalyticsPage() {
       </div>
 
       {loading ? (
-        <div className="flex min-h-[200px] items-center justify-center text-gray-500">載入中...</div>
+        <div className="flex min-h-[50vh] items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto" />
+            <p className="mt-3 text-gray-600">載入中...</p>
+          </div>
+        </div>
+      ) : error ? (
+        <div className="flex min-h-[50vh] items-center justify-center">
+          <div className="text-center max-w-md">
+            <div className="text-red-600 text-6xl mb-4">⚠</div>
+            <h2 className="text-xl font-semibold mb-2">載入失敗</h2>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <button
+              type="button"
+              onClick={() => fetchAll()}
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
+            >
+              重新載入
+            </button>
+          </div>
+        </div>
       ) : !hasAnyData ? (
         <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center shadow-sm">
           <p className="text-gray-600">開始使用後就能看到分析數據</p>
@@ -384,18 +418,18 @@ export default function AnalyticsPage() {
             </div>
           </div>
 
-          {/* Trend line chart */}
+          {/* Trend line chart - responsive container */}
           <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
             <h2 className="mb-4 text-lg font-semibold text-gray-900">對話量趨勢</h2>
-            <div className="h-[220px] w-full">
+            <div className="h-[220px] w-full min-w-0">
               <LineChart data={trends} width={700} height={220} />
             </div>
           </div>
 
-          {/* Hourly bar chart */}
+          {/* Hourly bar chart - responsive container */}
           <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
             <h2 className="mb-4 text-lg font-semibold text-gray-900">時段分布（0–23 時）</h2>
-            <div className="h-[220px] w-full">
+            <div className="h-[220px] w-full min-w-0">
               <BarChart data={hourly} width={700} height={220} />
             </div>
           </div>

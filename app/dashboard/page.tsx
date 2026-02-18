@@ -7,50 +7,48 @@ export default async function DashboardPage() {
   if (!user) return null;
 
   type Conversation = { id: string; created_at: string };
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
 
-  // 1. Total contacts count
-  const { count: contactsCount } = await supabase
-    .from('contacts')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', user.id);
+  // Run all dashboard queries in parallel for faster load
+  const [
+    { count: contactsCount },
+    { data: contactsWithConversations },
+    { count: newContactsCount },
+    { data: recentConversations },
+  ] = await Promise.all([
+    supabase
+      .from('contacts')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id),
+    supabase
+      .from('contacts')
+      .select('id, conversations(id, created_at)')
+      .eq('user_id', user.id),
+    supabase
+      .from('contacts')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .gte('created_at', weekAgo.toISOString()),
+    supabase
+      .from('conversations')
+      .select('id, message, created_at, contacts!inner(name, line_user_id, id)')
+      .eq('contacts.user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(5),
+  ]);
 
-  // 2. Get all contacts with their conversations for statistics
-  const { data: contactsWithConversations } = await supabase
-    .from('contacts')
-    .select('id, conversations(id, created_at)')
-    .eq('user_id', user.id);
-
-  // 計算總對話數
   const conversationsCount = (contactsWithConversations || []).reduce(
     (total, contact) => total + ((contact.conversations as Conversation[]) || []).length,
     0
   );
-
-  // 3. 計算今日對話數
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
   const todayConversationsCount = (contactsWithConversations || []).reduce((total, contact) => {
     const conversations = (contact.conversations as Conversation[]) || [];
     const todayConvs = conversations.filter((conv) => new Date(conv.created_at) >= today);
     return total + todayConvs.length;
   }, 0);
-
-  // 4. New contacts this week
-  const weekAgo = new Date();
-  weekAgo.setDate(weekAgo.getDate() - 7);
-  const { count: newContactsCount } = await supabase
-    .from('contacts')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', user.id)
-    .gte('created_at', weekAgo.toISOString());
-
-  // 5. Get recent 5 conversations
-  const { data: recentConversations } = await supabase
-    .from('conversations')
-    .select('id, message, created_at, contacts!inner(name, line_user_id, id)')
-    .eq('contacts.user_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(5);
 
   type ConversationRow = {
     id: string;

@@ -99,6 +99,7 @@ export default function LoginPage() {
               </label>
               <input
                 id="email"
+                data-testid="login-email"
                 type="email"
                 autoComplete="email"
                 required
@@ -113,6 +114,7 @@ export default function LoginPage() {
               </label>
               <input
                 id="password"
+                data-testid="login-password"
                 type="password"
                 autoComplete={isSignUp ? 'new-password' : 'current-password'}
                 required
@@ -123,6 +125,7 @@ export default function LoginPage() {
             </div>
             <button
               type="submit"
+              data-testid="login-submit"
               disabled={loading}
               className="mt-6 w-full rounded-lg bg-indigo-600 py-3 font-semibold text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
             >

@@ -85,8 +85,8 @@ export default function KnowledgeBasePage() {
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Test AI panel
-  const [testPanelOpen, setTestPanelOpen] = useState(false);
+  // Test AI panel - 預設展開方便測試
+  const [testPanelOpen, setTestPanelOpen] = useState(true);
   const [testQuestion, setTestQuestion] = useState('');
   const [testLoading, setTestLoading] = useState(false);
   const [testAnswer, setTestAnswer] = useState<string | null>(null);

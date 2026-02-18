@@ -99,6 +99,7 @@ export default function ConversationsPage() {
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [counts, setCounts] = useState<{ total: number; ai_handled: number; needs_human: number; resolved: number; closed: number } | null>(null);
   const [openStatusMenuId, setOpenStatusMenuId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -482,12 +483,27 @@ export default function ConversationsPage() {
   }, [updateContactsList]);
 
   async function loadContacts() {
+    setError(null);
     const supabase = createClient();
     
     // Get user
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
+    const timeoutId = setTimeout(() => {
+      setLoading((prev) => {
+        if (prev) {
+          setError('載入超時，請重新整理頁面或聯繫客服');
+          return false;
+        }
+        return prev;
+      });
+    }, 10000);
+
+    try {
     // Get all contacts with tags, status, and their latest conversation
     const { data: contactsData } = await supabase
       .from('contacts')
@@ -496,7 +512,6 @@ export default function ConversationsPage() {
       .order('created_at', { ascending: false });
 
     if (!contactsData) {
-      setLoading(false);
       return;
     }
 
@@ -549,29 +564,30 @@ export default function ConversationsPage() {
 
     setContacts(contactsWithMessages);
 
-    try {
-      const [tagsRes, countsRes] = await Promise.all([
-        fetch('/api/tags'),
-        fetch('/api/conversations/counts'),
-      ]);
-      if (tagsRes.ok) {
-        const json = await tagsRes.json();
-        setTagList(json.tags ?? []);
-      }
-      if (countsRes.ok) {
-        const json = await countsRes.json();
-        setCounts({
-          total: json.total ?? 0,
-          ai_handled: json.ai_handled ?? 0,
-          needs_human: json.needs_human ?? 0,
-          resolved: json.resolved ?? 0,
-          closed: json.closed ?? 0,
-        });
-      }
-    } catch {
-      // ignore
+    const [tagsRes, countsRes] = await Promise.all([
+      fetch('/api/tags'),
+      fetch('/api/conversations/counts'),
+    ]);
+    if (tagsRes.ok) {
+      const json = await tagsRes.json();
+      setTagList(json.tags ?? []);
     }
-    setLoading(false);
+    if (countsRes.ok) {
+      const json = await countsRes.json();
+      setCounts({
+        total: json.total ?? 0,
+        ai_handled: json.ai_handled ?? 0,
+        needs_human: json.needs_human ?? 0,
+        resolved: json.resolved ?? 0,
+        closed: json.closed ?? 0,
+      });
+    }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '載入失敗');
+    } finally {
+      clearTimeout(timeoutId);
+      setLoading(false);
+    }
   }
 
   async function loadConversations(contactId: string) {
@@ -590,8 +606,30 @@ export default function ConversationsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-gray-500">載入中...</div>
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto" />
+          <p className="mt-3 text-gray-600">載入中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="text-center max-w-md">
+          <div className="text-red-600 text-6xl mb-4">⚠</div>
+          <h2 className="text-xl font-semibold mb-2">載入失敗</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            type="button"
+            onClick={() => { setError(null); setLoading(true); loadContacts(); }}
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
+          >
+            重新載入
+          </button>
+        </div>
       </div>
     );
   }

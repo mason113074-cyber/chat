@@ -17,12 +17,20 @@ export default function DashboardError({
         <p className="text-gray-600 mb-6">
           資料暫時無法取得，請稍後再試。如果問題持續發生，請聯繫技術支援。
         </p>
-        <button
-          onClick={reset}
-          className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
-        >
-          重新載入
-        </button>
+        <div className="flex gap-3 justify-center">
+          <button
+            onClick={reset}
+            className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+          >
+            重新載入
+          </button>
+          <button
+            onClick={() => { window.location.href = '/dashboard'; }}
+            className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-6 py-3 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition-colors"
+          >
+            返回首頁
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -87,6 +87,7 @@ export default function SettingsPage() {
   const [quickReplies, setQuickReplies] = useState<QuickReply[]>(DEFAULT_QUICK_REPLIES);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Live Preview
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -104,6 +105,13 @@ export default function SettingsPage() {
 
   useEffect(() => {
     let cancelled = false;
+    setLoadError(null);
+    const timeoutId = setTimeout(() => {
+      if (!cancelled) {
+        setLoadError('載入超時，請重新整理頁面或聯繫客服');
+        setIsLoading(false);
+      }
+    }, 10000);
     async function load() {
       try {
         const response = await fetch('/api/settings');
@@ -121,14 +129,17 @@ export default function SettingsPage() {
       } catch (error) {
         if (!cancelled) {
           console.error('載入設定失敗:', error);
-          toast.show('載入設定失敗', 'error');
+          setLoadError(error instanceof Error ? error.message : '載入設定失敗');
         }
       } finally {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) {
+          clearTimeout(timeoutId);
+          setIsLoading(false);
+        }
       }
     }
     load();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; clearTimeout(timeoutId); };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- initial load only
   }, []);
 
@@ -236,8 +247,30 @@ export default function SettingsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto" />
+          <p className="mt-3 text-gray-600">載入中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="text-center max-w-md">
+          <div className="text-red-600 text-6xl mb-4">⚠</div>
+          <h2 className="text-xl font-semibold mb-2">載入失敗</h2>
+          <p className="text-gray-600 mb-4">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
+          >
+            重新載入
+          </button>
+        </div>
       </div>
     );
   }
