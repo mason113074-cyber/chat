@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
       .from('users')
       .select('system_prompt, ai_model, store_name, quick_replies')
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('Error fetching settings:', error);
