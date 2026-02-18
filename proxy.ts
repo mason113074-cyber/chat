@@ -1,53 +1,62 @@
+import createIntlMiddleware from 'next-intl/middleware';
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { routing } from './i18n/routing';
+
+const intlMiddleware = createIntlMiddleware(routing);
 
 export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  // Run next-intl first (redirects / to /zh-TW or /en, etc.)
+  const intlResponse = await intlMiddleware(request);
+  if (intlResponse && (intlResponse.status === 307 || intlResponse.status === 302)) {
+    return intlResponse;
+  }
+
+  const pathname = request.nextUrl.pathname;
+  const segments = pathname.split('/').filter(Boolean);
+  const locale = segments[0] ?? '';
+  const isLocalePath = (routing.locales as readonly string[]).includes(locale);
+  const rest = isLocalePath ? segments.slice(1) : segments;
+  const firstSegment = rest[0] ?? '';
+  const isDashboard = isLocalePath && firstSegment === 'dashboard';
+  const isSettings = isLocalePath && firstSegment === 'settings';
+  const isDashboardOnboarding =
+    isLocalePath && firstSegment === 'dashboard' && rest[1] === 'onboarding';
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anonKey) {
-    return response;
+    return intlResponse ?? NextResponse.next({ request });
   }
 
-  const supabase = createServerClient(
-    url,
-    anonKey,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
-        },
-      },
-    }
-  );
+  let response = intlResponse ?? NextResponse.next({ request });
 
-  // Refresh session (getUser triggers token refresh; setAll persists refreshed cookies)
+  const supabase = createServerClient(url, anonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+        response = NextResponse.next({ request });
+        cookiesToSet.forEach(({ name, value, options }) =>
+          response.cookies.set(name, value, options ?? {})
+        );
+      },
+    },
+  });
+
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (
-    (request.nextUrl.pathname.startsWith('/dashboard') ||
-      request.nextUrl.pathname.startsWith('/settings')) &&
-    !user
-  ) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/login';
-    return NextResponse.redirect(url);
+  if ((isDashboard || isSettings) && !user) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = `/${locale}/login`;
+    return NextResponse.redirect(redirectUrl);
   }
 
-  // Redirect to onboarding if not completed (dashboard only, allow /dashboard/onboarding)
-  if (user && request.nextUrl.pathname.startsWith('/dashboard') && request.nextUrl.pathname !== '/dashboard/onboarding' && !request.nextUrl.pathname.startsWith('/dashboard/onboarding/')) {
+  if (user && isDashboard && !isDashboardOnboarding) {
     const { data: row } = await supabase
       .from('users')
       .select('onboarding_completed')
@@ -55,9 +64,9 @@ export async function proxy(request: NextRequest) {
       .maybeSingle();
     const completed = row?.onboarding_completed === true;
     if (!completed) {
-      const url = request.nextUrl.clone();
-      url.pathname = '/dashboard/onboarding';
-      return NextResponse.redirect(url);
+      const redirectUrl = request.nextUrl.clone();
+      redirectUrl.pathname = `/${locale}/dashboard/onboarding`;
+      return NextResponse.redirect(redirectUrl);
     }
   }
 
@@ -66,6 +75,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!api|_next|_vercel|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 };
