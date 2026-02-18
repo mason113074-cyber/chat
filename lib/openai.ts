@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { classifyOpenAIError, getFallbackMessage } from './openai-error-handler';
 import { retryWithBackoff } from './retry';
 import { calculateCost, trackTokenUsage, checkTokenBudget } from './openai-usage';
+import { filterAIOutput, logFilterEvent } from './ai-output-filter';
 
 let openaiInstance: OpenAI | null = null;
 
@@ -71,7 +72,12 @@ export async function generateReply(
       }
     );
 
-    const reply = completion.choices?.[0]?.message?.content ?? '無法生成回覆';
+    let reply = completion.choices?.[0]?.message?.content ?? '無法生成回覆';
+    const filterResult = await filterAIOutput(reply);
+    if (!filterResult.isSafe) {
+      reply = filterResult.filteredResponse;
+      await logFilterEvent(filterResult, { userId, userMessage });
+    }
 
     if (userId && completion.usage) {
       const cost = calculateCost(
