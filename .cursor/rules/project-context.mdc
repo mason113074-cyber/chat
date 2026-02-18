@@ -1,5 +1,6 @@
 ---
-rule_type: always
+description: Project context for CustomerAIPro — product overview, tech stack, API endpoints, dev conventions, and plan limits. Use when implementing features, APIs, or UI so behavior and naming stay consistent.
+alwaysApply: true
 ---
 
 # CustomerAIPro Project Context
