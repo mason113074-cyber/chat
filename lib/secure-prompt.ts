@@ -3,12 +3,12 @@
  * 根據使用者的 System Prompt 和風險等級，生成強化版 Prompt
  */
 
-import { detectSensitiveKeywords, type SensitiveRiskLevel } from './sensitive-keywords';
+import { detectSensitiveKeywords } from './sensitive-keywords';
 
 export interface SecurePromptOptions {
   baseSystemPrompt: string;
   userMessage: string;
-  riskLevel?: SensitiveRiskLevel;
+  riskLevel?: 'high' | 'medium' | 'low';
   detectedKeywords?: string[];
 }
 
@@ -80,7 +80,7 @@ export function generateSecurePrompt(options: SecurePromptOptions): string {
   const riskLevel = optionsRiskLevel ?? detection.riskLevel;
   const keywords = detectedKeywords ?? detection.keywords;
 
-  let enhancedPrompt = baseSystemPrompt.trim() + BASE_SECURITY_RULES;
+  let enhancedPrompt = baseSystemPrompt + BASE_SECURITY_RULES;
 
   if (riskLevel === 'high' && keywords.length > 0) {
     enhancedPrompt += HIGH_RISK_CONSTRAINTS.replace('{keywords}', keywords.join('、')).replace(
