@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:api": "npx tsx scripts/test-api.ts"
+    "test:api": "npx tsx scripts/test-api.ts",
+    "test:ui": "playwright test",
+    "test:ui:headed": "playwright test --headed",
+    "test:ui:report": "playwright show-report"
   },
   "dependencies": {
     "@line/bot-sdk": "^9.4.0",
