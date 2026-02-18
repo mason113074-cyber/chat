@@ -167,7 +167,10 @@ export async function logFilterEvent(
       timestamp: new Date().toISOString(),
     });
 
-    // TODO: 未來可以儲存到 Supabase 用於分析
-    // await supabaseAdmin.from('security_logs').insert({ ... });
+    const logToDb = process.env.SECURITY_LOG_TO_DB === 'true';
+    if (logToDb) {
+      // TODO: 儲存到 Supabase security_logs 表用於分析
+      // await getSupabaseAdmin().from('security_logs').insert({ ... });
+    }
   }
 }

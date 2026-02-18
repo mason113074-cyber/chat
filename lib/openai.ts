@@ -46,15 +46,16 @@ export async function generateReply(
 
   // === 安全防護 Step 1：檢查使用者輸入 ===
   const riskDetection = detectSensitiveKeywords(userMessage);
+  const strictMode = process.env.SECURITY_STRICT_MODE !== 'false';
 
-  if (riskDetection.riskLevel === 'high') {
+  if (strictMode && riskDetection.riskLevel === 'high') {
     console.warn('[Security] High-risk input detected, returning safety fallback:', {
       keywords: riskDetection.keywords,
       userId,
       contactId,
     });
 
-    // 對於極高風險的問題，直接返回安全回覆，不呼叫 AI
+    // 嚴格模式：高風險直接返回安全回覆，不呼叫 AI
     return getSafetyFallbackResponse(riskDetection.keywords);
   }
 
@@ -101,8 +102,32 @@ export async function generateReply(
 
     const rawReply = completion.choices?.[0]?.message?.content ?? '無法生成回覆';
 
-    // === 安全防護 Step 3：過濾 AI 輸出 ===
-    const filterResult = await filterAIOutput(rawReply);
+    // === 安全防護 Step 3：過濾 AI 輸出（可選超時）===
+    const filterTimeoutMs = Math.max(0, parseInt(process.env.SECURITY_OUTPUT_FILTER_TIMEOUT ?? '0', 10));
+    let filterResult: Awaited<ReturnType<typeof filterAIOutput>>;
+    if (filterTimeoutMs > 0) {
+      try {
+        filterResult = await Promise.race([
+          filterAIOutput(rawReply),
+          new Promise<Awaited<ReturnType<typeof filterAIOutput>>>((_, reject) =>
+            setTimeout(() => reject(new Error('Output filter timeout')), filterTimeoutMs)
+          ),
+        ]);
+      } catch (err) {
+        if (err instanceof Error && err.message === 'Output filter timeout') {
+          filterResult = {
+            isSafe: false,
+            reason: '輸出過濾超時',
+            originalResponse: rawReply,
+            filteredResponse: '抱歉，系統忙碌，請稍後再試。',
+          };
+        } else {
+          throw err;
+        }
+      }
+    } else {
+      filterResult = await filterAIOutput(rawReply);
+    }
 
     // 記錄過濾事件
     await logFilterEvent(filterResult, {
