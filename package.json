@@ -15,21 +15,21 @@
   },
   "dependencies": {
     "@line/bot-sdk": "^9.4.0",
-    "@vercel/kv": "^2.0.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.45.0",
+    "@upstash/redis": "^1.36.2",
     "next": "^16.1.6",
     "openai": "^4.67.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "cross-env": "^7.0.3",
     "@playwright/test": "^1.58.2",
     "@types/node": "^20.16.0",
     "@types/react": "^18.3.8",
     "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.20",
+    "cross-env": "^7.0.3",
     "eslint": "^8.57.0",
     "eslint-config-next": "14.2.15",
     "postcss": "^8.4.47",

@@ -97,28 +97,34 @@ export default function SettingsPage() {
   const [testError, setTestError] = useState('');
 
   useEffect(() => {
+    let cancelled = false;
     async function load() {
       try {
         const response = await fetch('/api/settings');
         if (!response.ok) throw new Error('無法載入設定');
         const data = await response.json();
+        if (cancelled) return;
         if (data.systemPrompt) setSystemPrompt(data.systemPrompt);
         if (data.storeName != null) setStoreName(data.storeName || '');
-        if (data.aiModel) setAiModel(data.aiModel);
+        if (data.aiModel && AI_MODELS.includes(data.aiModel)) setAiModel(data.aiModel);
         if (Array.isArray(data.quickReplies) && data.quickReplies.length > 0) {
           const padded: QuickReply[] = [...data.quickReplies];
           while (padded.length < 5) padded.push({ id: `slot-${padded.length}`, text: '', enabled: true });
           setQuickReplies(padded.slice(0, 5));
         }
       } catch (error) {
-        console.error('載入設定失敗:', error);
-        toast.show('載入設定失敗', 'error');
+        if (!cancelled) {
+          console.error('載入設定失敗:', error);
+          toast.show('載入設定失敗', 'error');
+        }
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     }
     load();
-  }, [toast]);
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- initial load only
+  }, []);
 
   useEffect(() => {
     if (previewAnswer !== null && previewAnswer !== 'pending' && (systemPrompt !== lastSyncedPrompt || aiModel !== lastSyncedModel)) {
@@ -166,8 +172,8 @@ export default function SettingsPage() {
           ai_model: aiModel,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || '預覽失敗');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error((data && typeof data.error === 'string' ? data.error : null) || '預覽失敗');
       setPreviewAnswer(data.answer ?? '');
     } catch (e) {
       setPreviewAnswer(e instanceof Error ? e.message : '預覽失敗');
@@ -208,12 +214,12 @@ export default function SettingsPage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || '測試失敗');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error((errorData && typeof errorData.error === 'string' ? errorData.error : null) || '測試失敗');
       }
 
-      const data = await response.json();
-      setTestReply(data.reply);
+      const data = await response.json().catch(() => ({}));
+      setTestReply(typeof data?.reply === 'string' ? data.reply : '（無回覆）');
     } catch (error) {
       console.error('AI 測試失敗:', error);
       setTestError(error instanceof Error ? error.message : '測試失敗，請稍後再試');
