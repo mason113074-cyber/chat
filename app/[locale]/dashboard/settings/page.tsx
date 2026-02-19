@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslations } from 'next-intl';
+import { Link } from '@/i18n/navigation';
 import { useToast } from '@/components/Toast';
 import { QuickReplies } from '@/app/components/QuickReplies';
 import type { QuickReply } from '@/lib/types';
@@ -66,12 +68,12 @@ const TONE_PRESETS = {
 - 避免廢話，提高效率`
 };
 
-const AI_MODELS = ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo'] as const;
-const EXAMPLE_QUESTIONS = [
-  '你們的營業時間是幾點？',
-  '有什麼優惠活動嗎？',
-  '如何退換貨？',
-];
+const AI_MODELS = [
+  { id: 'gpt-4o', label: 'GPT-4o', desc: 'settingsModelGpt4oDesc' },
+  { id: 'gpt-4o-mini', label: 'GPT-4o Mini', desc: 'settingsModelGpt4oMiniDesc' },
+  { id: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo', desc: 'settingsModelGpt35Desc' },
+] as const;
+const EXAMPLE_QUESTIONS_KEYS = ['exampleQ1', 'exampleQ2', 'exampleQ3'] as const;
 
 const DEFAULT_QUICK_REPLIES: QuickReply[] = [
   { id: '1', text: '📦 查詢訂單狀態', enabled: true },
@@ -80,6 +82,7 @@ const DEFAULT_QUICK_REPLIES: QuickReply[] = [
 ];
 
 export default function SettingsPage() {
+  const t = useTranslations('settings');
   const toast = useToast();
   const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT);
   const [storeName, setStoreName] = useState('');
@@ -88,10 +91,11 @@ export default function SettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [webhookUrl, setWebhookUrl] = useState('');
 
   // Live Preview
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewQuestion, setPreviewQuestion] = useState(EXAMPLE_QUESTIONS[0]);
+  const [previewQuestionKey, setPreviewQuestionKey] = useState<typeof EXAMPLE_QUESTIONS_KEYS[number]>(EXAMPLE_QUESTIONS_KEYS[0]);
   const [previewAnswer, setPreviewAnswer] = useState<string | 'pending' | 'updated' | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [lastSyncedPrompt, setLastSyncedPrompt] = useState('');
@@ -108,7 +112,7 @@ export default function SettingsPage() {
     setLoadError(null);
     const timeoutId = setTimeout(() => {
       if (!cancelled) {
-        setLoadError('載入超時，請重新整理頁面或聯繫客服');
+        setLoadError(t('loadTimeout'));
         setIsLoading(false);
       }
     }, 10000);
@@ -117,13 +121,13 @@ export default function SettingsPage() {
         const response = await fetch('/api/settings', { credentials: 'include' });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
-          const message = (data && typeof data.error === 'string') ? data.error : '無法載入設定';
+          const message = (data && typeof data.error === 'string') ? data.error : t('loadFailed');
           throw new Error(message);
         }
         if (cancelled) return;
         if (data.systemPrompt) setSystemPrompt(data.systemPrompt);
         if (data.storeName != null) setStoreName(data.storeName || '');
-        if (data.aiModel && AI_MODELS.includes(data.aiModel)) setAiModel(data.aiModel);
+        if (data.aiModel && AI_MODELS.some((m) => m.id === data.aiModel)) setAiModel(data.aiModel);
         if (Array.isArray(data.quickReplies) && data.quickReplies.length > 0) {
           const padded: QuickReply[] = [...data.quickReplies];
           while (padded.length < 5) padded.push({ id: `slot-${padded.length}`, text: '', enabled: true });
@@ -132,7 +136,7 @@ export default function SettingsPage() {
       } catch (error) {
         if (!cancelled) {
           console.error('載入設定失敗:', error);
-          setLoadError(error instanceof Error ? error.message : '載入設定失敗');
+          setLoadError(error instanceof Error ? error.message : t('loadFailed'));
         }
       } finally {
         if (!cancelled) {
@@ -144,6 +148,12 @@ export default function SettingsPage() {
     load();
     return () => { cancelled = true; clearTimeout(timeoutId); };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- initial load only
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setWebhookUrl(`${window.location.origin}/api/webhook/line`);
+    }
   }, []);
 
   useEffect(() => {
@@ -165,19 +175,21 @@ export default function SettingsPage() {
           quickReplies: quickReplies.filter((r) => r.text.trim()).slice(0, 5),
         }),
       });
-      if (!response.ok) throw new Error('儲存失敗');
-      toast.show('已儲存', 'success');
+      if (!response.ok) throw new Error(t('savedError'));
+      toast.show(t('savedSuccess'), 'success');
     } catch (error) {
-      console.error('儲存失敗:', error);
-      toast.show('儲存失敗，請稍後再試', 'error');
+      console.error('Save failed:', error);
+      toast.show(t('savedError'), 'error');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handlePreviewReply = async (questionOverride?: string) => {
-    const q = questionOverride ?? previewQuestion;
-    setPreviewQuestion(q);
+  const handlePreviewReply = async (questionKeyOrText?: string) => {
+    const isKey = questionKeyOrText != null && (EXAMPLE_QUESTIONS_KEYS as readonly string[]).includes(questionKeyOrText);
+    const key = isKey ? (questionKeyOrText as typeof EXAMPLE_QUESTIONS_KEYS[number]) : previewQuestionKey;
+    const questionText = isKey ? t(questionKeyOrText as typeof EXAMPLE_QUESTIONS_KEYS[number]) : (questionKeyOrText ?? t(previewQuestionKey));
+    if (isKey) setPreviewQuestionKey(key);
     setPreviewLoading(true);
     setPreviewAnswer('pending');
     setLastSyncedPrompt(systemPrompt);
@@ -187,7 +199,7 @@ export default function SettingsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          question: q,
+          question: questionText,
           system_prompt: systemPrompt,
           ai_model: aiModel,
         }),
@@ -206,7 +218,7 @@ export default function SettingsPage() {
 
   const handleReset = () => {
     setSystemPrompt(DEFAULT_SYSTEM_PROMPT);
-    toast.show('已重置為預設值', 'success');
+    toast.show(t('resetSuccess'), 'success');
   };
 
   const handleToneSelect = (tone: keyof typeof TONE_PRESETS) => {
@@ -215,7 +227,7 @@ export default function SettingsPage() {
 
   const handleTestAI = async () => {
     if (!testMessage.trim()) {
-      setTestError('請輸入測試訊息');
+      setTestError(t('testEmptyError'));
       return;
     }
 
@@ -239,10 +251,10 @@ export default function SettingsPage() {
       }
 
       const data = await response.json().catch(() => ({}));
-      setTestReply(typeof data?.reply === 'string' ? data.reply : '（無回覆）');
+      setTestReply(typeof data?.reply === 'string' ? data.reply : '');
     } catch (error) {
       console.error('AI 測試失敗:', error);
-      setTestError(error instanceof Error ? error.message : '測試失敗，請稍後再試');
+      setTestError(error instanceof Error ? error.message : t('savedError'));
     } finally {
       setIsTesting(false);
     }
@@ -253,7 +265,7 @@ export default function SettingsPage() {
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto" />
-          <p className="mt-3 text-gray-600">載入中...</p>
+          <p className="mt-3 text-gray-600">{t('loading')}</p>
         </div>
       </div>
     );
@@ -264,14 +276,14 @@ export default function SettingsPage() {
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="text-center max-w-md">
           <div className="text-red-600 text-6xl mb-4">⚠</div>
-          <h2 className="text-xl font-semibold mb-2">載入失敗</h2>
+          <h2 className="text-xl font-semibold mb-2">{t('loadFailed')}</h2>
           <p className="text-gray-600 mb-4">{loadError}</p>
           <button
             type="button"
             onClick={() => window.location.reload()}
             className="rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
           >
-            重新載入
+            {t('reload')}
           </button>
         </div>
       </div>
@@ -280,16 +292,47 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900">AI 助理設定</h1>
-      <p className="mt-1 text-gray-600">管理您的 AI 客服助理設定與行為</p>
+      <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
+      <p className="mt-1 text-gray-600">{t('subtitle')}</p>
 
       <div className="mt-8 flex flex-col lg:flex-row gap-8">
         {/* Left: Form lg:w-3/5 */}
         <div className="lg:w-3/5 space-y-6">
+        {/* LINE 整合狀態 */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900">{t('lineIntegration')}</h2>
+          <p className="mt-1 text-sm text-gray-600">{t('lineIntegrationDesc')}</p>
+          <div className="mt-4 flex items-center gap-3">
+            <span className="flex h-3 w-3 rounded-full bg-green-500" />
+            <span className="text-sm font-medium text-green-700">{t('lineConnected')}</span>
+          </div>
+          <div className="mt-3 rounded-lg bg-gray-50 p-3">
+            <p className="text-xs font-medium text-gray-500 mb-1">{t('webhookUrl')}</p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-xs text-gray-700 bg-white rounded px-2 py-1.5 border border-gray-200 truncate">
+                {webhookUrl || '...'}
+              </code>
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== 'undefined' && webhookUrl) {
+                    navigator.clipboard.writeText(webhookUrl);
+                    toast.show(t('webhookCopied'), 'success');
+                  }
+                }}
+                className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+              >
+                {t('copy')}
+              </button>
+            </div>
+          </div>
+          <p className="mt-2 text-xs text-gray-400">{t('lineIntegrationHint')}</p>
+        </div>
+
         {/* 商店名稱 */}
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">商店名稱</h2>
-          <p className="mt-1 text-sm text-gray-600">顯示於聊天 Widget 頂部</p>
+          <h2 className="text-lg font-semibold text-gray-900">{t('storeName')}</h2>
+          <p className="mt-1 text-sm text-gray-600">{t('storeNameDesc')}</p>
           <input
             type="text"
             value={storeName}
@@ -301,13 +344,26 @@ export default function SettingsPage() {
 
         {/* AI Model */}
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">AI 模型</h2>
-          <p className="mt-1 text-sm text-gray-600">選擇回覆使用的模型</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {AI_MODELS.map((id) => (
-              <label key={id} className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 cursor-pointer text-gray-700 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50 has-[:checked]:text-indigo-900">
-                <input type="radio" name="ai_model" value={id} checked={aiModel === id} onChange={() => setAiModel(id)} className="text-indigo-600" />
-                <span className="text-sm font-medium">{id}</span>
+          <h2 className="text-lg font-semibold text-gray-900">{t('aiModel')}</h2>
+          <p className="mt-1 text-sm text-gray-600">{t('aiModelDesc')}</p>
+          <div className="mt-3 space-y-2">
+            {AI_MODELS.map((model) => (
+              <label
+                key={model.id}
+                className="flex items-start gap-3 rounded-lg border border-gray-200 px-4 py-3 cursor-pointer text-gray-700 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50 has-[:checked]:text-indigo-900"
+              >
+                <input
+                  type="radio"
+                  name="ai_model"
+                  value={model.id}
+                  checked={aiModel === model.id}
+                  onChange={() => setAiModel(model.id)}
+                  className="mt-0.5 text-indigo-600"
+                />
+                <div>
+                  <span className="text-sm font-medium">{model.label}</span>
+                  <p className="text-xs text-gray-500 mt-0.5">{t(model.desc)}</p>
+                </div>
               </label>
             ))}
           </div>
@@ -315,8 +371,8 @@ export default function SettingsPage() {
 
         {/* 快捷回覆按鈕 */}
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">快捷回覆按鈕</h2>
-          <p className="mt-1 text-sm text-gray-600">自訂 3～5 個常見問題，會顯示在 Widget 開場時供用戶點擊（儲存時一併更新）</p>
+          <h2 className="text-lg font-semibold text-gray-900">{t('quickReplyButtons')}</h2>
+          <p className="mt-1 text-sm text-gray-600">{t('quickReplyDesc')}</p>
           <div className="mt-4 space-y-3">
             {(() => {
               const padded: QuickReply[] = [...quickReplies];
@@ -326,7 +382,7 @@ export default function SettingsPage() {
                   <input
                     type="checkbox"
                     checked={item.enabled}
-                    aria-label={`常見問題 ${index + 1} 啟用`}
+                    aria-label={t('commonQuestionSlot', { index: index + 1 })}
                     onChange={() => {
                       setQuickReplies((prev) => {
                         const p = [...prev];
@@ -349,7 +405,7 @@ export default function SettingsPage() {
                         return p.slice(0, 5);
                       });
                     }}
-                    placeholder={`常見問題 ${index + 1}`}
+                    placeholder={t('commonQuestionSlot', { index: index + 1 })}
                     className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-20"
                   />
                 </div>
@@ -399,8 +455,14 @@ export default function SettingsPage() {
               value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}
               className="w-full min-h-[200px] resize-y rounded-lg border border-gray-300 bg-white text-gray-900 p-4 font-mono text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-20"
-              placeholder="輸入 System Prompt..."
+              placeholder={t('systemPromptPlaceholder')}
             />
+            <div className="mt-2 flex items-center justify-between text-xs text-gray-400">
+              <span>{systemPrompt.length} {t('characters')}</span>
+              {systemPrompt.length > 2000 && (
+                <span className="text-amber-600 font-medium">⚠ {t('promptTooLong')}</span>
+              )}
+            </div>
           </div>
 
           {/* 按鈕組 */}
@@ -412,44 +474,40 @@ export default function SettingsPage() {
             >
               {isSaving ? (
                 <>
-                  <span className="animate-spin mr-2" role="status" aria-label="儲存中">⏳</span>
-                  儲存中...
+                  <span className="animate-spin mr-2" role="status" aria-label={t('saving')}>⏳</span>
+                  {t('saving')}
                 </>
               ) : (
-                '💾 儲存'
+                t('save')
               )}
             </button>
             <button
               onClick={handleReset}
               className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-6 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition-colors"
             >
-              🔄 重置為預設
+              {t('resetDefault')}
             </button>
           </div>
         </div>
 
         {/* AI 回覆測試區 */}
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">🧪 AI 回覆測試</h2>
-          <p className="mt-1 text-sm text-gray-600">
-            測試您的 System Prompt 設定，看看 AI 會如何回應
-          </p>
+          <h2 className="text-lg font-semibold text-gray-900">{t('aiReplyTest')}</h2>
+          <p className="mt-1 text-sm text-gray-600">{t('aiReplyTestDesc')}</p>
 
           <div className="mt-4 space-y-4">
-            {/* 模擬客戶訊息輸入 */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                模擬客戶訊息：
+                {t('simulateMessage')}
               </label>
               <textarea
                 value={testMessage}
                 onChange={(e) => setTestMessage(e.target.value)}
                 className="w-full min-h-[100px] resize-y rounded-lg border border-gray-300 bg-white text-gray-900 p-3 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 focus:ring-opacity-20"
-                placeholder="請輸入模擬的客戶問題，例如：「你好，請問你們的服務時間？」"
+                placeholder={t('simulatePlaceholder')}
               />
             </div>
 
-            {/* 測試按鈕 */}
             <button
               onClick={handleTestAI}
               disabled={isTesting || !testMessage.trim()}
@@ -457,19 +515,18 @@ export default function SettingsPage() {
             >
               {isTesting ? (
                 <>
-                  <span className="animate-spin mr-2" role="status" aria-label="測試中">⏳</span>
-                  測試中...
+                  <span className="animate-spin mr-2" role="status" aria-label={t('testing')}>⏳</span>
+                  {t('testing')}
                 </>
               ) : (
-                '🚀 測試回覆'
+                t('testReply')
               )}
             </button>
 
-            {/* AI 回覆預覽 */}
             {(testReply || testError) && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  AI 回覆預覽：
+                  {t('testResultLabel')}
                 </label>
                 <div className={`rounded-lg p-4 text-sm ${
                   testError 
@@ -483,36 +540,30 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Feature Preview Cards */}
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900">即將推出</h2>
-          
-          <div className="rounded-xl border-2 border-dashed border-gray-300 bg-white p-6">
-            <div className="flex items-start gap-4">
-              <span className="text-3xl">📚</span>
+        {/* Quick Links */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900">{t('quickLinks')}</h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <Link
+              href="/dashboard/knowledge-base"
+              className="flex items-center gap-3 rounded-lg border border-gray-200 p-4 transition hover:border-indigo-300 hover:bg-indigo-50/50"
+            >
+              <span className="text-2xl">📚</span>
               <div>
-                <h3 className="text-base font-semibold text-gray-900">
-                  知識庫上傳
-                </h3>
-                <p className="mt-1 text-sm text-gray-600">
-                  上傳您的產品手冊、FAQ 文件與服務說明，讓 AI 提供更準確的專業回答
-                </p>
+                <p className="font-medium text-gray-900">{t('linkKnowledgeBase')}</p>
+                <p className="text-sm text-gray-500">{t('linkKnowledgeBaseDesc')}</p>
               </div>
-            </div>
-          </div>
-
-          <div className="rounded-xl border-2 border-dashed border-gray-300 bg-white p-6">
-            <div className="flex items-start gap-4">
-              <span className="text-3xl">🔄</span>
+            </Link>
+            <Link
+              href="/dashboard/analytics"
+              className="flex items-center gap-3 rounded-lg border border-gray-200 p-4 transition hover:border-indigo-300 hover:bg-indigo-50/50"
+            >
+              <span className="text-2xl">📊</span>
               <div>
-                <h3 className="text-base font-semibold text-gray-900">
-                  自動轉人工
-                </h3>
-                <p className="mt-1 text-sm text-gray-600">
-                  設定觸發條件，當遇到特定關鍵字或複雜問題時，自動轉交給真人客服處理
-                </p>
+                <p className="font-medium text-gray-900">{t('linkAnalytics')}</p>
+                <p className="text-sm text-gray-500">{t('linkAnalyticsDesc')}</p>
               </div>
-            </div>
+            </Link>
           </div>
         </div>
         </div>
@@ -520,10 +571,10 @@ export default function SettingsPage() {
         {/* Right: Live Preview lg:w-2/5 lg:sticky lg:top-24 (hidden on mobile, use collapsible below) */}
         <div className="hidden lg:block lg:w-2/5 lg:sticky lg:top-24 self-start">
           <div className="rounded-xl bg-gradient-to-br from-indigo-50 to-purple-50 p-4 shadow-sm border border-indigo-100">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">Live Preview</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">{t('livePreview')}</h2>
             <div className="mx-auto max-w-sm rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden" style={{ height: '500px' }}>
               <div className="bg-indigo-600 text-white px-4 py-3 flex items-center gap-2">
-                <span className="font-medium text-base truncate">{storeName || '我的商店'}</span>
+                <span className="font-medium text-base truncate">{storeName || t('storeNamePlaceholder')}</span>
                 <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" title="線上" />
               </div>
               <div className="h-[380px] overflow-y-auto p-4 space-y-3 bg-white [&_.quick-reply-btn]:text-base [&_.quick-reply-btn]:font-medium [&_.quick-reply-btn]:text-gray-800">
@@ -535,7 +586,7 @@ export default function SettingsPage() {
                 <QuickReplies items={quickReplies} onSelect={(query) => handlePreviewReply(query)} />
                 <div className="flex justify-end">
                   <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-indigo-500 text-white px-4 py-2.5 text-base font-medium leading-snug">
-                    {previewQuestion}
+                    {t(previewQuestionKey)}
                   </div>
                 </div>
                 <div className="flex justify-start">
@@ -548,37 +599,37 @@ export default function SettingsPage() {
                       </span>
                     )}
                     {!previewLoading && previewAnswer === 'updated' && (
-                      <span className="text-gray-600">設定已更新，點擊重新預覽</span>
+                      <span className="text-gray-600">{t('previewNote')}</span>
                     )}
                     {!previewLoading && previewAnswer === 'pending' && (
-                      <span className="text-gray-600">正在生成預覽...</span>
+                      <span className="text-gray-600">{t('testing')}</span>
                     )}
                     {!previewLoading && previewAnswer !== null && previewAnswer !== 'pending' && previewAnswer !== 'updated' && (
                       <span className="whitespace-pre-wrap">{previewAnswer}</span>
                     )}
                     {!previewLoading && previewAnswer === null && (
-                      <span className="text-gray-600">點擊下方按鈕預覽 AI 回覆</span>
+                      <span className="text-gray-600">{t('previewNote')}</span>
                     )}
                   </div>
                 </div>
               </div>
               <div className="border-t border-gray-200 p-2">
                 <div className="rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-base text-gray-600">
-                  輸入訊息（僅供預覽）
+                  {t('inputPlaceholder')}
                 </div>
               </div>
             </div>
             <div className="mt-3 space-y-2">
-              <p className="text-sm font-medium text-gray-700">範例問題：</p>
+              <p className="text-sm font-medium text-gray-700">{t('exampleQuestions')}</p>
               <div className="flex flex-wrap gap-2">
-                {EXAMPLE_QUESTIONS.map((q) => (
+                {EXAMPLE_QUESTIONS_KEYS.map((q) => (
                   <button
                     key={q}
                     type="button"
                     onClick={() => handlePreviewReply(q)}
                     className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-800 font-medium hover:bg-gray-50"
                   >
-                    {q}
+                    {t(q)}
                   </button>
                 ))}
               </div>
@@ -588,7 +639,7 @@ export default function SettingsPage() {
                 disabled={previewLoading}
                 className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
               >
-                🔄 預覽 AI 回覆
+                {t('previewAiReply')}
               </button>
             </div>
           </div>
@@ -602,13 +653,13 @@ export default function SettingsPage() {
           onClick={() => setPreviewOpen((o) => !o)}
           className="w-full rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-purple-50 px-4 py-3 text-left font-medium text-gray-900"
         >
-          {previewOpen ? '▼ 收合 Live Preview' : '▶ 展開 Live Preview'}
+          {previewOpen ? t('collapsePreview') : t('expandPreview')}
         </button>
         {previewOpen && (
           <div className="mt-2 rounded-xl bg-gradient-to-br from-indigo-50 to-purple-50 p-4 shadow-sm border border-indigo-100">
             <div className="mx-auto max-w-sm rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden" style={{ height: '500px' }}>
               <div className="bg-indigo-600 text-white px-4 py-3 flex items-center gap-2">
-                <span className="font-medium text-base truncate">{storeName || '我的商店'}</span>
+                <span className="font-medium text-base truncate">{storeName || t('storeNamePlaceholder')}</span>
                 <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />
               </div>
               <div className="h-[380px] overflow-y-auto p-4 space-y-3 bg-white [&_.quick-reply-btn]:text-base [&_.quick-reply-btn]:font-medium [&_.quick-reply-btn]:text-gray-800">
@@ -617,7 +668,7 @@ export default function SettingsPage() {
                 </div>
                 <QuickReplies items={quickReplies} onSelect={(query) => handlePreviewReply(query)} />
                 <div className="flex justify-end">
-                  <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-indigo-500 text-white px-4 py-2.5 text-base font-medium leading-snug">{previewQuestion}</div>
+                  <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-indigo-500 text-white px-4 py-2.5 text-base font-medium leading-snug">{t(previewQuestionKey)}</div>
                 </div>
                 <div className="flex justify-start">
                   <div className="max-w-[85%] rounded-2xl rounded-tl-md bg-gray-200 text-gray-900 px-4 py-2.5 text-base font-medium leading-snug">
@@ -628,25 +679,25 @@ export default function SettingsPage() {
                         <span className="w-2 h-2 rounded-full bg-gray-500 animate-typing-dot" />
                       </span>
                     )}
-                    {!previewLoading && previewAnswer === 'updated' && <span className="text-gray-600">設定已更新，點擊重新預覽</span>}
-                    {!previewLoading && previewAnswer === 'pending' && <span className="text-gray-600">正在生成預覽...</span>}
+                    {!previewLoading && previewAnswer === 'updated' && <span className="text-gray-600">{t('previewNote')}</span>}
+                    {!previewLoading && previewAnswer === 'pending' && <span className="text-gray-600">{t('testing')}</span>}
                     {!previewLoading && previewAnswer !== null && previewAnswer !== 'pending' && previewAnswer !== 'updated' && <span className="whitespace-pre-wrap">{previewAnswer}</span>}
-                    {!previewLoading && previewAnswer === null && <span className="text-gray-600">點擊下方按鈕預覽 AI 回覆</span>}
+                    {!previewLoading && previewAnswer === null && <span className="text-gray-600">{t('previewNote')}</span>}
                   </div>
                 </div>
               </div>
               <div className="border-t border-gray-200 p-2">
-                <div className="rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-base text-gray-600">輸入訊息（僅供預覽）</div>
+                <div className="rounded-lg border border-gray-300 bg-gray-100 px-3 py-2 text-base text-gray-600">{t('inputPlaceholder')}</div>
               </div>
             </div>
             <div className="mt-3 space-y-2">
-              <p className="text-sm font-medium text-gray-700">範例問題：</p>
+              <p className="text-sm font-medium text-gray-700">{t('exampleQuestions')}</p>
               <div className="flex flex-wrap gap-2">
-                {EXAMPLE_QUESTIONS.map((q) => (
-                  <button key={q} type="button" onClick={() => handlePreviewReply(q)} className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-800 font-medium hover:bg-gray-50">{q}</button>
+                {EXAMPLE_QUESTIONS_KEYS.map((q) => (
+                  <button key={q} type="button" onClick={() => handlePreviewReply(q)} className="rounded-full border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-800 font-medium hover:bg-gray-50">{t(q)}</button>
                 ))}
               </div>
-              <button type="button" onClick={() => handlePreviewReply()} disabled={previewLoading} className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">🔄 預覽 AI 回覆</button>
+              <button type="button" onClick={() => handlePreviewReply()} disabled={previewLoading} className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">{t('previewAiReply')}</button>
             </div>
           </div>
         )}
