@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { useToast } from '@/components/Toast';
@@ -35,10 +35,11 @@ export default function SettingsPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [webhookUrl, setWebhookUrl] = useState('');
 
-  // Live Preview (previewQuestionDisplay = text shown in user bubble; quick replies pass raw text, example buttons pass keys)
+  // Live Preview: user bubble shows this text. Ref updated synchronously on click so bubble never shows stale example.
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewQuestionKey, setPreviewQuestionKey] = useState<typeof EXAMPLE_QUESTIONS_KEYS[number]>(EXAMPLE_QUESTIONS_KEYS[0]);
   const [previewQuestionDisplay, setPreviewQuestionDisplay] = useState<string>('');
+  const lastPreviewQuestionRef = useRef<string>('');
   const [previewAnswer, setPreviewAnswer] = useState<string | 'pending' | 'updated' | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [lastSyncedPrompt, setLastSyncedPrompt] = useState('');
@@ -153,6 +154,7 @@ export default function SettingsPage() {
     const key = isKey ? (questionKeyOrText as typeof EXAMPLE_QUESTIONS_KEYS[number]) : previewQuestionKey;
     const questionText = isKey ? t(questionKeyOrText as typeof EXAMPLE_QUESTIONS_KEYS[number]) : (questionKeyOrText ?? t(previewQuestionKey));
     if (isKey) setPreviewQuestionKey(key);
+    lastPreviewQuestionRef.current = questionText;
     setPreviewQuestionDisplay(questionText);
     setPreviewLoading(true);
     setPreviewAnswer('pending');
@@ -612,7 +614,7 @@ export default function SettingsPage() {
                 <QuickReplies items={quickReplies} onSelect={(query) => handlePreviewReply(query)} />
                 <div className="flex justify-end">
                   <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-indigo-500 text-white px-4 py-2.5 text-base font-medium leading-snug">
-                    {previewQuestionDisplay || t(previewQuestionKey)}
+                    {lastPreviewQuestionRef.current || previewQuestionDisplay || t(previewQuestionKey)}
                   </div>
                 </div>
                 <div className="flex justify-start">
@@ -694,7 +696,7 @@ export default function SettingsPage() {
                 </div>
                 <QuickReplies items={quickReplies} onSelect={(query) => handlePreviewReply(query)} />
                 <div className="flex justify-end">
-                  <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-indigo-500 text-white px-4 py-2.5 text-base font-medium leading-snug">{previewQuestionDisplay || t(previewQuestionKey)}</div>
+                  <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-indigo-500 text-white px-4 py-2.5 text-base font-medium leading-snug">{lastPreviewQuestionRef.current || previewQuestionDisplay || t(previewQuestionKey)}</div>
                 </div>
                 <div className="flex justify-start">
                   <div className="max-w-[85%] rounded-2xl rounded-tl-md bg-gray-200 text-gray-900 px-4 py-2.5 text-base font-medium leading-snug">
