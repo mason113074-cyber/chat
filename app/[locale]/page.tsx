@@ -4,6 +4,7 @@ import { Link } from '@/i18n/navigation';
 import { LandingNavbar } from '@/app/components/LandingNavbar';
 import { LandingFooter } from '@/app/components/LandingFooter';
 import { LandingFAQ } from '@/app/components/LandingFAQ';
+import { getSupabaseAdmin } from '@/lib/supabase';
 
 type Props = { params: Promise<{ locale: string }> };
 
@@ -36,11 +37,40 @@ export default async function Home({ params }: Props) {
     { titleKey: 'step3Title' as const, descKey: 'step3Desc' as const },
   ];
 
+  let totalUsers = 0;
+  let totalConversations = 0;
+  let totalKnowledgeBase = 0;
+  try {
+    const supabase = getSupabaseAdmin();
+    const [usersRes, convsRes, kbRes] = await Promise.all([
+      supabase.from('contacts').select('*', { count: 'exact', head: true }),
+      supabase.from('conversations').select('*', { count: 'exact', head: true }),
+      supabase.from('knowledge_base').select('*', { count: 'exact', head: true }),
+    ]);
+    totalUsers = usersRes.count ?? 0;
+    totalConversations = convsRes.count ?? 0;
+    totalKnowledgeBase = kbRes.count ?? 0;
+  } catch (error) {
+    console.error('Failed to fetch landing page stats:', error);
+  }
+
   const stats = [
-    { value: '500+', labelKey: 'trustedMerchants' as const },
-    { value: '50,000+', labelKey: 'conversationsHandled' as const },
-    { value: '95%', labelKey: 'customerSatisfaction' as const },
-    { value: '<30 秒', labelKey: 'avgResponseTime' as const },
+    {
+      value: totalUsers > 0 ? `${totalUsers}+` : '—',
+      labelKey: 'trustedMerchants' as const,
+    },
+    {
+      value: totalConversations > 0 ? (totalConversations).toLocaleString() : '—',
+      labelKey: 'conversationsHandled' as const,
+    },
+    {
+      value: totalKnowledgeBase > 0 ? `${totalKnowledgeBase}+` : '—',
+      labelKey: 'knowledgeBaseEntries' as const,
+    },
+    {
+      value: '<30 秒',
+      labelKey: 'avgResponseTime' as const,
+    },
   ];
 
   return (
@@ -83,18 +113,26 @@ export default async function Home({ params }: Props) {
           </div>
         </section>
 
-        <section className="border-y border-white/5 bg-slate-900/40 py-8">
-          <div className="mx-auto max-w-6xl px-4 sm:px-6">
-            <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
-              {stats.map((s) => (
-                <div key={s.labelKey} className="text-center">
-                  <div className="text-2xl font-bold text-white sm:text-3xl">{s.value}</div>
-                  <div className="mt-1 text-sm text-slate-400">{t(s.labelKey)}</div>
-                </div>
-              ))}
+        {(totalUsers > 0 || totalConversations > 0) ? (
+          <section className="border-y border-white/5 bg-slate-900/40 py-8">
+            <div className="mx-auto max-w-6xl px-4 sm:px-6">
+              <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
+                {stats.map((s) => (
+                  <div key={s.labelKey} className="text-center">
+                    <div className="text-2xl font-bold text-white sm:text-3xl">{s.value}</div>
+                    <div className="mt-1 text-sm text-slate-400">{t(s.labelKey)}</div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        ) : (
+          <section className="border-y border-white/5 bg-slate-900/40 py-6">
+            <div className="mx-auto max-w-6xl px-4 sm:px-6 text-center">
+              <p className="text-sm text-slate-400">{t('betaBanner')}</p>
+            </div>
+          </section>
+        )}
 
         <section id="features" className="mx-auto max-w-6xl px-4 py-16 sm:px-6 md:py-20">
           <div className="text-center">
@@ -146,10 +184,10 @@ export default async function Home({ params }: Props) {
           </div>
           <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { name: 'Free', price: '$0', periodKey: 'perMonth', desc: '50', ctaKey: 'ctaFreeStartShort', primary: false, href: '/login?signup=true' },
-              { name: 'Basic', price: '$29', periodKey: 'perMonth', desc: '500', ctaKey: 'ctaFreeStartShort', primary: false, href: '/login?signup=true' },
-              { name: 'Pro', price: '$79', periodKey: 'perMonth', desc: '2000', ctaKey: 'ctaFreeStartShort', primary: true, href: '/login?signup=true' },
-              { name: 'Enterprise', price: '—', periodKey: '', desc: '', ctaKey: 'ctaFreeStartShort', primary: false, href: 'mailto:support@customeraipro.com' },
+              { name: 'Free', price: 'NT$ 0', periodKey: 'perMonth', desc: t('planFreeDesc'), ctaKey: 'ctaFreeStartShort', primary: false, href: '/login?signup=true' },
+              { name: 'Basic', price: 'NT$ 990', periodKey: 'perMonth', desc: t('planBasicDesc'), ctaKey: 'ctaFreeStartShort', primary: false, href: '/login?signup=true' },
+              { name: 'Pro', price: 'NT$ 2,990', periodKey: 'perMonth', desc: t('planProDesc'), ctaKey: 'ctaFreeStartShort', primary: true, href: '/login?signup=true' },
+              { name: 'Enterprise', price: t('planEnterprisePrice'), periodKey: '', desc: t('planEnterpriseDesc'), ctaKey: 'ctaContactUs', primary: false, href: 'mailto:support@customeraipro.com' },
             ].map((plan) => (
               <div
                 key={plan.name}
