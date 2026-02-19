@@ -1,11 +1,37 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { useToast } from '@/components/Toast';
 import { QuickReplies } from '@/app/components/QuickReplies';
 import type { QuickReply } from '@/lib/types';
+
+/** 已知的繁中預設快捷回覆文案（含舊版），用於載入時若介面為英文則改顯示當前語系翻譯 */
+const ZH_QUICK_REPLY_SLOTS: [string[], string[], string[]] = [
+  ['查詢訂單狀態', '你們的營業時間是幾點'],
+  ['運費怎麼計算', '有什麼優惠活動嗎'],
+  ['如何退換貨'],
+];
+function isZhDefaultQuickReply(slotIndex: number, text: string): boolean {
+  const trimmed = (text ?? '').trim();
+  const variants = ZH_QUICK_REPLY_SLOTS[slotIndex];
+  return variants.some((v) => trimmed.includes(v));
+}
+
+/** 繁中系統提示常見開頭，用於判斷是否為預設/語氣範本，在英文介面下改顯示英文預設 */
+const ZH_SYSTEM_PROMPT_PREFIXES = [
+  '你是這位商家的專業客服',
+  '你是一位親切友善的客服助理',
+  '你是一位專業且友善的客服助理',
+  '您好，我是專業客服顧問',
+  '我是快速客服助理',
+  '你是本商店的 AI 客服助理',
+];
+function isZhDefaultSystemPrompt(prompt: string): boolean {
+  const firstLine = prompt.trim().split(/\n/)[0]?.trim() ?? '';
+  return ZH_SYSTEM_PROMPT_PREFIXES.some((prefix) => firstLine.includes(prefix));
+}
 
 const AI_MODELS = [
   { id: 'gpt-4o', label: 'GPT-4o', desc: 'settingsModelGpt4oDesc' },
@@ -16,6 +42,7 @@ const EXAMPLE_QUESTIONS_KEYS = ['exampleQ1', 'exampleQ2', 'exampleQ3'] as const;
 
 export default function SettingsPage() {
   const t = useTranslations('settings');
+  const locale = useLocale();
   const toast = useToast();
   const defaultSystemPrompt = useMemo(() => t('defaultSystemPrompt'), [t]);
   const defaultQuickReplies = useMemo<QuickReply[]>(
@@ -78,13 +105,26 @@ export default function SettingsPage() {
           throw new Error(message);
         }
         if (cancelled) return;
-        if (data.systemPrompt) setSystemPrompt(data.systemPrompt);
+        let loadedPrompt = data.systemPrompt;
+        if (loadedPrompt && locale === 'en' && isZhDefaultSystemPrompt(loadedPrompt)) {
+          loadedPrompt = t('defaultSystemPrompt');
+        }
+        if (loadedPrompt) setSystemPrompt(loadedPrompt);
         if (data.storeName != null) setStoreName(data.storeName || '');
         if (data.aiModel && AI_MODELS.some((m) => m.id === data.aiModel)) setAiModel(data.aiModel);
         if (Array.isArray(data.quickReplies) && data.quickReplies.length > 0) {
-          const padded: QuickReply[] = [...data.quickReplies];
+          let padded: QuickReply[] = [...data.quickReplies];
           while (padded.length < 5) padded.push({ id: `slot-${padded.length}`, text: '', enabled: true });
-          setQuickReplies(padded.slice(0, 5));
+          padded = padded.slice(0, 5);
+          if (locale === 'en') {
+            padded = padded.map((item, i) => {
+              if (i === 0 && isZhDefaultQuickReply(0, item.text)) return { ...item, text: t('exampleQ1') };
+              if (i === 1 && isZhDefaultQuickReply(1, item.text)) return { ...item, text: t('exampleQ2') };
+              if (i === 2 && isZhDefaultQuickReply(2, item.text)) return { ...item, text: t('exampleQ3') };
+              return item;
+            });
+          }
+          setQuickReplies(padded);
         }
         try {
           const lineRes = await fetch('/api/settings/line', { credentials: 'include' });
