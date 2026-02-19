@@ -1,5 +1,6 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { TAG_COLORS } from '@/lib/contact-tags';
@@ -34,6 +35,7 @@ function tagClass(color: string): string {
 }
 
 export default function ContactsPage() {
+  const t = useTranslations('contacts');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,7 +72,7 @@ export default function ContactsPage() {
     const timeoutId = setTimeout(() => {
       setLoading((prev) => {
         if (prev) {
-          setError('載入超時，請重新整理頁面或聯繫客服');
+          setError(t('loadTimeout'));
           return false;
         }
         return prev;
@@ -78,13 +80,13 @@ export default function ContactsPage() {
     }, 10000);
     Promise.all([fetchContacts(), fetchTags()])
       .catch((err) => {
-        setError(err instanceof Error ? err.message : '載入失敗');
+        setError(err instanceof Error ? err.message : t('loadFailed'));
       })
       .finally(() => {
         clearTimeout(timeoutId);
         setLoading(false);
       });
-  }, [fetchContacts, fetchTags]);
+  }, [fetchContacts, fetchTags, t]);
 
   const filteredContacts =
     selectedTagIds.size === 0
@@ -207,7 +209,7 @@ export default function ContactsPage() {
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto" />
-          <p className="mt-3 text-gray-600">載入中...</p>
+          <p className="mt-3 text-gray-600">{t('loading')}</p>
         </div>
       </div>
     );
@@ -218,14 +220,14 @@ export default function ContactsPage() {
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="text-center max-w-md">
           <div className="text-red-600 text-6xl mb-4">⚠</div>
-          <h2 className="text-xl font-semibold mb-2">載入失敗</h2>
+          <h2 className="text-xl font-semibold mb-2">{t('loadFailed')}</h2>
           <p className="text-gray-600 mb-4">{error}</p>
           <button
             type="button"
             onClick={() => window.location.reload()}
             className="rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
           >
-            重新載入
+            {t('reload')}
           </button>
         </div>
       </div>
@@ -236,32 +238,32 @@ export default function ContactsPage() {
     <div>
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">客戶管理</h1>
-          <p className="mt-1 text-gray-600">共 {filteredContacts.length} 位聯絡人</p>
+          <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
+          <p className="mt-1 text-gray-600">{t('totalContacts', { count: filteredContacts.length })}</p>
         </div>
         <button
           type="button"
           onClick={() => setManageOpen(true)}
           className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
         >
-          管理標籤
+          {t('manageTags')}
         </button>
       </div>
 
       {/* Tag filter */}
       {tags.length > 0 && (
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span className="text-sm text-gray-500">標籤篩選：</span>
-          {tags.map((t) => (
+          <span className="text-sm text-gray-500">{t('tagFilter')}</span>
+          {tags.map((tag) => (
             <button
-              key={t.id}
+              key={tag.id}
               type="button"
-              onClick={() => toggleTagFilter(t.id)}
-              className={`rounded-full px-3 py-1 text-xs font-medium ${tagClass(t.color)} ${
-                selectedTagIds.has(t.id) ? 'ring-2 ring-offset-1 ring-gray-400' : ''
+              onClick={() => toggleTagFilter(tag.id)}
+              className={`rounded-full px-3 py-1 text-xs font-medium ${tagClass(tag.color)} ${
+                selectedTagIds.has(tag.id) ? 'ring-2 ring-offset-1 ring-gray-400' : ''
               }`}
             >
-              {t.name}
+              {tag.name}
             </button>
           ))}
           {selectedTagIds.size > 0 && (
@@ -270,7 +272,7 @@ export default function ContactsPage() {
               onClick={() => setSelectedTagIds(new Set())}
               className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
             >
-              清除篩選
+              {t('clearFilter')}
             </button>
           )}
         </div>
@@ -281,8 +283,8 @@ export default function ContactsPage() {
           <div className="rounded-xl border border-gray-200 bg-white px-6 py-16 shadow-sm">
             <EmptyState
               icon="👥"
-              title="還沒有客戶"
-              description="當客戶透過 LINE 發送第一則訊息後，會自動建立聯絡人並顯示於此。"
+              title={t('emptyTitle')}
+              description={t('emptyDesc')}
             />
           </div>
         ) : (
@@ -291,11 +293,11 @@ export default function ContactsPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">名稱</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">LINE User ID</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">標籤</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">對話數量</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">最後互動時間</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{t('colName')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{t('colLineUserId')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{t('colTags')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{t('colConversations')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{t('colLastInteraction')}</th>
                   <th className="px-6 py-3 w-12" />
                 </tr>
               </thead>
@@ -307,7 +309,7 @@ export default function ContactsPage() {
                         href={`/dashboard/conversations/${c.id}`}
                         className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
                       >
-                        {c.name || '未命名客戶'}
+                        {c.name || t('unnamedCustomer')}
                       </Link>
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600 font-mono">{c.line_user_id}</td>
@@ -336,7 +338,7 @@ export default function ContactsPage() {
                         type="button"
                         onClick={() => setOpenPopoverId((id) => (id === c.id ? null : c.id))}
                         className="rounded p-1.5 text-gray-500 hover:bg-gray-200"
-                        aria-label="標籤"
+                        aria-label={t('tagLabel')}
                       >
                         🏷️
                       </button>
@@ -358,12 +360,12 @@ export default function ContactsPage() {
                             })}
                           </div>
                           <div className="border-t border-gray-100 mt-2 pt-2 px-2 space-y-2">
-                            <p className="text-xs font-medium text-gray-500">+ 新增標籤</p>
+                            <p className="text-xs font-medium text-gray-500">{t('addTag')}</p>
                             <input
                               type="text"
                               value={newTagName}
                               onChange={(e) => setNewTagName(e.target.value)}
-                              placeholder="標籤名稱"
+                              placeholder={t('tagNamePlaceholder')}
                               className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
                             />
                             <select
@@ -382,7 +384,7 @@ export default function ContactsPage() {
                               onClick={() => createTag()}
                               className="w-full rounded bg-indigo-600 px-2 py-1 text-sm text-white hover:bg-indigo-700"
                             >
-                              新增標籤
+                              {t('addTagButton')}
                             </button>
                           </div>
                         </div>
@@ -402,10 +404,10 @@ export default function ContactsPage() {
                 disabled={page === 1}
                 className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                上一頁
+                {t('prevPage')}
               </button>
               <span className="text-sm text-gray-600">
-                第 {page} / 共 {totalPages} 頁（顯示 {(page - 1) * ITEMS_PER_PAGE + 1} - {Math.min(page * ITEMS_PER_PAGE, filteredContacts.length)}）
+                {t('pageInfo', { page, total: totalPages, start: (page - 1) * ITEMS_PER_PAGE + 1, end: Math.min(page * ITEMS_PER_PAGE, filteredContacts.length) })}
               </span>
               <button
                 type="button"
@@ -413,7 +415,7 @@ export default function ContactsPage() {
                 disabled={page === totalPages}
                 className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                下一頁
+                {t('nextPage')}
               </button>
             </div>
           )}
@@ -429,13 +431,13 @@ export default function ContactsPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">管理標籤</h2>
+              <h2 className="text-lg font-semibold text-gray-900">{t('manageTags')}</h2>
               <button type="button" onClick={() => setManageOpen(false)} className="text-gray-500 hover:text-gray-700">✕</button>
             </div>
             <div className="p-4 overflow-y-auto flex-1">
-              {tags.map((t) => (
-                <div key={t.id} className="flex items-center gap-2 py-2 border-b border-gray-100 last:border-0">
-                  {editingTagId === t.id ? (
+              {tags.map((tag) => (
+                <div key={tag.id} className="flex items-center gap-2 py-2 border-b border-gray-100 last:border-0">
+                  {editingTagId === tag.id ? (
                     <>
                       <input
                         type="text"
@@ -452,14 +454,14 @@ export default function ContactsPage() {
                           <option key={col} value={col}>{col}</option>
                         ))}
                       </select>
-                      <button type="button" onClick={() => updateTag(t.id, editingName, editingColor)} className="text-sm text-indigo-600">儲存</button>
-                      <button type="button" onClick={() => setEditingTagId(null)} className="text-sm text-gray-500">取消</button>
+                      <button type="button" onClick={() => updateTag(tag.id, editingName, editingColor)} className="text-sm text-indigo-600">{t('save')}</button>
+                      <button type="button" onClick={() => setEditingTagId(null)} className="text-sm text-gray-500">{t('cancel')}</button>
                     </>
                   ) : (
                     <>
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium flex-1 ${tagClass(t.color)}`}>{t.name}</span>
-                      <button type="button" onClick={() => { setEditingTagId(t.id); setEditingName(t.name); setEditingColor(t.color); }} className="text-sm text-indigo-600">編輯</button>
-                      <button type="button" onClick={() => deleteTag(t.id)} className="text-sm text-red-600">刪除</button>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium flex-1 ${tagClass(tag.color)}`}>{tag.name}</span>
+                      <button type="button" onClick={() => { setEditingTagId(tag.id); setEditingName(tag.name); setEditingColor(tag.color); }} className="text-sm text-indigo-600">{t('edit')}</button>
+                      <button type="button" onClick={() => deleteTag(tag.id)} className="text-sm text-red-600">{t('delete')}</button>
                     </>
                   )}
                 </div>

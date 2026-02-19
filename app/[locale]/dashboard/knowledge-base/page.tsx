@@ -1,14 +1,15 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { useTranslations, useLocale } from 'next-intl';
 import { useToast } from '@/components/Toast';
 
 const CATEGORIES = [
-  { value: 'general', label: '其他' },
-  { value: '常見問題', label: '常見問題' },
-  { value: '產品資訊', label: '產品資訊' },
-  { value: '退換貨政策', label: '退換貨政策' },
-  { value: '營業資訊', label: '營業資訊' },
+  { value: 'general', labelKey: 'catGeneral' as const },
+  { value: '常見問題', labelKey: 'catFaq' as const },
+  { value: '產品資訊', labelKey: 'catProduct' as const },
+  { value: '退換貨政策', labelKey: 'catReturn' as const },
+  { value: '營業資訊', labelKey: 'catBusiness' as const },
 ] as const;
 
 const CATEGORY_COLOR: Record<string, string> = {
@@ -67,6 +68,8 @@ function parseCsv(content: string): { title: string; content: string; category: 
 }
 
 export default function KnowledgeBasePage() {
+  const t = useTranslations('knowledgeBase');
+  const locale = useLocale();
   const toast = useToast();
   const [items, setItems] = useState<Item[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -152,7 +155,7 @@ export default function KnowledgeBasePage() {
           setModalOpen(false);
           fetchList();
           fetchStats();
-          toast.show('已更新', 'success');
+          toast.show(t('toastUpdated'), 'success');
         }
       } else {
         const res = await fetch('/api/knowledge-base', {
@@ -164,7 +167,7 @@ export default function KnowledgeBasePage() {
           setModalOpen(false);
           fetchList();
           fetchStats();
-          toast.show('已新增', 'success');
+          toast.show(t('toastAdded'), 'success');
         }
       }
     } finally {
@@ -173,12 +176,12 @@ export default function KnowledgeBasePage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('確定要刪除這筆知識嗎？')) return;
+    if (!confirm(t('confirmDelete'))) return;
     const res = await fetch(`/api/knowledge-base/${id}`, { method: 'DELETE' });
     if (res.ok) {
       fetchList();
       fetchStats();
-      toast.show('已刪除', 'success');
+      toast.show(t('toastDeleted'), 'success');
     }
   };
 
@@ -223,7 +226,7 @@ export default function KnowledgeBasePage() {
         setImportPreview([]);
         fetchList();
         fetchStats();
-        toast.show(`已匯入 ${importPreview.length} 筆`, 'success');
+        toast.show(t('toastImported', { count: importPreview.length }), 'success');
       }
     } finally {
       setImporting(false);
@@ -244,13 +247,13 @@ export default function KnowledgeBasePage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.show(data.error ?? '測試失敗', 'error');
+        toast.show(data.error ?? t('testFailed'), 'error');
         return;
       }
       setTestAnswer(data.answer ?? '');
       setTestSources(data.sources ?? []);
     } catch {
-      toast.show('請求失敗，請稍後再試', 'error');
+      toast.show(t('requestFailed'), 'error');
     } finally {
       setTestLoading(false);
     }
@@ -276,30 +279,30 @@ export default function KnowledgeBasePage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">知識庫</h1>
+      <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
 
       {/* Stats */}
       {stats && (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
-            <p className="text-sm text-gray-500">知識條目總數</p>
+            <p className="text-sm text-gray-500">{t('statTotal')}</p>
             <p className="text-xl font-bold text-gray-900">{stats.total}</p>
           </div>
           <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
-            <p className="text-sm text-gray-500">啟用中</p>
+            <p className="text-sm text-gray-500">{t('statActive')}</p>
             <p className="text-xl font-bold text-gray-900">{stats.activeCount}</p>
           </div>
           <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
-            <p className="text-sm text-gray-500">最後更新</p>
+            <p className="text-sm text-gray-500">{t('statLastUpdated')}</p>
             <p className="text-lg font-bold text-gray-900">
-              {stats.lastUpdated ? new Date(stats.lastUpdated).toLocaleString('zh-TW') : '—'}
+              {stats.lastUpdated ? new Date(stats.lastUpdated).toLocaleString(locale === 'zh-TW' ? 'zh-TW' : 'en') : '—'}
             </p>
           </div>
           <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
-            <p className="text-sm text-gray-500">各分類數量</p>
+            <p className="text-sm text-gray-500">{t('statByCategory')}</p>
             <p className="text-sm text-gray-700">
               {Object.entries(stats.byCategory)
-                .map(([k, v]) => `${CATEGORIES.find((c) => c.value === k)?.label ?? k}: ${v}`)
+                .map(([k, v]) => `${t(CATEGORIES.find((c) => c.value === k)?.labelKey ?? 'catGeneral')}: ${v}`)
                 .join('、') || '—'}
             </p>
           </div>
@@ -313,14 +316,14 @@ export default function KnowledgeBasePage() {
           onClick={openAdd}
           className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
         >
-          新增知識
+          {t('addKnowledge')}
         </button>
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
           className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
         >
-          匯入 FAQ
+          {t('importFaq')}
         </button>
         <input
           ref={fileInputRef}
@@ -334,18 +337,18 @@ export default function KnowledgeBasePage() {
           onClick={(e) => { e.preventDefault(); downloadSample('txt'); }}
           className="text-sm text-indigo-600 hover:underline"
         >
-          下載 .txt 範例
+          {t('downloadTxtSample')}
         </a>
         <a
           href="#"
           onClick={(e) => { e.preventDefault(); downloadSample('csv'); }}
           className="text-sm text-indigo-600 hover:underline"
         >
-          下載 .csv 範例
+          {t('downloadCsvSample')}
         </a>
         <input
           type="text"
-          placeholder="搜尋標題或內容..."
+          placeholder={t('searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm w-48"
@@ -355,9 +358,9 @@ export default function KnowledgeBasePage() {
           onChange={(e) => setCategoryFilter(e.target.value)}
           className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
         >
-          <option value="">全部分類</option>
+          <option value="">{t('allCategories')}</option>
           {CATEGORIES.map((c) => (
-            <option key={c.value} value={c.value}>{c.label}</option>
+            <option key={c.value} value={c.value}>{t(c.labelKey)}</option>
           ))}
         </select>
       </div>
@@ -367,16 +370,16 @@ export default function KnowledgeBasePage() {
         <div>
       {/* List */}
       {loading ? (
-        <p className="text-gray-500">載入中...</p>
+        <p className="text-gray-500">{t('loading')}</p>
       ) : items.length === 0 ? (
         <div className="rounded-xl border border-gray-200 bg-white p-12 text-center shadow-sm">
-          <p className="text-gray-600">還沒有知識庫內容。新增 FAQ 讓 AI 回覆更精準！</p>
+          <p className="text-gray-600">{t('emptyDesc')}</p>
           <button
             type="button"
             onClick={openAdd}
             className="mt-4 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
           >
-            新增知識
+            {t('addKnowledge')}
           </button>
         </div>
       ) : (
@@ -389,7 +392,7 @@ export default function KnowledgeBasePage() {
               <div className="flex items-start justify-between gap-2">
                 <h3 className="font-semibold text-gray-900 line-clamp-1">{item.title}</h3>
                 <span className={`shrink-0 rounded px-2 py-0.5 text-xs ${CATEGORY_COLOR[item.category] ?? CATEGORY_COLOR.general}`}>
-                  {CATEGORIES.find((c) => c.value === item.category)?.label ?? item.category}
+                  {t(CATEGORIES.find((c) => c.value === item.category)?.labelKey ?? 'catGeneral')}
                 </span>
               </div>
               <p className="mt-2 text-sm text-gray-600 line-clamp-2">
@@ -397,7 +400,7 @@ export default function KnowledgeBasePage() {
                 {(item.content?.length ?? 0) > PREVIEW_LEN ? '...' : ''}
               </p>
               <p className="mt-2 text-xs text-gray-400">
-                {new Date(item.updated_at).toLocaleString('zh-TW')}
+                {new Date(item.updated_at).toLocaleString(locale === 'zh-TW' ? 'zh-TW' : 'en')}
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <button
@@ -421,7 +424,7 @@ export default function KnowledgeBasePage() {
                   onClick={() => handleToggleActive(item)}
                   className="text-sm text-gray-600 hover:text-gray-900"
                 >
-                  {item.is_active ? '停用' : '啟用'}
+                  {item.is_active ? t('disable') : t('enable')}
                 </button>
               </div>
             </div>
@@ -438,7 +441,7 @@ export default function KnowledgeBasePage() {
               onClick={() => setTestPanelOpen((o) => !o)}
               className="flex w-full items-center justify-between text-left font-semibold text-gray-900"
             >
-              <span>🧪 測試 AI 回答</span>
+              <span>{t('testAiReply')}</span>
               <span className="text-gray-500">{testPanelOpen ? '▼' : '▶'}</span>
             </button>
             {testPanelOpen && (
@@ -447,7 +450,7 @@ export default function KnowledgeBasePage() {
                   type="text"
                   value={testQuestion}
                   onChange={(e) => setTestQuestion(e.target.value)}
-                  placeholder="輸入客戶可能會問的問題..."
+                  placeholder={t('testPlaceholder')}
                   className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
                   disabled={testLoading}
                 />
@@ -458,7 +461,7 @@ export default function KnowledgeBasePage() {
                     disabled={testLoading || !testQuestion.trim()}
                     className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
                   >
-                    {testLoading ? '送出中...' : '送出'}
+                    {testLoading ? t('testSubmitting') : t('testSubmit')}
                   </button>
                   {(testAnswer !== null || testSources.length > 0) && (
                     <button
@@ -466,26 +469,26 @@ export default function KnowledgeBasePage() {
                       onClick={clearTestResult}
                       className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                     >
-                      清除
+                      {t('testClear')}
                     </button>
                   )}
                 </div>
                 {testAnswer !== null && (
                   <div className="rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-800">
-                    <p className="font-medium text-gray-700">AI 回覆：</p>
+                    <p className="font-medium text-gray-700">{t('testAiResponse')}</p>
                     <p className="mt-1 whitespace-pre-wrap">{testAnswer}</p>
                   </div>
                 )}
                 {(testAnswer !== null || testSources.length > 0) && (
                   <div className="rounded-lg border border-gray-200 bg-white p-3 text-sm">
-                    <p className="font-medium text-gray-700">參考來源：</p>
+                    <p className="font-medium text-gray-700">{t('testSources')}</p>
                     {testSources.length === 0 ? (
                       <p className="mt-1 text-amber-700">
-                        ⚠️ 沒有找到相關知識庫內容，AI 將使用通用知識回答
+                        {t('testNoSources')}
                       </p>
                     ) : (
                       <>
-                        <p className="mt-1 text-gray-600">📚 參考了 {testSources.length} 條知識庫內容</p>
+                        <p className="mt-1 text-gray-600">{t('testSourceCount', { count: testSources.length })}</p>
                         <div className="mt-2 space-y-2">
                           {testSources.map((s) => (
                             <div
@@ -494,7 +497,7 @@ export default function KnowledgeBasePage() {
                             >
                               <span className="font-medium text-gray-900">{s.title}</span>
                               <span className={`ml-2 rounded px-1.5 py-0.5 text-xs ${CATEGORY_COLOR[s.category] ?? CATEGORY_COLOR.general}`}>
-                                {CATEGORIES.find((c) => c.value === s.category)?.label ?? s.category}
+                                {t(CATEGORIES.find((c) => c.value === s.category)?.labelKey ?? 'catGeneral')}
                               </span>
                             </div>
                           ))}
@@ -513,43 +516,43 @@ export default function KnowledgeBasePage() {
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-lg">
-            <h2 className="text-lg font-semibold text-gray-900">{editingId ? '編輯知識' : '新增知識'}</h2>
+            <h2 className="text-lg font-semibold text-gray-900">{editingId ? t('editKnowledge') : t('addKnowledge')}</h2>
             <div className="mt-4 space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700">標題 *</label>
+                <label className="block text-sm font-medium text-gray-700">{t('fieldTitle')} *</label>
                 <input
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                  placeholder="例如：營業時間"
+                  placeholder={t('titlePlaceholder')}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">分類</label>
+                <label className="block text-sm font-medium text-gray-700">{t('fieldCategory')}</label>
                 <select
                   value={formCategory}
                   onChange={(e) => setFormCategory(e.target.value)}
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
                 >
                   {CATEGORIES.map((c) => (
-                    <option key={c.value} value={c.value}>{c.label}</option>
+                    <option key={c.value} value={c.value}>{t(c.labelKey)}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">內容</label>
+                <label className="block text-sm font-medium text-gray-700">{t('fieldContent')}</label>
                 <textarea
                   value={formContent}
                   onChange={(e) => setFormContent(e.target.value)}
                   rows={6}
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                  placeholder="輸入知識內容，AI 會參考此內容回覆客戶"
+                  placeholder={t('contentPlaceholder')}
                 />
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-700">AI 預覽</p>
+                <p className="text-sm font-medium text-gray-700">{t('aiPreview')}</p>
                 <p className="mt-1 rounded bg-gray-50 p-2 text-sm text-gray-600">
-                  {formTitle || formContent ? `【${formTitle || '（無標題）'}】\n${formContent || '（無內容）'}` : '填寫標題與內容後會顯示在此'}
+                  {formTitle || formContent ? `【${formTitle || t('noTitle')}】\n${formContent || t('noContent')}` : t('aiPreviewEmpty')}
                 </p>
               </div>
             </div>
@@ -559,7 +562,7 @@ export default function KnowledgeBasePage() {
                 onClick={() => setModalOpen(false)}
                 className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
               >
-                取消
+                {t('cancel')}
               </button>
               <button
                 type="button"
@@ -567,7 +570,7 @@ export default function KnowledgeBasePage() {
                 disabled={saving || !formTitle.trim()}
                 className="rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-50"
               >
-                {saving ? '儲存中...' : '儲存'}
+                {saving ? t('saving') : t('save')}
               </button>
             </div>
           </div>
@@ -578,8 +581,8 @@ export default function KnowledgeBasePage() {
       {importOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-lg">
-            <h2 className="text-lg font-semibold text-gray-900">匯入預覽</h2>
-            <p className="mt-2 text-sm text-gray-600">共 {importPreview.length} 筆，確認後將寫入知識庫。</p>
+            <h2 className="text-lg font-semibold text-gray-900">{t('importPreview')}</h2>
+            <p className="mt-2 text-sm text-gray-600">{t('importPreviewDesc', { count: importPreview.length })}</p>
             <div className="mt-4 max-h-60 overflow-y-auto rounded border border-gray-200 p-2 text-sm">
               {importPreview.slice(0, 20).map((row, i) => (
                 <div key={i} className="border-b border-gray-100 py-1 last:border-0">
@@ -587,7 +590,7 @@ export default function KnowledgeBasePage() {
                   {row.content && <span className="text-gray-500"> — {row.content.slice(0, 40)}...</span>}
                 </div>
               ))}
-              {importPreview.length > 20 && <p className="text-gray-400">... 其餘 {importPreview.length - 20} 筆</p>}
+              {importPreview.length > 20 && <p className="text-gray-400">{t('importRemaining', { count: importPreview.length - 20 })}</p>}
             </div>
             <div className="mt-6 flex justify-end gap-2">
               <button
@@ -595,7 +598,7 @@ export default function KnowledgeBasePage() {
                 onClick={() => { setImportOpen(false); setImportPreview([]); }}
                 className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
               >
-                取消
+                {t('cancel')}
               </button>
               <button
                 type="button"
@@ -603,7 +606,7 @@ export default function KnowledgeBasePage() {
                 disabled={importing}
                 className="rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-50"
               >
-                {importing ? '匯入中...' : '確認匯入'}
+                {importing ? t('importing') : t('confirmImport')}
               </button>
             </div>
           </div>

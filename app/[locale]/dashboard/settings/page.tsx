@@ -1,72 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { useToast } from '@/components/Toast';
 import { QuickReplies } from '@/app/components/QuickReplies';
 import type { QuickReply } from '@/lib/types';
-
-const DEFAULT_SYSTEM_PROMPT = `你是一位專業且友善的客服助理。
-
-主要職責：
-- 即時回應客戶詢問，提供準確資訊
-- 解答產品或服務相關問題
-- 協助處理訂單查詢與售後服務
-- 在必要時將複雜問題轉交給人工客服
-
-回覆風格：
-- 使用繁體中文
-- 語氣親切、專業
-- 回答簡潔明確
-- 適時使用 emoji 讓對話更友善
-
-⚠️ 重要限制：
-- 不得承諾未經授權的折扣、賠償或退款
-- 遇到退款、取消訂單等敏感問題，請回覆：「此問題需要專員處理，我已為您記錄」
-- 不得提供醫療、法律、投資等專業建議
-- 不確定答案時，誠實告知並提供轉接人工客服`;
-
-const TONE_PRESETS = {
-  friendly: `你是一位親切友善的客服助理 😊
-
-主要職責：
-- 用溫暖的語氣回應客戶，讓他們感到被關心
-- 耐心解答各種問題，不厭其煩
-- 適時給予鼓勵和正面回饋
-- 用簡單易懂的語言說明
-
-回覆風格：
-- 使用繁體中文
-- 語氣溫暖、親切、像朋友一樣
-- 多使用 emoji 增加親和力 (每則訊息 2-3 個)
-- 適時表達同理心`,
-
-  professional: `您好，我是專業客服顧問。
-
-主要職責：
-- 提供精準、專業的產品與服務諮詢
-- 以專業知識解決客戶疑問
-- 維持高效率的溝通節奏
-- 確保資訊準確無誤
-
-回覆風格：
-- 使用繁體中文，正式用語
-- 語氣專業、有禮、條理清晰
-- 避免過多 emoji，保持專業形象
-- 使用完整句子，邏輯嚴謹`,
-
-  concise: `我是快速客服助理。
-
-職責：快速解決客戶問題
-
-回覆原則：
-- 繁體中文
-- 簡短有力，直接切入重點
-- 1-2 句話解決問題
-- 只在必要時使用 emoji
-- 避免廢話，提高效率`
-};
 
 const AI_MODELS = [
   { id: 'gpt-4o', label: 'GPT-4o', desc: 'settingsModelGpt4oDesc' },
@@ -75,27 +14,31 @@ const AI_MODELS = [
 ] as const;
 const EXAMPLE_QUESTIONS_KEYS = ['exampleQ1', 'exampleQ2', 'exampleQ3'] as const;
 
-const DEFAULT_QUICK_REPLIES: QuickReply[] = [
-  { id: '1', text: '📦 查詢訂單狀態', enabled: true },
-  { id: '2', text: '💰 運費怎麼計算？', enabled: true },
-  { id: '3', text: '🔄 如何退換貨？', enabled: true },
-];
-
 export default function SettingsPage() {
   const t = useTranslations('settings');
   const toast = useToast();
-  const [systemPrompt, setSystemPrompt] = useState(DEFAULT_SYSTEM_PROMPT);
+  const defaultSystemPrompt = useMemo(() => t('defaultSystemPrompt'), [t]);
+  const defaultQuickReplies = useMemo<QuickReply[]>(
+    () => [
+      { id: '1', text: t('exampleQ1'), enabled: true },
+      { id: '2', text: t('exampleQ2'), enabled: true },
+      { id: '3', text: t('exampleQ3'), enabled: true },
+    ],
+    [t]
+  );
+  const [systemPrompt, setSystemPrompt] = useState(defaultSystemPrompt);
   const [storeName, setStoreName] = useState('');
   const [aiModel, setAiModel] = useState<string>('gpt-4o-mini');
-  const [quickReplies, setQuickReplies] = useState<QuickReply[]>(DEFAULT_QUICK_REPLIES);
+  const [quickReplies, setQuickReplies] = useState<QuickReply[]>(defaultQuickReplies);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [webhookUrl, setWebhookUrl] = useState('');
 
-  // Live Preview
+  // Live Preview (previewQuestionDisplay = text shown in user bubble; quick replies pass raw text, example buttons pass keys)
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewQuestionKey, setPreviewQuestionKey] = useState<typeof EXAMPLE_QUESTIONS_KEYS[number]>(EXAMPLE_QUESTIONS_KEYS[0]);
+  const [previewQuestionDisplay, setPreviewQuestionDisplay] = useState<string>('');
   const [previewAnswer, setPreviewAnswer] = useState<string | 'pending' | 'updated' | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [lastSyncedPrompt, setLastSyncedPrompt] = useState('');
@@ -106,6 +49,15 @@ export default function SettingsPage() {
   const [testReply, setTestReply] = useState('');
   const [isTesting, setIsTesting] = useState(false);
   const [testError, setTestError] = useState('');
+
+  // LINE Token 設定
+  const [lineModalOpen, setLineModalOpen] = useState(false);
+  const [lineChannelId, setLineChannelId] = useState('');
+  const [lineChannelSecret, setLineChannelSecret] = useState('');
+  const [lineAccessToken, setLineAccessToken] = useState('');
+  const [lineSaving, setLineSaving] = useState(false);
+  const [lineTesting, setLineTesting] = useState(false);
+  const [lineTestResult, setLineTestResult] = useState<'success' | 'error' | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -132,6 +84,17 @@ export default function SettingsPage() {
           const padded: QuickReply[] = [...data.quickReplies];
           while (padded.length < 5) padded.push({ id: `slot-${padded.length}`, text: '', enabled: true });
           setQuickReplies(padded.slice(0, 5));
+        }
+        try {
+          const lineRes = await fetch('/api/settings/line', { credentials: 'include' });
+          if (lineRes.ok && !cancelled) {
+            const lineData = await lineRes.json();
+            if (lineData.channel_id) setLineChannelId(lineData.channel_id);
+            if (lineData.channel_secret_masked) setLineChannelSecret(lineData.channel_secret_masked);
+            if (lineData.access_token_masked) setLineAccessToken(lineData.access_token_masked);
+          }
+        } catch {
+          // LINE 設定讀取失敗不阻塞主設定載入
         }
       } catch (error) {
         if (!cancelled) {
@@ -190,6 +153,7 @@ export default function SettingsPage() {
     const key = isKey ? (questionKeyOrText as typeof EXAMPLE_QUESTIONS_KEYS[number]) : previewQuestionKey;
     const questionText = isKey ? t(questionKeyOrText as typeof EXAMPLE_QUESTIONS_KEYS[number]) : (questionKeyOrText ?? t(previewQuestionKey));
     if (isKey) setPreviewQuestionKey(key);
+    setPreviewQuestionDisplay(questionText);
     setPreviewLoading(true);
     setPreviewAnswer('pending');
     setLastSyncedPrompt(systemPrompt);
@@ -205,24 +169,64 @@ export default function SettingsPage() {
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error((data && typeof data.error === 'string' ? data.error : null) || '預覽失敗');
+      if (!res.ok) throw new Error((data && typeof data.error === 'string' ? data.error : null) || t('previewFailed'));
       setPreviewAnswer(data.answer ?? '');
     } catch (e) {
-      setPreviewAnswer(e instanceof Error ? e.message : '預覽失敗');
+      setPreviewAnswer(e instanceof Error ? e.message : t('previewFailed'));
     } finally {
       setPreviewLoading(false);
     }
   };
 
-  const welcomeText = systemPrompt.trim().split(/\n/)[0]?.trim() || '歡迎使用 CustomerAIPro！';
+  const welcomeText = systemPrompt.trim().split(/\n/)[0]?.trim() || t('welcomeFallback');
 
   const handleReset = () => {
-    setSystemPrompt(DEFAULT_SYSTEM_PROMPT);
+    setSystemPrompt(t('defaultSystemPrompt'));
     toast.show(t('resetSuccess'), 'success');
   };
 
-  const handleToneSelect = (tone: keyof typeof TONE_PRESETS) => {
-    setSystemPrompt(TONE_PRESETS[tone]);
+  const handleToneSelect = (tone: 'friendly' | 'professional' | 'concise') => {
+    setSystemPrompt(t(`tonePreset${tone.charAt(0).toUpperCase() + tone.slice(1)}` as 'tonePresetFriendly' | 'tonePresetProfessional' | 'tonePresetConcise'));
+  };
+
+  const handleLineSave = async () => {
+    setLineSaving(true);
+    setLineTestResult(null);
+    try {
+      const body: Record<string, string> = {};
+      if (lineChannelId && !lineChannelId.startsWith('- ')) body.channel_id = lineChannelId;
+      if (lineChannelSecret && !lineChannelSecret.startsWith('- ')) body.channel_secret = lineChannelSecret;
+      if (lineAccessToken && !lineAccessToken.startsWith('- ')) body.access_token = lineAccessToken;
+      const res = await fetch('/api/settings/line', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error('Save failed');
+      toast.show(t('savedSuccess'), 'success');
+      setLineModalOpen(false);
+    } catch {
+      toast.show(t('savedError'), 'error');
+    } finally {
+      setLineSaving(false);
+    }
+  };
+
+  const handleLineTest = async () => {
+    setLineTesting(true);
+    setLineTestResult(null);
+    try {
+      const res = await fetch('/api/settings/line/test', { method: 'POST', credentials: 'include' });
+      if (res.ok) {
+        setLineTestResult('success');
+      } else {
+        setLineTestResult('error');
+      }
+    } catch {
+      setLineTestResult('error');
+    } finally {
+      setLineTesting(false);
+    }
   };
 
   const handleTestAI = async () => {
@@ -254,7 +258,7 @@ export default function SettingsPage() {
       setTestReply(typeof data?.reply === 'string' ? data.reply : '');
     } catch (error) {
       console.error('AI 測試失敗:', error);
-      setTestError(error instanceof Error ? error.message : t('savedError'));
+      setTestError(error instanceof Error ? error.message : t('testFailed'));
     } finally {
       setIsTesting(false);
     }
@@ -327,6 +331,29 @@ export default function SettingsPage() {
             </div>
           </div>
           <p className="mt-2 text-xs text-gray-400">{t('lineIntegrationHint')}</p>
+          <div className="mt-4 flex flex-wrap gap-2 items-center">
+            <button
+              type="button"
+              onClick={() => setLineModalOpen(true)}
+              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              {t('editLineToken')}
+            </button>
+            <button
+              type="button"
+              onClick={handleLineTest}
+              disabled={lineTesting}
+              className="rounded-lg border border-indigo-300 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+            >
+              {lineTesting ? t('testing') : t('testConnection')}
+            </button>
+            {lineTestResult === 'success' && (
+              <span className="flex items-center text-sm text-green-600 font-medium">✅ {t('connectionSuccess')}</span>
+            )}
+            {lineTestResult === 'error' && (
+              <span className="flex items-center text-sm text-red-600 font-medium">❌ {t('connectionFailed')}</span>
+            )}
+          </div>
         </div>
 
         {/* 商店名稱 */}
@@ -416,35 +443,34 @@ export default function SettingsPage() {
 
         {/* System Prompt Editor Card */}
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">AI 回覆風格</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{t('aiReplyStyle')}</h2>
           <p className="mt-1 text-sm text-gray-600">
-            自訂 AI 助理的人格設定與回覆指導原則
+            {t('aiReplyStyleDesc')}
           </p>
 
-          {/* 語氣快速選擇 */}
           <div className="mt-4">
-            <p className="text-sm font-medium text-gray-700 mb-2">快速選擇語氣：</p>
+            <p className="text-sm font-medium text-gray-700 mb-2">{t('quickToneSelect')}</p>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => handleToneSelect('friendly')}
                 className="rounded-full border border-gray-300 bg-white px-3 py-1 text-sm text-gray-700 hover:border-indigo-500 hover:bg-indigo-50 hover:text-indigo-900 transition-colors"
               >
-                😊 親切友善
+                {t('toneFriendly')}
               </button>
               <button
                 type="button"
                 onClick={() => handleToneSelect('professional')}
                 className="rounded-full border border-gray-300 bg-white px-3 py-1 text-sm text-gray-700 hover:border-indigo-500 hover:bg-indigo-50 hover:text-indigo-900 transition-colors"
               >
-                💼 專業正式
+                {t('toneProfessional')}
               </button>
               <button
                 type="button"
                 onClick={() => handleToneSelect('concise')}
                 className="rounded-full border border-gray-300 bg-white px-3 py-1 text-sm text-gray-700 hover:border-indigo-500 hover:bg-indigo-50 hover:text-indigo-900 transition-colors"
               >
-                ⚡ 簡潔快速
+                {t('toneConcise')}
               </button>
             </div>
           </div>
@@ -586,7 +612,7 @@ export default function SettingsPage() {
                 <QuickReplies items={quickReplies} onSelect={(query) => handlePreviewReply(query)} />
                 <div className="flex justify-end">
                   <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-indigo-500 text-white px-4 py-2.5 text-base font-medium leading-snug">
-                    {t(previewQuestionKey)}
+                    {previewQuestionDisplay || t(previewQuestionKey)}
                   </div>
                 </div>
                 <div className="flex justify-start">
@@ -599,7 +625,7 @@ export default function SettingsPage() {
                       </span>
                     )}
                     {!previewLoading && previewAnswer === 'updated' && (
-                      <span className="text-gray-600">{t('previewNote')}</span>
+                      <span className="text-gray-600">{t('previewStale')}</span>
                     )}
                     {!previewLoading && previewAnswer === 'pending' && (
                       <span className="text-gray-600">{t('testing')}</span>
@@ -668,7 +694,7 @@ export default function SettingsPage() {
                 </div>
                 <QuickReplies items={quickReplies} onSelect={(query) => handlePreviewReply(query)} />
                 <div className="flex justify-end">
-                  <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-indigo-500 text-white px-4 py-2.5 text-base font-medium leading-snug">{t(previewQuestionKey)}</div>
+                  <div className="max-w-[85%] rounded-2xl rounded-tr-md bg-indigo-500 text-white px-4 py-2.5 text-base font-medium leading-snug">{previewQuestionDisplay || t(previewQuestionKey)}</div>
                 </div>
                 <div className="flex justify-start">
                   <div className="max-w-[85%] rounded-2xl rounded-tl-md bg-gray-200 text-gray-900 px-4 py-2.5 text-base font-medium leading-snug">
@@ -679,7 +705,7 @@ export default function SettingsPage() {
                         <span className="w-2 h-2 rounded-full bg-gray-500 animate-typing-dot" />
                       </span>
                     )}
-                    {!previewLoading && previewAnswer === 'updated' && <span className="text-gray-600">{t('previewNote')}</span>}
+                    {!previewLoading && previewAnswer === 'updated' && <span className="text-gray-600">{t('previewStale')}</span>}
                     {!previewLoading && previewAnswer === 'pending' && <span className="text-gray-600">{t('testing')}</span>}
                     {!previewLoading && previewAnswer !== null && previewAnswer !== 'pending' && previewAnswer !== 'updated' && <span className="whitespace-pre-wrap">{previewAnswer}</span>}
                     {!previewLoading && previewAnswer === null && <span className="text-gray-600">{t('previewNote')}</span>}
@@ -698,6 +724,90 @@ export default function SettingsPage() {
                 ))}
               </div>
               <button type="button" onClick={() => handlePreviewReply()} disabled={previewLoading} className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">{t('previewAiReply')}</button>
+            </div>
+          </div>
+        )}
+
+        {/* LINE Token 設定 Modal */}
+        {lineModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-lg">
+              <h2 className="text-lg font-semibold text-gray-900">{t('lineTokenSettings')}</h2>
+              <p className="mt-1 text-sm text-gray-600">{t('lineTokenDesc')}</p>
+
+              <div className="mt-4 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Channel ID</label>
+                  <input
+                    type="text"
+                    value={lineChannelId}
+                    onChange={(e) => setLineChannelId(e.target.value)}
+                    placeholder="1234567890"
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Channel Secret</label>
+                  <input
+                    type="password"
+                    value={lineChannelSecret}
+                    onChange={(e) => setLineChannelSecret(e.target.value)}
+                    placeholder="- - - - - - - - - - - - - - - - "
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono"
+                  />
+                  <p className="mt-1 text-xs text-gray-400">{t('lineSecretHint')}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Channel Access Token</label>
+                  <textarea
+                    value={lineAccessToken}
+                    onChange={(e) => setLineAccessToken(e.target.value)}
+                    placeholder="- - - - - - - - - - - - - - - - "
+                    rows={3}
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono resize-none"
+                  />
+                  <p className="mt-1 text-xs text-gray-400">{t('lineTokenHint')}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Webhook URL</label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <code className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 truncate">
+                      {webhookUrl}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (webhookUrl) {
+                          navigator.clipboard.writeText(webhookUrl);
+                          toast.show(t('webhookCopied'), 'success');
+                        }
+                      }}
+                      className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      {t('copy')}
+                    </button>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-400">{t('lineIntegrationHint')}</p>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setLineModalOpen(false)}
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+                >
+                  {t('cancel')}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLineSave}
+                  disabled={lineSaving}
+                  className="rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {lineSaving ? t('saving') : t('save')}
+                </button>
+              </div>
             </div>
           </div>
         )}
