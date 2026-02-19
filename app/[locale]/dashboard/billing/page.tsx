@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { getNextPlanSlug } from '@/lib/plans';
 
 type Plan = {
@@ -52,6 +53,7 @@ const PLAN_CARD_STYLE: Record<string, string> = {
 const PER_PAGE = 10;
 
 export default function BillingPage() {
+  const t = useTranslations('billing');
   const [plans, setPlans] = useState<Plan[]>([]);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -71,7 +73,7 @@ export default function BillingPage() {
     const timeoutId = setTimeout(() => {
       setLoading((prev) => {
         if (prev) {
-          setError('載入超時，請重新整理頁面或聯繫客服');
+          setError(t('loadTimeout'));
           return false;
         }
         return prev;
@@ -105,12 +107,12 @@ export default function BillingPage() {
         });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '載入失敗');
+      setError(err instanceof Error ? err.message : t('loadFailed'));
     } finally {
       clearTimeout(timeoutId);
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchData();
@@ -120,13 +122,13 @@ export default function BillingPage() {
     if (billingUsage == null) return;
     const convPct = billingUsage.conversations.limit === -1 ? 0 : Math.min(100, billingUsage.conversations.percentage);
     const knowledgePct = billingUsage.knowledge.limit === -1 ? 0 : Math.min(100, billingUsage.knowledge.percentage);
-    const t = requestAnimationFrame(() => {
+    const rafId = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         setDisplayConvPct(convPct);
         setDisplayKnowledgePct(knowledgePct);
       });
     });
-    return () => cancelAnimationFrame(t);
+    return () => cancelAnimationFrame(rafId);
   }, [billingUsage]);
 
   const currentPlanSlug = subscription?.plan
@@ -139,7 +141,7 @@ export default function BillingPage() {
   );
 
   const handleCancelSubscription = async () => {
-    if (!confirm('確定要取消訂閱嗎？訂閱將在目前計費週期結束後失效。')) return;
+    if (!confirm(t('cancelConfirm'))) return;
     setActionLoading('cancel');
     try {
       const res = await fetch('/api/subscription', {
@@ -201,7 +203,7 @@ export default function BillingPage() {
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto" />
-          <p className="mt-3 text-gray-600">載入中...</p>
+          <p className="mt-3 text-gray-600">{t('loading')}</p>
         </div>
       </div>
     );
@@ -212,14 +214,14 @@ export default function BillingPage() {
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="text-center max-w-md">
           <div className="text-red-600 text-6xl mb-4">⚠</div>
-          <h2 className="text-xl font-semibold mb-2">載入失敗</h2>
+          <h2 className="text-xl font-semibold mb-2">{t('loadFailed')}</h2>
           <p className="text-gray-600 mb-4">{error}</p>
           <button
             type="button"
             onClick={() => fetchData()}
             className="rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
           >
-            重新載入
+            {t('reload')}
           </button>
         </div>
       </div>
@@ -229,22 +231,22 @@ export default function BillingPage() {
   const conv = billingUsage?.conversations ?? { used: 0, limit: 0, percentage: 0 };
   const isUnlimitedConv = conv.limit === -1;
   const nextPlanSlug = getNextPlanSlug(currentPlanSlug);
-  const nextPlanName = nextPlanSlug ? plans.find((p) => p.slug === nextPlanSlug)?.name ?? '更高方案' : null;
+  const nextPlanName = nextPlanSlug ? plans.find((p) => p.slug === nextPlanSlug)?.name ?? t('higherPlan') : null;
 
   const barColor = (pct: number) =>
     pct >= 100 ? 'bg-red-500' : pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-yellow-500' : 'bg-green-500';
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold text-gray-900">方案與計費</h1>
+      <h1 className="text-2xl font-bold text-gray-900">{t('pageTitle')}</h1>
 
       {/* 用量概覽 */}
       <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">用量概覽</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('usageOverview')}</h2>
 
         {/* 對話用量 */}
         <div className="mb-6">
-          <p className="text-sm font-medium text-gray-700 mb-2">📊 本月對話用量</p>
+          <p className="text-sm font-medium text-gray-700 mb-2">📊 {t('monthlyConversationUsage')}</p>
           <div className="h-3 w-full rounded-full bg-gray-200 overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-700 ${barColor(isUnlimitedConv ? 0 : conv.percentage)}`}
@@ -253,14 +255,14 @@ export default function BillingPage() {
           </div>
           <p className="mt-1 text-sm text-gray-600">
             {isUnlimitedConv
-              ? `已使用 ${conv.used} 則（無限制）`
-              : `已使用 ${conv.used} / ${conv.limit} 則${conv.percentage > 0 ? ` · ${conv.percentage}%` : ''}`}
+              ? t('usedUnlimited', { used: conv.used })
+              : t('usedOfLimit', { used: conv.used, limit: conv.limit }) + (conv.percentage > 0 ? ` · ${conv.percentage}%` : '')}
           </p>
         </div>
 
         {/* 知識庫用量 */}
         <div className="mb-4">
-          <p className="text-sm font-medium text-gray-700 mb-2">📚 知識庫條目</p>
+          <p className="text-sm font-medium text-gray-700 mb-2">📚 {t('knowledgeBaseItems')}</p>
           <div className="h-3 w-full rounded-full bg-gray-200 overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-700 ${barColor(
@@ -273,10 +275,9 @@ export default function BillingPage() {
           </div>
           <p className="mt-1 text-sm text-gray-600">
             {billingUsage?.knowledge.limit === -1
-              ? `已使用 ${billingUsage?.knowledge.used ?? 0} 條（無限制）`
-              : `已使用 ${billingUsage?.knowledge.used ?? 0} / ${billingUsage?.knowledge.limit ?? 0} 條${
-                  (billingUsage?.knowledge.percentage ?? 0) > 0 ? ` · ${billingUsage?.knowledge.percentage}%` : ''
-                }`}
+              ? t('usedUnlimitedEntries', { used: billingUsage?.knowledge.used ?? 0 })
+              : t('usedOfLimitEntries', { used: billingUsage?.knowledge.used ?? 0, limit: billingUsage?.knowledge.limit ?? 0 }) +
+                ((billingUsage?.knowledge.percentage ?? 0) > 0 ? ` · ${billingUsage?.knowledge.percentage}%` : '')}
           </p>
         </div>
 
@@ -284,10 +285,13 @@ export default function BillingPage() {
         {billingUsage?.billing_period && (
           <>
             <p className="text-xs text-gray-500">
-              帳單週期：{billingUsage.billing_period.start} - {billingUsage.billing_period.end} ｜ 剩餘{' '}
-              {billingUsage.billing_period.days_remaining} 天
+              {t('billingPeriod', {
+                start: billingUsage.billing_period.start,
+                end: billingUsage.billing_period.end,
+                days: billingUsage.billing_period.days_remaining,
+              })}
             </p>
-            <p className="text-xs text-gray-400 mt-1">用量於每月 1 日重置</p>
+            <p className="text-xs text-gray-400 mt-1">{t('usageResetsMonthly')}</p>
           </>
         )}
 
@@ -297,30 +301,26 @@ export default function BillingPage() {
             {conv.percentage >= 100 && (
               <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 flex flex-wrap items-center gap-3">
                 <span className="text-red-600">❌</span>
-                <p className="text-red-800 text-sm flex-1">
-                  已達到本月對話上限，AI 自動回覆已暫停。升級方案以恢復服務。
-                </p>
+                <p className="text-red-800 text-sm flex-1">{t('limitReached')}</p>
                 <button
                   type="button"
                   onClick={() => document.getElementById('plans-section')?.scrollIntoView({ behavior: 'smooth' })}
                   className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
                 >
-                  升級方案
+                  {t('upgradePlan')}
                 </button>
               </div>
             )}
             {conv.percentage >= 95 && conv.percentage < 100 && (
               <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 flex flex-wrap items-center gap-3">
                 <span className="text-red-600">🚨</span>
-                <p className="text-red-800 text-sm flex-1">
-                  即將達到對話上限！剩餘 {conv.limit - conv.used} 則，超出後將無法自動回覆
-                </p>
+                <p className="text-red-800 text-sm flex-1">{t('limitAlmostReached', { remaining: conv.limit - conv.used })}</p>
                 <button
                   type="button"
                   onClick={() => document.getElementById('plans-section')?.scrollIntoView({ behavior: 'smooth' })}
                   className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
                 >
-                  立即升級
+                  {t('upgradeNow')}
                 </button>
               </div>
             )}
@@ -328,14 +328,14 @@ export default function BillingPage() {
               <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 flex flex-wrap items-center gap-3">
                 <span className="text-amber-600">⚠️</span>
                 <p className="text-amber-800 text-sm flex-1">
-                  您已使用 {conv.percentage}% 的對話額度，建議升級到 {nextPlanName ?? '更高方案'} 以避免中斷
+                  {t('usageWarning', { percentage: conv.percentage, plan: nextPlanName ?? t('higherPlan') })}
                 </p>
                 <button
                   type="button"
                   onClick={() => document.getElementById('plans-section')?.scrollIntoView({ behavior: 'smooth' })}
                   className="rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-700"
                 >
-                  升級方案
+                  {t('upgradePlan')}
                 </button>
               </div>
             )}
@@ -345,28 +345,28 @@ export default function BillingPage() {
 
       {/* 訂閱狀態區塊 */}
       <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">目前訂閱狀態</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('subscriptionStatus')}</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
-            <p className="text-sm text-gray-500">方案</p>
+            <p className="text-sm text-gray-500">{t('plan')}</p>
             <p className="font-medium text-gray-900">
-              {currentPlan?.name ?? '免費試用'}
+              {currentPlan?.name ?? t('freeTrial')}
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-500">狀態</p>
+            <p className="text-sm text-gray-500">{t('status')}</p>
             <p className="font-medium text-gray-900">
               {subscription
                 ? subscription.cancel_at_period_end
-                  ? '已取消（期末生效）'
+                  ? t('cancelledAtPeriodEnd')
                   : subscription.status === 'trialing'
-                    ? '試用中'
-                    : '生效中'
-                : '免費方案'}
+                    ? t('trialing')
+                    : t('active')
+                : t('freePlan')}
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-500">下次扣款日</p>
+            <p className="text-sm text-gray-500">{t('nextBillingDate')}</p>
             <p className="font-medium text-gray-900">
               {subscription?.current_period_end
                 ? new Date(subscription.current_period_end).toLocaleDateString('zh-TW')
@@ -374,11 +374,11 @@ export default function BillingPage() {
             </p>
           </div>
           <div>
-            <p className="text-sm text-gray-500">本月 AI 回覆用量</p>
+            <p className="text-sm text-gray-500">{t('monthlyAiUsage')}</p>
             {usage && (
               <>
                 <p className="font-medium text-gray-900">
-                  {usage.used} / {usage.limit > 1e6 ? '無限' : usage.limit}
+                  {usage.used} / {usage.limit > 1e6 ? t('unlimited') : usage.limit}
                 </p>
                 {usage.limit < 1e6 && (
                   <div className="mt-1 h-2 w-full rounded-full bg-gray-200 overflow-hidden">
@@ -397,10 +397,10 @@ export default function BillingPage() {
                   </div>
                 )}
                 {usage.limit < 1e6 && usage.used >= usage.limit * 0.8 && usage.used < usage.limit && (
-                  <p className="text-amber-600 text-xs mt-1">即將達到本月上限</p>
+                  <p className="text-amber-600 text-xs mt-1">{t('approachingLimit')}</p>
                 )}
                 {usage.limit < 1e6 && usage.used >= usage.limit && (
-                  <p className="text-red-600 text-xs mt-1">已達本月上限</p>
+                  <p className="text-red-600 text-xs mt-1">{t('reachedLimit')}</p>
                 )}
               </>
             )}
@@ -412,7 +412,7 @@ export default function BillingPage() {
             onClick={() => document.getElementById('plans-section')?.scrollIntoView({ behavior: 'smooth' })}
             className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
-            變更方案
+            {t('changePlan')}
           </button>
           {subscription && !subscription.cancel_at_period_end && (
             <button
@@ -421,20 +421,20 @@ export default function BillingPage() {
               disabled={!!actionLoading}
               className="rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
             >
-              {actionLoading === 'cancel' ? '處理中...' : '取消訂閱'}
+              {actionLoading === 'cancel' ? t('processing') : t('cancelSubscription')}
             </button>
           )}
           <span className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-sm text-gray-500">
-            更新付款方式 — 即將推出
+            {t('contactToUpdatePayment')}
           </span>
         </div>
       </section>
 
       {/* 方案選擇 */}
       <section id="plans-section" className="scroll-mt-8">
-        <h2 className="text-lg font-semibold text-gray-900 mb-2">選擇方案</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-2">{t('choosePlan')}</h2>
         <div className="mb-4 flex items-center gap-2">
-          <span className="text-sm text-gray-600">月繳</span>
+          <span className="text-sm text-gray-600">{t('monthly')}</span>
           <button
             type="button"
             role="switch"
@@ -450,9 +450,9 @@ export default function BillingPage() {
               }`}
             />
           </button>
-          <span className="text-sm text-gray-600">年繳</span>
+          <span className="text-sm text-gray-600">{t('yearly')}</span>
           <span className="rounded bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
-            省約 17%
+            {t('savePercent')}
           </span>
         </div>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -472,16 +472,16 @@ export default function BillingPage() {
             const isPro = plan.slug === 'pro';
 
             const getCtaLabel = () => {
-              if (isCurrent) return '目前方案';
-              if (plan.slug === 'free') return '開始使用';
+              if (isCurrent) return t('currentPlan');
+              if (plan.slug === 'free') return t('getStarted');
               const currentPrice = currentPlan
                 ? billingCycle === 'yearly'
                   ? currentPlan.price_yearly
                   : currentPlan.price_monthly
                 : 0;
-              if (price > currentPrice) return `升級到 ${plan.name}`;
-              if (price < currentPrice) return `降級到 ${plan.name}`;
-              return '選擇方案';
+              if (price > currentPrice) return t('upgradeTo', { plan: plan.name });
+              if (price < currentPrice) return t('downgradeTo', { plan: plan.name });
+              return t('selectPlan');
             };
 
             return (
@@ -493,7 +493,7 @@ export default function BillingPage() {
               >
                 {isPro && (
                   <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-purple-600 px-3 py-0.5 text-xs font-medium text-white">
-                    最受歡迎
+                    {t('mostPopular')}
                   </span>
                 )}
                 <h3 className="text-lg font-semibold text-gray-900">{plan.name}</h3>
@@ -503,12 +503,12 @@ export default function BillingPage() {
                     NT$ {price.toLocaleString()}
                   </span>
                   <span className="text-gray-500">
-                    /{billingCycle === 'yearly' ? '年' : '月'}
+                    /{billingCycle === 'yearly' ? t('year') : t('month')}
                   </span>
                 </div>
                 {billingCycle === 'yearly' && plan.price_yearly > 0 && savePercent > 0 && (
                   <p className="mt-1 text-xs text-green-600">
-                    相當於每月 NT$ {monthlyEquivalent}，省 {savePercent}%
+                    {t('yearlyEquivalent', { monthly: monthlyEquivalent, savePercent })}
                   </p>
                 )}
                 <ul className="mt-4 space-y-2">
@@ -525,7 +525,7 @@ export default function BillingPage() {
                   disabled={isCurrent || actionLoading !== null}
                   className="mt-6 w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
-                  {isCurrent ? '目前方案' : getCtaLabel()}
+                  {isCurrent ? t('currentPlan') : getCtaLabel()}
                 </button>
               </div>
             );
@@ -535,19 +535,19 @@ export default function BillingPage() {
 
       {/* 付款紀錄 */}
       <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">付款紀錄</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">{t('paymentHistory')}</h2>
         {payments.length === 0 ? (
-          <p className="py-8 text-center text-gray-500">尚無付款紀錄</p>
+          <p className="py-8 text-center text-gray-500">{t('noPayments')}</p>
         ) : (
           <>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead>
                   <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">日期</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">金額</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">狀態</th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">操作</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{t('date')}</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{t('amount')}</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{t('payStatus')}</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{t('action')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -570,15 +570,15 @@ export default function BillingPage() {
                           }
                         >
                           {pay.status === 'succeeded'
-                            ? '成功'
+                            ? t('paySucceeded')
                             : pay.status === 'failed'
-                              ? '失敗'
+                              ? t('payFailed')
                               : pay.status === 'refunded'
-                                ? '已退款'
-                                : '處理中'}
+                                ? t('payRefunded')
+                                : t('payProcessing')}
                         </span>
                       </td>
-                      <td className="px-4 py-2 text-sm text-gray-500">下載收據 — 即將推出</td>
+                      <td className="px-4 py-2 text-sm text-gray-500">{t('receiptContactSupport')}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -592,10 +592,10 @@ export default function BillingPage() {
                   disabled={paymentsPage === 0}
                   className="rounded border border-gray-300 px-3 py-1 text-sm disabled:opacity-50"
                 >
-                  上一頁
+                  {t('prevPage')}
                 </button>
                 <span className="text-sm text-gray-600">
-                  第 {paymentsPage + 1} / {totalPages} 頁
+                  {t('pageOf', { current: paymentsPage + 1, total: totalPages })}
                 </span>
                 <button
                   type="button"
@@ -603,7 +603,7 @@ export default function BillingPage() {
                   disabled={paymentsPage >= totalPages - 1}
                   className="rounded border border-gray-300 px-3 py-1 text-sm disabled:opacity-50"
                 >
-                  下一頁
+                  {t('nextPage')}
                 </button>
               </div>
             )}
