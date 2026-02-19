@@ -13,21 +13,30 @@ const STEPS = [
 
 const INDUSTRIES = ['餐飲', '零售', '美業', '教育', '電商', '其他'] as const;
 
+const TONE_CORE_RULES =
+  '\n\n⚠ 核心限制：只根據知識庫內容回答，不編造資訊；不確定時回覆：「這個問題我需要轉交給專人處理」；不承諾折扣、退款等金錢事項。';
+
 const TONE_PRESETS = [
   {
     id: 'friendly',
     label: '親切友善 🤗',
-    prompt: '你是這位商家的客服小幫手。請像朋友一樣親切回覆客戶，適度使用 emoji，讓對話溫暖、易懂。',
+    prompt:
+      '你是這位商家的客服小幫手。請像朋友一樣親切回覆客戶，適度使用 emoji，讓對話溫暖、易懂。' +
+      TONE_CORE_RULES,
   },
   {
     id: 'professional',
     label: '專業正式 👔',
-    prompt: '你是這位商家的專業客服。請用專業、有條理的語氣回覆，清楚傳達資訊，保持禮貌與效率。',
+    prompt:
+      '你是這位商家的專業客服。請用專業、有條理的語氣回覆，清楚傳達資訊，保持禮貌與效率。' +
+      TONE_CORE_RULES,
   },
   {
     id: 'brief',
     label: '簡潔快速 ⚡',
-    prompt: '你是這位商家的客服。請用最簡短的方式回覆重點，不贅述，方便客戶快速得到答案。',
+    prompt:
+      '你是這位商家的客服。請用最簡短的方式回覆重點，不贅述，方便客戶快速得到答案。' +
+      TONE_CORE_RULES,
   },
 ] as const;
 

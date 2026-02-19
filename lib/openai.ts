@@ -86,7 +86,7 @@ export async function generateReply(
             { role: 'system' as const, content: securePrompt },
             { role: 'user' as const, content: userMessage },
           ],
-          temperature: 0.7,
+          temperature: 0.2, // 客服場景建議 0.1–0.3，降低幻覺
           max_tokens: 500,
         });
       },

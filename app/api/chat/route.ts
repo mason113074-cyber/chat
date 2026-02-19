@@ -5,7 +5,10 @@ import { searchKnowledgeForUser } from '@/lib/knowledge';
 import { getConversationUsageForUser } from '@/lib/billing-usage';
 import { detectSensitiveKeywords } from '@/lib/security/sensitive-keywords';
 
-const KNOWLEDGE_PREFIX = '\n\n以下是相關的知識庫資料，請優先參考這些資訊來回答：\n';
+const KNOWLEDGE_PREFIX =
+  '\n\n## 以下是你可以參考的知識庫內容（只能根據以下內容回答，勿使用其他知識）：\n';
+const KNOWLEDGE_EMPTY_INSTRUCTION =
+  '\n\n注意：知識庫中沒有找到與此問題相關的內容，請回覆需要轉接專人，勿自行編造答案。';
 const SENSITIVE_CONTENT_ERROR = '此問題涉及敏感內容，建議聯繫人工客服。';
 
 export async function POST(request: NextRequest) {
@@ -51,9 +54,7 @@ export async function POST(request: NextRequest) {
       aiModel = data?.ai_model ?? null;
 
       const knowledgeText = await searchKnowledgeForUser(user.id, message, 3, 2000);
-      if (knowledgeText) {
-        systemPrompt = (systemPrompt?.trim() ?? '') + KNOWLEDGE_PREFIX + knowledgeText;
-      }
+      systemPrompt = (systemPrompt?.trim() ?? '') + (knowledgeText ? KNOWLEDGE_PREFIX + knowledgeText : KNOWLEDGE_EMPTY_INSTRUCTION);
     }
 
     const content = await generateReply(message, systemPrompt, aiModel);

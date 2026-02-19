@@ -11,8 +11,42 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { invalidateAnalyticsCache } from '@/lib/analytics-cache';
 import { detectSensitiveKeywords } from '@/lib/security/sensitive-keywords';
 
-const KNOWLEDGE_PREFIX = '\n\n以下是相關的知識庫資料，請優先參考這些資訊來回答：\n';
+const KNOWLEDGE_PREFIX =
+  '\n\n## 以下是你可以參考的知識庫內容（只能根據以下內容回答，勿使用其他知識）：\n';
+const KNOWLEDGE_EMPTY_INSTRUCTION =
+  '\n\n注意：知識庫中沒有找到與此問題相關的內容，請回覆需要轉接專人，勿自行編造答案。';
 const SENSITIVE_CONTENT_REPLY = '此問題涉及敏感內容，建議聯繫人工客服。';
+const GUARDRAIL_SAFE_REPLY = '感謝您的詢問！此問題需要專員處理，我已為您記錄，會盡快回覆您。';
+
+const FORBIDDEN_PATTERNS = [
+  /免費送你/,
+  /我可以給你.*折/,
+  /退.*全額/,
+  /保證.*效果/,
+  /我不是AI/,
+  /我是真人/,
+];
+const MAX_REPLY_LENGTH = 500;
+
+const HUMAN_HANDOFF_KEYWORDS = [
+  '找真人',
+  '轉人工',
+  '客服人員',
+  '真人客服',
+  '投訴',
+  '申訴',
+  '不滿意',
+  '太差了',
+  '什麼爛',
+  '退款',
+  '退錢',
+  '賠償',
+  'human',
+  'agent',
+  'real person',
+  'complaint',
+];
+const AI_HANDOFF_PHRASES = ['轉交給專人', '需要專員處理', '轉接人工'];
 
 const NEEDS_HUMAN_KEYWORDS = /不確定|無法回答|請聯繫|請聯絡|抱歉我不清楚|抱歉我無法|轉人工|真人客服/;
 
@@ -180,20 +214,41 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
     );
     const fullSystemPrompt = knowledgeText
       ? (systemPrompt?.trim() ?? '') + KNOWLEDGE_PREFIX + knowledgeText
-      : systemPrompt ?? '';
+      : (systemPrompt?.trim() ?? '') + KNOWLEDGE_EMPTY_INSTRUCTION;
     const aiResponse = await generateReply(
       userMessage,
       fullSystemPrompt,
       aiModel,
       ownerUserId,
-      contact.id // 新增：傳入 contact.id 用於安全日誌
+      contact.id
     );
 
-    await replyMessage(replyToken, aiResponse);
+    let finalReply = aiResponse;
+    let guardrailTriggered = false;
+    for (const pattern of FORBIDDEN_PATTERNS) {
+      if (pattern.test(aiResponse)) {
+        finalReply = GUARDRAIL_SAFE_REPLY;
+        guardrailTriggered = true;
+        break;
+      }
+    }
+    if (finalReply.length > MAX_REPLY_LENGTH) {
+      finalReply = finalReply.substring(0, MAX_REPLY_LENGTH - 3) + '...';
+    }
+
+    await replyMessage(replyToken, finalReply);
 
     await insertConversationMessage(contact.id, userMessage, 'user');
-    const resolution = computeResolution(sources.length, aiResponse);
-    await insertConversationMessage(contact.id, aiResponse, 'assistant', {
+    const needsHumanFromUser = HUMAN_HANDOFF_KEYWORDS.some((keyword) =>
+      userMessage.toLowerCase().includes(keyword.toLowerCase())
+    );
+    const needsHumanFromAi = AI_HANDOFF_PHRASES.some((phrase) => finalReply.includes(phrase));
+    const needsHuman =
+      guardrailTriggered || needsHumanFromUser || needsHumanFromAi;
+    const resolution = needsHuman
+      ? { status: 'needs_human' as const, resolved_by: 'unresolved', is_resolved: false }
+      : computeResolution(sources.length, finalReply);
+    await insertConversationMessage(contact.id, finalReply, 'assistant', {
       status: resolution.status,
       resolved_by: resolution.resolved_by,
       is_resolved: resolution.is_resolved,
