@@ -1,9 +1,24 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import { createClient } from '@/lib/supabase/client';
-
-type ConversationStatus = 'ai_handled' | 'needs_human' | 'resolved' | 'closed';
+import {
+  SearchBar,
+  StatusTabs,
+  FilterBar,
+  TagFilter,
+  BatchToolbar,
+  EmptyState,
+  ConversationListItem,
+  ConversationPanel,
+  type ConversationStatus,
+  type StatusFilter,
+  type DateRangeFilter,
+  type SortBy,
+  type TagWithCount,
+  type Conversation,
+} from './components';
 
 type Contact = {
   id: string;
@@ -16,75 +31,8 @@ type Contact = {
   lastMessageTime: string;
 };
 
-/** Highlight matching substring in text (case-insensitive). */
-function highlightMatch(text: string, query: string): React.ReactNode {
-  if (!query.trim()) return text;
-  const q = query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const re = new RegExp(`(${q})`, 'gi');
-  const parts = text.split(re);
-  return parts.map((part, i) =>
-    i % 2 === 1 ? (
-      <mark key={i} className="bg-yellow-200 rounded px-0.5">
-        {part}
-      </mark>
-    ) : (
-      part
-    )
-  );
-}
-
-type TagWithCount = { tag: string; count: number };
-
-const TAG_COLORS = [
-  'bg-indigo-100 text-indigo-800',
-  'bg-emerald-100 text-emerald-800',
-  'bg-amber-100 text-amber-800',
-  'bg-rose-100 text-rose-800',
-  'bg-sky-100 text-sky-800',
-  'bg-violet-100 text-violet-800',
-];
-function tagColor(tag: string): string {
-  const i = tag.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-  return TAG_COLORS[Math.abs(i) % TAG_COLORS.length];
-}
-
-const STATUS_BADGE: Record<ConversationStatus, { label: string; className: string; pulse?: boolean }> = {
-  ai_handled: { label: 'AI 已處理', className: 'bg-green-100 text-green-800' },
-  needs_human: { label: '需人工處理', className: 'bg-orange-100 text-orange-800', pulse: true },
-  resolved: { label: '已解決', className: 'bg-blue-100 text-blue-800' },
-  closed: { label: '已關閉', className: 'bg-gray-100 text-gray-700' },
-};
-
-function StatusBadge({ status }: { status: ConversationStatus }) {
-  const conf = STATUS_BADGE[status] ?? STATUS_BADGE.ai_handled;
-  return (
-    <span
-      className={`rounded-full px-2 py-0.5 text-xs font-medium ${conf.className} ${conf.pulse ? 'animate-pulse opacity-90' : ''}`}
-    >
-      {conf.label}
-    </span>
-  );
-}
-
-type Conversation = {
-  id: string;
-  message: string;
-  role: string;
-  created_at: string;
-};
-
-type StatusFilter = 'all' | 'ai_handled' | 'needs_human' | 'resolved' | 'closed';
-type DateRangeFilter = 'all' | 'today' | '7' | '30';
-type SortBy = 'newest' | 'oldest' | 'unread_first' | 'name_az';
-
-const SORT_OPTIONS: { value: SortBy; label: string }[] = [
-  { value: 'newest', label: '最新訊息優先' },
-  { value: 'oldest', label: '最舊訊息優先' },
-  { value: 'unread_first', label: '未讀優先' },
-  { value: 'name_az', label: '按客戶名稱 A-Z' },
-];
-
 export default function ConversationsPage() {
+  const t = useTranslations('conversations');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [tagList, setTagList] = useState<TagWithCount[]>([]);
   const [selectedTagFilters, setSelectedTagFilters] = useState<Set<string>>(new Set());
@@ -101,8 +49,6 @@ export default function ConversationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [counts, setCounts] = useState<{ total: number; ai_handled: number; needs_human: number; resolved: number; closed: number } | null>(null);
-  const [openStatusMenuId, setOpenStatusMenuId] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Debounce search 300ms
   useEffect(() => {
@@ -354,11 +300,6 @@ export default function ConversationsPage() {
     }
   }, [selectedContactId]);
 
-  // 自動捲動到最新訊息
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [conversations]);
-
   // 訂閱對話即時更新
   useEffect(() => {
     if (!selectedContactId) return;
@@ -496,7 +437,7 @@ export default function ConversationsPage() {
     const timeoutId = setTimeout(() => {
       setLoading((prev) => {
         if (prev) {
-          setError('載入超時，請重新整理頁面或聯繫客服');
+          setError(t('loadTimeout'));
           return false;
         }
         return prev;
@@ -583,7 +524,7 @@ export default function ConversationsPage() {
       });
     }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '載入失敗');
+      setError(err instanceof Error ? err.message : t('loadFailed'));
     } finally {
       clearTimeout(timeoutId);
       setLoading(false);
@@ -609,7 +550,7 @@ export default function ConversationsPage() {
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto" />
-          <p className="mt-3 text-gray-600">載入中...</p>
+          <p className="mt-3 text-gray-600">{t('loading')}</p>
         </div>
       </div>
     );
@@ -620,14 +561,14 @@ export default function ConversationsPage() {
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="text-center max-w-md">
           <div className="text-red-600 text-6xl mb-4">⚠</div>
-          <h2 className="text-xl font-semibold mb-2">載入失敗</h2>
+          <h2 className="text-xl font-semibold mb-2">{t('loadFailed')}</h2>
           <p className="text-gray-600 mb-4">{error}</p>
           <button
             type="button"
             onClick={() => { setError(null); setLoading(true); loadContacts(); }}
             className="rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700"
           >
-            重新載入
+            {t('reload')}
           </button>
         </div>
       </div>
@@ -638,211 +579,70 @@ export default function ConversationsPage() {
     <div>
       {/* Mobile: Search + filters + contact list */}
       <div className="lg:hidden">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">對話紀錄</h1>
-        {/* Search */}
+        <h1 className="text-2xl font-bold text-gray-900 mb-4">{t('pageTitle')}</h1>
         <div className="mb-3">
-          <input
-            type="search"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="搜尋客戶名稱或訊息內容"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-            aria-label="搜尋對話"
+          <SearchBar value={searchInput} onChange={setSearchInput} />
+        </div>
+        <div className="mb-3 overflow-x-auto">
+          <StatusTabs
+            activeFilter={statusFilter}
+            counts={counts}
+            onChange={setStatusFilter}
+            compact
           />
         </div>
-        {/* Status filter tabs */}
-        <div className="mb-3 overflow-x-auto">
-          <div className="flex gap-1 min-w-0 pb-1">
-            {[
-              { value: 'all' as const, label: '全部', count: counts?.total ?? 0 },
-              { value: 'ai_handled' as const, label: 'AI 已處理', count: counts?.ai_handled ?? 0, color: 'text-green-700' },
-              { value: 'needs_human' as const, label: '需人工處理', count: counts?.needs_human ?? 0, color: 'text-orange-700' },
-              { value: 'resolved' as const, label: '已解決', count: counts?.resolved ?? 0 },
-              { value: 'closed' as const, label: '已關閉', count: counts?.closed ?? 0 },
-            ].map((tab) => (
-              <button
-                key={tab.value}
-                type="button"
-                onClick={() => setStatusFilter(tab.value)}
-                className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap border-b-2 transition-colors ${
-                  statusFilter === tab.value
-                    ? 'border-indigo-600 text-gray-900 font-semibold bg-indigo-50'
-                    : 'border-transparent text-gray-600 hover:bg-gray-100'
-                } ${tab.color ?? ''}`}
-              >
-                {tab.label} {tab.count > 0 ? `(${tab.count})` : ''}
-              </button>
-            ))}
-          </div>
+        <div className="mb-3">
+          <FilterBar
+            dateRange={dateRangeFilter}
+            sortBy={sortBy}
+            onDateRangeChange={setDateRangeFilter}
+            onSortChange={setSortBy}
+          />
         </div>
-        {/* Date filters */}
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <div className="flex flex-wrap gap-1">
-            {(['today', '7', '30', 'all'] as const).map((range) => (
-              <button
-                key={range}
-                type="button"
-                onClick={() => setDateRangeFilter(range)}
-                className={`rounded-lg px-2.5 py-1 text-xs font-medium ${
-                  dateRangeFilter === range
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {range === 'today' ? '今天' : range === '7' ? '最近 7 天' : range === '30' ? '最近 30 天' : '全部'}
-              </button>
-            ))}
-          </div>
-        </div>
-        {/* Sort */}
-        <div className="mb-3 flex items-center gap-2">
-          <span className="text-xs font-medium text-gray-500 shrink-0">排序 ↕</span>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortBy)}
-            className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
-            aria-label="排序方式"
-          >
-            {SORT_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        {/* Mobile tag filter */}
         {(tagList.length > 0 || selectedTagFilters.size > 0) && (
           <div className="mb-4 p-3 rounded-xl border border-gray-200 bg-white">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-gray-500">標籤篩選</span>
-              {selectedTagFilters.size > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setSelectedTagFilters(new Set())}
-                  className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
-                >
-                  全部對話
-                </button>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {tagList.map(({ tag, count }) => {
-                const selected = selectedTagFilters.has(tag);
-                return (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => {
-                      setSelectedTagFilters((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(tag)) next.delete(tag);
-                        else next.add(tag);
-                        return next;
-                      });
-                    }}
-                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${selected ? tagColor(tag) + ' ring-1 ring-offset-1 ring-gray-300' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-                  >
-                    {tag}
-                    <span className="opacity-80">({count})</span>
-                  </button>
-                );
-              })}
-            </div>
+            <TagFilter
+              tags={tagList}
+              selectedTags={selectedTagFilters}
+              onToggle={(tag) => {
+                setSelectedTagFilters((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(tag)) next.delete(tag);
+                  else next.add(tag);
+                  return next;
+                });
+              }}
+              onClearAll={() => setSelectedTagFilters(new Set())}
+            />
           </div>
         )}
         {filteredContacts.length === 0 ? (
-          <div className="rounded-xl border border-gray-200 bg-white px-6 py-16 text-center shadow-sm">
-            <div className="flex flex-col items-center">
-              <div className="rounded-full bg-indigo-100 w-20 h-20 flex items-center justify-center mb-4">
-                <span className="text-4xl">💬</span>
-              </div>
-              {contacts.length === 0 ? (
-                <>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    尚無對話紀錄
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-6 max-w-md">
-                    當客戶透過 LINE 與 Bot 對話後，對話會顯示於此。
-                  </p>
-                  <a
-                    href="/dashboard/settings"
-                    className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
-                  >
-                    查看 LINE 設定教學
-                  </a>
-                </>
-              ) : (
-                <>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    沒有符合條件的對話
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-4">嘗試調整搜尋或篩選條件</p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearchInput('');
-                      setSearchQuery('');
-                      setStatusFilter('all');
-                      setDateRangeFilter('all');
-                      setSelectedTagFilters(new Set());
-                    }}
-                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
-                  >
-                    清除篩選
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
+          contacts.length === 0 ? (
+            <EmptyState variant="no-contacts" />
+          ) : (
+            <EmptyState
+              variant="no-filtered"
+              onClearFilters={() => {
+                setSearchInput('');
+                setSearchQuery('');
+                setStatusFilter('all');
+                setDateRangeFilter('all');
+                setSelectedTagFilters(new Set());
+              }}
+            />
+          )
         ) : (
           <div className="space-y-3">
-            <p className="text-sm text-gray-500">找到 {filteredContacts.length} 個對話</p>
-            {/* Mobile batch toolbar */}
-            {selectedIds.size > 0 && (
-              <div className="rounded-xl border border-gray-200 bg-gray-100 p-3 flex flex-wrap items-center gap-2">
-                <span className="text-sm font-medium text-gray-700">已選 {selectedIds.size} 個對話</span>
-                <button
-                  type="button"
-                  onClick={() => runBatch('resolve')}
-                  disabled={batchLoading}
-                  className="rounded px-2 py-1 text-xs font-medium bg-white border border-gray-300"
-                >
-                  標記為已解決
-                </button>
-                <button
-                  type="button"
-                  onClick={() => runBatch('unresolve')}
-                  disabled={batchLoading}
-                  className="rounded px-2 py-1 text-xs font-medium bg-white border border-gray-300"
-                >
-                  標記為未解決
-                </button>
-                <button
-                  type="button"
-                  onClick={handleBatchDelete}
-                  disabled={batchLoading}
-                  className="rounded px-2 py-1 text-xs font-medium bg-white border border-red-200 text-red-700"
-                >
-                  批次刪除
-                </button>
-                <button
-                  type="button"
-                  onClick={handleBatchAddTag}
-                  disabled={batchLoading}
-                  className="rounded px-2 py-1 text-xs font-medium bg-white border border-gray-300"
-                >
-                  批次新增標籤
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedIds(new Set())}
-                  disabled={batchLoading}
-                  className="rounded px-2 py-1 text-xs font-medium text-indigo-600"
-                >
-                  取消選擇
-                </button>
-              </div>
-            )}
+            <p className="text-sm text-gray-500">{t('foundConversations', { count: filteredContacts.length })}</p>
+            <BatchToolbar
+              selectedCount={selectedIds.size}
+              loading={batchLoading}
+              onResolve={() => runBatch('resolve')}
+              onUnresolve={() => runBatch('unresolve')}
+              onDelete={handleBatchDelete}
+              onAddTag={handleBatchAddTag}
+              onCancel={() => setSelectedIds(new Set())}
+            />
             {successMessage && (
               <div className="rounded-xl bg-green-50 text-green-800 text-sm p-3 border border-green-100">
                 {successMessage}
@@ -854,95 +654,23 @@ export default function ConversationsPage() {
                 checked={allFilteredSelected}
                 onChange={toggleSelectAll}
                 className="h-4 w-4 rounded border-gray-300 text-indigo-600"
-                aria-label="全選/取消全選"
+                aria-label={t('selectAll')}
               />
-              <span className="text-xs text-gray-500">全選/取消全選</span>
+              <span className="text-xs text-gray-500">{t('selectAll')}</span>
             </div>
             {sortedContacts.map((contact) => (
-              <div
+              <ConversationListItem
                 key={contact.id}
-                className={`flex items-start gap-3 rounded-xl border border-gray-200 p-4 shadow-sm ${
-                  contact.conversationStatus === 'needs_human' ? 'bg-orange-50' : 'bg-white'
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedIds.has(contact.id)}
-                  onChange={() => toggleSelect(contact.id)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-indigo-600"
-                  aria-label={`選擇 ${contact.name || '未命名'}`}
-                />
-                <a
-                  href={`/dashboard/conversations/${contact.id}`}
-                  className="flex-1 min-w-0"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-medium text-gray-900">
-                          {highlightMatch(contact.name || '未命名客戶', searchQuery)}
-                        </p>
-                        <StatusBadge status={contact.conversationStatus} />
-                      </div>
-                      <p className="mt-1 text-sm text-gray-600 line-clamp-1">
-                        {highlightMatch(
-                          contact.lastMessage.length > 50
-                            ? contact.lastMessage.substring(0, 50) + '...'
-                            : contact.lastMessage,
-                          searchQuery
-                        )}
-                      </p>
-                      {contact.tags.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          {contact.tags.slice(0, 3).map((t) => (
-                            <span
-                              key={t}
-                              className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${tagColor(t)}`}
-                            >
-                              {t}
-                            </span>
-                          ))}
-                          {contact.tags.length > 3 && (
-                            <span className="text-xs text-gray-400">+{contact.tags.length - 3}</span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    {contact.lastMessageTime && (
-                      <p className="text-xs text-gray-500 whitespace-nowrap">
-                        {new Date(contact.lastMessageTime).toLocaleString('zh-TW', {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </p>
-                    )}
-                  </div>
-                </a>
-                <div className="relative shrink-0">
-                  <button
-                    type="button"
-                    onClick={(e) => { e.preventDefault(); setOpenStatusMenuId((id) => (id === contact.id ? null : contact.id)); }}
-                    className="rounded p-1.5 text-gray-500 hover:bg-gray-200"
-                    aria-label="變更狀態"
-                  >
-                    ⋯
-                  </button>
-                  {openStatusMenuId === contact.id && (
-                    <>
-                      <div className="fixed inset-0 z-10" onClick={() => setOpenStatusMenuId(null)} aria-hidden />
-                      <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-                        <button type="button" onClick={() => { changeStatus(contact.id, 'resolved'); setOpenStatusMenuId(null); }} className="block w-full px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100">標記為已解決</button>
-                        <button type="button" onClick={() => { changeStatus(contact.id, 'needs_human'); setOpenStatusMenuId(null); }} className="block w-full px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100">標記為需人工</button>
-                        <button type="button" onClick={() => { changeStatus(contact.id, 'closed'); setOpenStatusMenuId(null); }} className="block w-full px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100">關閉對話</button>
-                        <button type="button" onClick={() => { changeStatus(contact.id, 'ai_handled'); setOpenStatusMenuId(null); }} className="block w-full px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100">重新開啟</button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
+                contact={contact}
+                isSelected={false}
+                isChecked={selectedIds.has(contact.id)}
+                searchQuery={searchQuery}
+                onSelect={() => {
+                  window.location.href = `/dashboard/conversations/${contact.id}`;
+                }}
+                onToggleCheck={() => toggleSelect(contact.id)}
+                onChangeStatus={(newStatus) => changeStatus(contact.id, newStatus)}
+              />
             ))}
           </div>
         )}
@@ -950,172 +678,55 @@ export default function ConversationsPage() {
 
       {/* Desktop: Two-column layout */}
       <div className="hidden lg:block">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">對話紀錄</h1>
-        
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">{t('pageTitle')}</h1>
         <div className="flex gap-6 h-[calc(100vh-12rem)]">
-          {/* Left: Tag filter + Contact list */}
           <div className="w-80 flex-shrink-0">
             <div className="rounded-xl border border-gray-200 bg-white overflow-hidden h-full flex flex-col">
               <div className="p-4 border-b border-gray-200 bg-gray-50">
-                <h2 className="font-semibold text-gray-900">聯絡人</h2>
+                <h2 className="font-semibold text-gray-900">{t('contacts')}</h2>
               </div>
-              {/* Search */}
               <div className="p-3 border-b border-gray-100">
-                <input
-                  type="search"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="搜尋客戶名稱或訊息內容"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                  aria-label="搜尋對話"
+                <SearchBar value={searchInput} onChange={setSearchInput} />
+              </div>
+              <div className="p-3 border-b border-gray-100">
+                <StatusTabs
+                  activeFilter={statusFilter}
+                  counts={counts}
+                  onChange={setStatusFilter}
+                />
+                <div className="mt-2">
+                  <FilterBar
+                    dateRange={dateRangeFilter}
+                    sortBy={sortBy}
+                    onDateRangeChange={setDateRangeFilter}
+                    onSortChange={setSortBy}
+                  />
+                </div>
+              </div>
+              <div className="p-3 border-b border-gray-100">
+                <TagFilter
+                  tags={tagList}
+                  selectedTags={selectedTagFilters}
+                  onToggle={(tag) => {
+                    setSelectedTagFilters((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(tag)) next.delete(tag);
+                      else next.add(tag);
+                      return next;
+                    });
+                  }}
+                  onClearAll={() => setSelectedTagFilters(new Set())}
                 />
               </div>
-              {/* Status filter tabs */}
-              <div className="p-3 border-b border-gray-100">
-                <div className="flex flex-wrap gap-1">
-                  {[
-                    { value: 'all' as const, label: '全部', count: counts?.total ?? 0 },
-                    { value: 'ai_handled' as const, label: 'AI 已處理', count: counts?.ai_handled ?? 0 },
-                    { value: 'needs_human' as const, label: '需人工', count: counts?.needs_human ?? 0 },
-                    { value: 'resolved' as const, label: '已解決', count: counts?.resolved ?? 0 },
-                    { value: 'closed' as const, label: '已關閉', count: counts?.closed ?? 0 },
-                  ].map((tab) => (
-                    <button
-                      key={tab.value}
-                      type="button"
-                      onClick={() => setStatusFilter(tab.value)}
-                      className={`rounded-lg px-2.5 py-1 text-xs font-medium border-b-2 transition-colors ${
-                        statusFilter === tab.value
-                          ? 'border-indigo-600 bg-indigo-50 text-gray-900 font-semibold'
-                          : 'border-transparent text-gray-600 hover:bg-gray-100'
-                      }`}
-                    >
-                      {tab.label} {tab.count > 0 ? tab.count : ''}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {(['today', '7', '30', 'all'] as const).map((range) => (
-                    <button
-                      key={range}
-                      type="button"
-                      onClick={() => setDateRangeFilter(range)}
-                      className={`rounded px-2 py-1 text-xs font-medium ${
-                        dateRangeFilter === range
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      {range === 'today' ? '今天' : range === '7' ? '7 天' : range === '30' ? '30 天' : '全部'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {/* Sort */}
-              <div className="p-3 border-b border-gray-100">
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">排序 ↕</label>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as SortBy)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
-                  aria-label="排序方式"
-                >
-                  {SORT_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {/* Tag filter */}
-              <div className="p-3 border-b border-gray-100">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-gray-500">標籤篩選</span>
-                  {selectedTagFilters.size > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setSelectedTagFilters(new Set())}
-                      className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
-                    >
-                      全部對話
-                    </button>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {tagList.map(({ tag, count }) => {
-                    const selected = selectedTagFilters.has(tag);
-                    return (
-                      <button
-                        key={tag}
-                        type="button"
-                        onClick={() => {
-                          setSelectedTagFilters((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(tag)) next.delete(tag);
-                            else next.add(tag);
-                            return next;
-                          });
-                        }}
-                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${selected ? tagColor(tag) + ' ring-1 ring-offset-1 ring-gray-300' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-                      >
-                        {tag}
-                        <span className="opacity-80">({count})</span>
-                      </button>
-                    );
-                  })}
-                  {tagList.length === 0 && (
-                    <span className="text-xs text-gray-400">尚無標籤</span>
-                  )}
-                </div>
-              </div>
-              {/* Batch toolbar */}
-              {selectedIds.size > 0 && (
-                <div className="border-b border-gray-200 bg-gray-100 px-3 py-2 flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-medium text-gray-700 whitespace-nowrap">
-                    已選 {selectedIds.size} 個對話
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => runBatch('resolve')}
-                    disabled={batchLoading}
-                    className="rounded px-2 py-1 text-xs font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    標記為已解決
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => runBatch('unresolve')}
-                    disabled={batchLoading}
-                    className="rounded px-2 py-1 text-xs font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    標記為未解決
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleBatchDelete}
-                    disabled={batchLoading}
-                    className="rounded px-2 py-1 text-xs font-medium bg-white border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-50"
-                  >
-                    批次刪除
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleBatchAddTag}
-                    disabled={batchLoading}
-                    className="rounded px-2 py-1 text-xs font-medium bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    批次新增標籤
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedIds(new Set())}
-                    disabled={batchLoading}
-                    className="rounded px-2 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 disabled:opacity-50"
-                  >
-                    取消選擇
-                  </button>
-                </div>
-              )}
+              <BatchToolbar
+                selectedCount={selectedIds.size}
+                loading={batchLoading}
+                onResolve={() => runBatch('resolve')}
+                onUnresolve={() => runBatch('unresolve')}
+                onDelete={handleBatchDelete}
+                onAddTag={handleBatchAddTag}
+                onCancel={() => setSelectedIds(new Set())}
+              />
               {successMessage && (
                 <div className="px-3 py-2 bg-green-50 text-green-800 text-sm border-b border-green-100">
                   {successMessage}
@@ -1124,214 +735,61 @@ export default function ConversationsPage() {
               <div className="flex-1 overflow-y-auto">
                 {filteredContacts.length > 0 && (
                   <div className="px-3 py-2 text-sm text-gray-500 border-b border-gray-100">
-                    找到 {filteredContacts.length} 個對話
+                    {t('foundConversations', { count: filteredContacts.length })}
                   </div>
                 )}
                 {filteredContacts.length === 0 ? (
                   <div className="p-6 text-center">
-                    <div className="flex flex-col items-center py-8">
-                      <div className="rounded-full bg-indigo-100 w-16 h-16 flex items-center justify-center mb-3">
-                        <span className="text-3xl">👥</span>
-                      </div>
-                      <p className="text-sm text-gray-600">
-                        {contacts.length === 0
-                          ? '尚無聯絡人對話'
-                          : '沒有符合條件的對話'}
-                      </p>
-                      {contacts.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSearchInput('');
-                            setSearchQuery('');
-                            setStatusFilter('all');
-                            setDateRangeFilter('all');
-                            setSelectedTagFilters(new Set());
-                          }}
-                          className="mt-2 text-sm text-indigo-600 hover:text-indigo-700 font-medium"
-                        >
-                          清除篩選
-                        </button>
-                      )}
-                    </div>
+                    {contacts.length === 0 ? (
+                      <EmptyState variant="no-contacts" />
+                    ) : (
+                      <EmptyState
+                        variant="no-filtered"
+                        onClearFilters={() => {
+                          setSearchInput('');
+                          setSearchQuery('');
+                          setStatusFilter('all');
+                          setDateRangeFilter('all');
+                          setSelectedTagFilters(new Set());
+                        }}
+                      />
+                    )}
                   </div>
                 ) : (
                   <div className="divide-y divide-gray-100">
-                    <div
-                      className="flex items-center gap-3 p-3 border-b border-gray-100 bg-gray-50/80"
-                      role="row"
-                    >
+                    <div className="flex items-center gap-3 p-3 border-b border-gray-100 bg-gray-50/80" role="row">
                       <input
                         type="checkbox"
                         checked={allFilteredSelected}
                         onChange={toggleSelectAll}
                         className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                        aria-label="全選/取消全選"
+                        aria-label={t('selectAll')}
                       />
-                      <span className="text-xs text-gray-500">全選/取消全選</span>
+                      <span className="text-xs text-gray-500">{t('selectAll')}</span>
                     </div>
                     {sortedContacts.map((contact) => (
-                      <div
+                      <ConversationListItem
                         key={contact.id}
-                        className={`
-                          flex items-start gap-3 w-full text-left p-4 transition-colors
-                          ${selectedContactId === contact.id ? 'bg-indigo-50' : contact.conversationStatus === 'needs_human' ? 'bg-orange-50 hover:bg-orange-100' : 'hover:bg-gray-50'}
-                        `}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(contact.id)}
-                          onChange={() => toggleSelect(contact.id)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="mt-0.5 h-4 w-4 shrink-0 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                          aria-label={`選擇 ${contact.name || '未命名'}`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setSelectedContactId(contact.id)}
-                          className="flex-1 min-w-0 text-left"
-                        >
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-medium text-gray-900">
-                              {highlightMatch(contact.name || '未命名客戶', searchQuery)}
-                            </p>
-                            <StatusBadge status={contact.conversationStatus} />
-                          </div>
-                        <p className="mt-1 text-sm text-gray-600 line-clamp-1">
-                          {highlightMatch(
-                            contact.lastMessage.length > 40
-                              ? contact.lastMessage.substring(0, 40) + '...'
-                              : contact.lastMessage,
-                            searchQuery
-                          )}
-                        </p>
-                        {contact.tags.length > 0 && (
-                          <div className="mt-2 flex flex-wrap gap-1">
-                            {contact.tags.slice(0, 3).map((t) => (
-                              <span
-                                key={t}
-                                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${tagColor(t)}`}
-                              >
-                                {t}
-                              </span>
-                            ))}
-                            {contact.tags.length > 3 && (
-                              <span className="text-xs text-gray-400">+{contact.tags.length - 3}</span>
-                            )}
-                          </div>
-                        )}
-                        {contact.lastMessageTime && (
-                          <p className="mt-1 text-xs text-gray-500">
-                            {new Date(contact.lastMessageTime).toLocaleString('zh-TW', {
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </p>
-                        )}
-                        </button>
-                        <div className="relative shrink-0">
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); setOpenStatusMenuId((id) => (id === contact.id ? null : contact.id)); }}
-                            className="rounded p-1.5 text-gray-500 hover:bg-gray-200"
-                            aria-label="變更狀態"
-                          >
-                            ⋯
-                          </button>
-                          {openStatusMenuId === contact.id && (
-                            <>
-                              <div className="fixed inset-0 z-10" onClick={() => setOpenStatusMenuId(null)} aria-hidden />
-                              <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-                                <button type="button" onClick={() => { changeStatus(contact.id, 'resolved'); setOpenStatusMenuId(null); }} className="block w-full px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100">標記為已解決</button>
-                                <button type="button" onClick={() => { changeStatus(contact.id, 'needs_human'); setOpenStatusMenuId(null); }} className="block w-full px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100">標記為需人工</button>
-                                <button type="button" onClick={() => { changeStatus(contact.id, 'closed'); setOpenStatusMenuId(null); }} className="block w-full px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100">關閉對話</button>
-                                <button type="button" onClick={() => { changeStatus(contact.id, 'ai_handled'); setOpenStatusMenuId(null); }} className="block w-full px-3 py-1.5 text-left text-sm text-gray-700 hover:bg-gray-100">重新開啟</button>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </div>
+                        contact={contact}
+                        isSelected={selectedContactId === contact.id}
+                        isChecked={selectedIds.has(contact.id)}
+                        searchQuery={searchQuery}
+                        onSelect={() => setSelectedContactId(contact.id)}
+                        onToggleCheck={() => toggleSelect(contact.id)}
+                        onChangeStatus={(newStatus) => changeStatus(contact.id, newStatus)}
+                      />
                     ))}
                   </div>
                 )}
               </div>
             </div>
           </div>
-
-          {/* Right: Conversation view */}
           <div className="flex-1 min-w-0">
             <div className="rounded-xl border border-gray-200 bg-white overflow-hidden h-full flex flex-col">
-              {!selectedContactId ? (
-                <div className="flex-1 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="rounded-full bg-indigo-100 w-20 h-20 flex items-center justify-center mx-auto mb-4">
-                      <span className="text-4xl">💬</span>
-                    </div>
-                    <p className="text-gray-600">請選擇一個對話</p>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {/* Header */}
-                  <div className="p-4 border-b border-gray-200 bg-gray-50">
-                    <h2 className="font-semibold text-gray-900">
-                      {selectedContact?.name || '未命名客戶'}
-                    </h2>
-                  </div>
-
-                  {/* Messages */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    {conversations.length === 0 ? (
-                      <div className="text-center py-12">
-                        <div className="rounded-full bg-indigo-100 w-16 h-16 flex items-center justify-center mx-auto mb-3">
-                          <span className="text-3xl">💬</span>
-                        </div>
-                        <p className="text-gray-600 text-sm">尚無對話內容</p>
-                      </div>
-                    ) : (
-                      <>
-                        {conversations.map((conv) => (
-                          <div
-                            key={conv.id}
-                            className={`flex ${conv.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                          >
-                            <div
-                              className={`
-                                max-w-[70%] rounded-2xl px-4 py-2
-                                ${
-                                  conv.role === 'user'
-                                    ? 'bg-green-100 text-gray-900'
-                                    : 'bg-gray-100 text-gray-900'
-                                }
-                              `}
-                            >
-                              <p className="text-sm whitespace-pre-wrap break-words">
-                                {conv.message}
-                              </p>
-                              <p
-                                className={`
-                                  mt-1 text-xs
-                                  ${conv.role === 'user' ? 'text-gray-600' : 'text-gray-500'}
-                                `}
-                              >
-                                {new Date(conv.created_at).toLocaleString('zh-TW', {
-                                  month: 'short',
-                                  day: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                        <div ref={messagesEndRef} />
-                      </>
-                    )}
-                  </div>
-                </>
-              )}
+              <ConversationPanel
+                selectedContactName={selectedContact?.name ?? null}
+                conversations={conversations}
+              />
             </div>
           </div>
         </div>
