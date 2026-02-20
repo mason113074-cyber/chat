@@ -35,6 +35,7 @@
     "systemTest": "系統測試",
     "features": "功能",
     "pricing": "定價",
+    "demo": "產品導覽",
     "faq": "常見問題",
     "openMenu": "開啟選單"
   },
@@ -649,6 +650,47 @@
     "security2Desc": "符合個資法與隱私政策",
     "security3Title": "退款保證",
     "security3Desc": "不滿意可申請退款"
+  },
+  "demo": {
+    "hero": {
+      "title": "CustomerAIPro 產品導覽 — AI 智能客服演示",
+      "subtitle": "3 分鐘了解如何使用 CustomerAIPro 建立 AI 智能客服系統。包含 LINE 整合、知識庫設定、即時對話演示。",
+      "duration": "約 3 分鐘"
+    },
+    "tourType": {
+      "interactive": {
+        "title": "互動式導覽",
+        "description": "跟著步驟一步步認識產品，適合想親手操作體驗的您。",
+        "cta": "開始互動導覽"
+      },
+      "video": {
+        "title": "視頻導覽",
+        "description": "觀看短片了解設定流程與核心功能。",
+        "cta": "觀看視頻"
+      }
+    },
+    "tour": {
+      "title": "互動式產品導覽",
+      "step1Title": "知識庫",
+      "step1Desc": "上傳 FAQ 與產品資訊，AI 會從您的內容學習並精準回答。",
+      "step2Title": "LINE 整合",
+      "step2Desc": "連結 LINE 官方帳號，客戶即可 24/7 與您的 AI 對話。",
+      "step3Title": "即時對話演示",
+      "step3Desc": "親自試用 AI 對話，看看回覆如何從知識庫產生。",
+      "next": "下一步",
+      "back": "上一步",
+      "finish": "完成"
+    },
+    "video": {
+      "title": "產品演示視頻",
+      "caption": "CustomerAIPro 設定與功能快速導覽。"
+    },
+    "cta": {
+      "title": "準備好開始了嗎？",
+      "subtitle": "建立帳號，幾分鐘內即可啟動 AI 智能客服。",
+      "signup": "免費開始",
+      "pricing": "查看定價"
+    }
   },
   "pricing": {
     "pageTitle": "方案與定價",
