@@ -18,10 +18,14 @@ export async function GET(request: NextRequest) {
 
     const search = request.nextUrl.searchParams.get('search')?.trim() || '';
     const category = request.nextUrl.searchParams.get('category')?.trim() || '';
+    const page = Math.max(1, parseInt(request.nextUrl.searchParams.get('page') ?? '1', 10) || 1);
+    const limitParam = request.nextUrl.searchParams.get('limit');
+    const limit = Math.min(100, Math.max(1, parseInt(limitParam ?? '50', 10) || 50));
+    const offset = (page - 1) * limit;
 
     let q = supabase
       .from('knowledge_base')
-      .select('id, title, content, category, is_active, created_at, updated_at')
+      .select('id, title, content, category, is_active, created_at, updated_at', { count: 'exact' })
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false });
 
@@ -32,12 +36,17 @@ export async function GET(request: NextRequest) {
       q = q.or(`title.ilike.%${search}%,content.ilike.%${search}%`);
     }
 
-    const { data, error } = await q;
+    const { data, error, count } = await q.range(offset, offset + limit - 1);
     if (error) {
       console.error(error);
       return NextResponse.json({ error: '取得失敗' }, { status: 500 });
     }
-    return NextResponse.json({ items: data ?? [] });
+    return NextResponse.json({
+      items: data ?? [],
+      total: count ?? 0,
+      page,
+      limit,
+    });
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: '伺服器錯誤' }, { status: 500 });

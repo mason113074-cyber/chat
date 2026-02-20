@@ -65,10 +65,40 @@ export default async function DashboardPage({ params }: Props) {
     contacts: { name: string | null; line_user_id: string; id: string } | null;
   };
 
+  const isEmpty = (contactsCount ?? 0) === 0 && conversationsCount === 0;
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
       <p className="mt-1 text-gray-600">{t('welcome')}</p>
+
+      {/* Welcome empty state: 3 steps */}
+      {isEmpty && (
+        <div className="mt-8 rounded-2xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-8">
+          <h2 className="text-xl font-bold text-gray-900">{t('welcomeEmptyTitle')}</h2>
+          <p className="mt-2 text-gray-600">{t('welcomeEmptyDesc')}</p>
+          <div className="mt-8 grid gap-6 sm:grid-cols-3">
+            <div className="rounded-xl border border-indigo-100 bg-white p-5">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-lg font-bold text-indigo-600">1</div>
+              <h3 className="mt-3 font-semibold text-gray-900">{t('stepConnectLine')}</h3>
+              <p className="mt-1 text-sm text-gray-600">{t('stepConnectLineDesc')}</p>
+              <Link href="/dashboard/settings" className="mt-3 inline-block text-sm font-medium text-indigo-600 hover:text-indigo-700">{t('goToSettings')} →</Link>
+            </div>
+            <div className="rounded-xl border border-indigo-100 bg-white p-5">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-lg font-bold text-indigo-600">2</div>
+              <h3 className="mt-3 font-semibold text-gray-900">{t('stepUploadKb')}</h3>
+              <p className="mt-1 text-sm text-gray-600">{t('stepUploadKbDesc')}</p>
+              <Link href="/dashboard/knowledge-base" className="mt-3 inline-block text-sm font-medium text-indigo-600 hover:text-indigo-700">{t('goToKnowledgeBase')} →</Link>
+            </div>
+            <div className="rounded-xl border border-indigo-100 bg-white p-5">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-lg font-bold text-indigo-600">3</div>
+              <h3 className="mt-3 font-semibold text-gray-900">{t('stepSendTest')}</h3>
+              <p className="mt-1 text-sm text-gray-600">{t('stepSendTestDesc')}</p>
+              <p className="mt-3 text-sm text-gray-500">{t('viewLineSettings')}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Statistics Cards */}
       <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">

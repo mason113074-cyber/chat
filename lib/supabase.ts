@@ -172,6 +172,32 @@ export async function getOrCreateContactByLineUserId(
   throw error;
 }
 
+/** Fetch recent conversation messages for a contact (oldest first, for context). */
+export async function getRecentConversationMessages(
+  contactId: string,
+  limit: number = 5
+): Promise<{ role: 'user' | 'assistant'; content: string }[]> {
+  const client = getSupabaseAdmin();
+  const { data, error } = await client
+    .from('conversations')
+    .select('role, message')
+    .eq('contact_id', contactId)
+    .in('role', ['user', 'assistant'])
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    console.error('Error fetching recent conversation messages:', error);
+    return [];
+  }
+  const list = (data ?? []).map((row) => ({
+    role: row.role as 'user' | 'assistant',
+    content: String(row.message ?? ''),
+  }));
+  list.reverse(); // oldest first for API context
+  return list;
+}
+
 /** Insert a single conversation message (user or assistant). */
 export async function insertConversationMessage(
   contactId: string,

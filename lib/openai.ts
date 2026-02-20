@@ -31,12 +31,15 @@ const DEFAULT_MODEL = 'gpt-4o-mini';
 const defaultSystemPrompt =
   '你是一個專業的客服助手。請用繁體中文回答用戶的問題，保持友善、專業的態度。回答要簡潔明確，幫助用戶解決問題。';
 
+export type PreviousMessage = { role: 'user' | 'assistant'; content: string };
+
 export async function generateReply(
   userMessage: string,
   systemPrompt?: string | null,
   model?: string | null,
   userId?: string,
-  contactId?: string // 用於安全日誌
+  contactId?: string, // 用於安全日誌
+  previousMessages?: PreviousMessage[] // 最近對話歷史，會加入 prompt context
 ): Promise<string> {
   const modelId = model?.trim() || DEFAULT_MODEL;
   const basePrompt =
@@ -78,14 +81,19 @@ export async function generateReply(
 
   try {
     // === 呼叫 OpenAI API（保留原有重試邏輯）===
+    const apiMessages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
+      { role: 'system', content: securePrompt },
+      ...(previousMessages ?? []).flatMap((m) =>
+        m.content.trim() ? [{ role: m.role as 'user' | 'assistant', content: m.content.trim() }] : []
+      ),
+      { role: 'user', content: userMessage },
+    ];
+
     const completion = await retryWithBackoff(
       async () => {
         return await getOpenAI().chat.completions.create({
           model: modelId,
-          messages: [
-            { role: 'system' as const, content: securePrompt },
-            { role: 'user' as const, content: userMessage },
-          ],
+          messages: apiMessages,
           temperature: 0.2, // 客服場景建議 0.1–0.3，降低幻覺
           max_tokens: 500,
         });

@@ -360,4 +360,27 @@ test.describe.serial('Production 完整 User Flow', () => {
       passed: true,
     });
   });
+
+  test('15. 系統測試 - 健康檢查 Dashboard', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+    page.on('pageerror', (e) => errors.push(e.message));
+
+    await page.goto('/dashboard/system-test');
+    await page.waitForLoadState('networkidle');
+    const url = page.url();
+    const screenshotPath = path.join(SCREENSHOT_DIR, '15-system-test.png');
+    await page.screenshot({ path: screenshotPath, fullPage: false });
+    const body = (await page.textContent('body').catch(() => '')) ?? '';
+    expect(body?.includes('系統測試') || body?.includes('System Test') || body?.includes('健康檢查') || body?.includes('Health')).toBeTruthy();
+    expect(body).not.toContain('Application error');
+
+    reportEntries.push({
+      page: '系統測試 Dashboard',
+      url,
+      screenshot: screenshotPath,
+      errors: [...errors],
+      passed: true,
+    });
+  });
 });

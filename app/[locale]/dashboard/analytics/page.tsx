@@ -278,10 +278,17 @@ export default function AnalyticsPage() {
         </div>
       ) : !hasAnyData ? (
         <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center shadow-sm">
+          <div className="rounded-full bg-indigo-100 w-20 h-20 flex items-center justify-center mx-auto mb-4 text-4xl">📊</div>
           <p className="text-gray-600">{t('emptyDesc')}</p>
-          <Link href="/dashboard/conversations" className="mt-4 inline-block rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-            {t('goToConversations')}
-          </Link>
+          <p className="mt-2 text-sm text-slate-500">{t('emptyConnectLine')}</p>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <Link href="/dashboard/settings" className="inline-block rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+              {t('goToSettings')}
+            </Link>
+            <Link href="/dashboard/conversations" className="inline-block rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+              {t('goToConversations')}
+            </Link>
+          </div>
         </div>
       ) : (
         <>

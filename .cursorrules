@@ -1,0 +1,33 @@
+# CustomerAI Pro 開發規範
+
+> 詳細專案脈絡與 API 端點請見 `.cursor/rules/project-context.mdc`；程式碼風格見 `.cursor/rules/code-style.mdc`。
+
+## 技術堆疊
+- Frontend: Next.js 16 App Router + TypeScript + Tailwind CSS
+- Backend: Next.js API Routes + Supabase
+- AI: OpenAI GPT-4o-mini
+- Payments: LemonSqueezy
+- LINE: LINE Messaging API (Webhook: /api/webhook/line)
+
+## 開發原則
+1. 所有 API 必須有錯誤處理和 TypeScript 類型
+2. 使用 Server Components 優先，Client Components 標記 'use client'
+3. 所有表單需要驗證（zod）
+4. 所有資料庫操作使用 Supabase Row Level Security
+5. 使用 shadcn/ui 組件庫保持一致性
+
+## 代碼規範
+- 函數命名：camelCase
+- 組件命名：PascalCase
+- 常數：UPPER_SNAKE_CASE
+- 檔案結構：功能導向（feature-based）
+
+## 測試要求
+- 每個 API Route 需要單元測試（Vitest）
+- 關鍵功能需要 E2E 測試（Playwright，e2e/*.spec.ts）
+- 使用 Playwright 進行 E2E 測試
+
+## 文檔要求
+- 每個主要功能需要 README.md
+- API 需要 OpenAPI/Swagger 文檔
+- 組件需要 Storybook 文檔

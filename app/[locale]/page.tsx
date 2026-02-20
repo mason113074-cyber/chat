@@ -8,12 +8,30 @@ import { getSupabaseAdmin } from '@/lib/supabase';
 
 type Props = { params: Promise<{ locale: string }> };
 
+const SITE_URL = 'https://www.customeraipro.com';
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'landing' });
+  const title = `CustomerAI Pro — ${t('heroTitle')}`;
+  const description = t('heroSubtitle');
+  const localePath = locale === 'zh-TW' ? '/zh-TW' : '/en';
   return {
-    title: `CustomerAI Pro — ${t('heroTitle')}`,
-    description: t('heroSubtitle'),
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url: `${SITE_URL}${localePath}`,
+      siteName: 'CustomerAI Pro',
+      locale: locale === 'zh-TW' ? 'zh_TW' : 'en',
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+    },
   };
 }
 
@@ -86,8 +104,22 @@ export default async function Home({ params }: Props) {
           },
         ];
 
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'CustomerAI Pro',
+    applicationCategory: 'BusinessApplication',
+    description: typeof t('heroSubtitle') === 'string' ? t('heroSubtitle') : '',
+    url: SITE_URL,
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'TWD' },
+  };
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-50">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute -left-32 top-0 h-80 w-80 rounded-full bg-indigo-500/25 blur-3xl" />
         <div className="absolute right-0 top-20 h-96 w-96 rounded-full bg-cyan-400/20 blur-3xl" />
@@ -123,6 +155,26 @@ export default async function Home({ params }: Props) {
               <span>⚡ {t('tenMinSetup')}</span>
               <span>🤖 {t('aiAutoReply')}</span>
             </p>
+          </div>
+        </section>
+
+        {/* Client logos */}
+        <section className="border-y border-white/5 bg-slate-900/30 py-8">
+          <p className="text-center text-xs uppercase tracking-widest text-slate-500 mb-6">
+            {t('trustedBy')}
+          </p>
+          <div className="mx-auto max-w-6xl px-4 sm:px-6 overflow-hidden">
+            <div className="flex gap-8 md:gap-12 justify-center items-center flex-nowrap overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent">
+              {([1, 2, 3, 4, 5, 6] as const).map((i) => (
+                <div
+                  key={i}
+                  className="flex-shrink-0 w-28 h-14 rounded-lg bg-slate-700/60 flex items-center justify-center text-slate-400 text-sm font-medium"
+                  aria-hidden
+                >
+                  {t(`logo${i}` as 'logo1')}
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -169,6 +221,39 @@ export default async function Home({ params }: Props) {
           </div>
         </section>
 
+        {/* Testimonials */}
+        <section className="border-t border-white/5 bg-slate-900/40 py-16 md:py-20">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <div className="text-center">
+              <p className="text-xs uppercase tracking-[0.25em] text-slate-400">{t('testimonialsTitle')}</p>
+              <h2 className="mt-3 text-3xl font-bold text-white sm:text-4xl">{t('testimonialsSubtitle')}</h2>
+            </div>
+            <div className="mt-12 grid gap-8 md:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-lg"
+                >
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="h-12 w-12 rounded-full bg-indigo-500/30 flex items-center justify-center text-indigo-200 font-semibold">
+                      {t(`testimonial${i}Name` as 'testimonial1Name').charAt(0)}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-white">{t(`testimonial${i}Name` as 'testimonial1Name')}</p>
+                      <p className="text-sm text-slate-400">{t(`testimonial${i}Role` as 'testimonial1Role')} · {t(`testimonial${i}Company` as 'testimonial1Company')}</p>
+                    </div>
+                  </div>
+                  <p className="text-slate-200/90 text-sm leading-relaxed">
+                    {locale === 'zh-TW' ? '「' : '"'}
+                    {t(`testimonial${i}Quote` as 'testimonial1Quote')}
+                    {locale === 'zh-TW' ? '」' : '"'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         <section className="border-t border-white/5 bg-slate-900/30 py-16 md:py-20">
           <div className="mx-auto max-w-6xl px-4 sm:px-6">
             <div className="text-center">
@@ -183,6 +268,24 @@ export default async function Home({ params }: Props) {
                   </div>
                   <h3 className="mt-4 text-lg font-semibold text-white">{t(s.titleKey)}</h3>
                   <p className="mt-2 text-sm text-slate-400">{t(s.descKey)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Why choose us */}
+        <section className="border-t border-white/5 bg-slate-900/40 py-16 md:py-20">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <div className="text-center">
+              <p className="text-xs uppercase tracking-[0.25em] text-slate-400">{t('whyChooseUsTitle')}</p>
+              <h2 className="mt-3 text-3xl font-bold text-white sm:text-4xl">{t('whyChooseUsSubtitle')}</h2>
+            </div>
+            <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
+                  <p className="text-lg font-semibold text-white">{t(`why${i}Title` as 'why1Title')}</p>
+                  <p className="mt-2 text-sm text-slate-400">{t(`why${i}Desc` as 'why1Desc')}</p>
                 </div>
               ))}
             </div>
@@ -237,6 +340,27 @@ export default async function Home({ params }: Props) {
         </section>
 
         <LandingFAQ />
+
+        {/* Security guarantee */}
+        <section className="border-t border-white/5 bg-slate-900/30 py-16 md:py-20">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <div className="text-center">
+              <p className="text-xs uppercase tracking-[0.25em] text-slate-400">{t('securityTitle')}</p>
+              <h2 className="mt-3 text-3xl font-bold text-white sm:text-4xl">{t('securitySubtitle')}</h2>
+            </div>
+            <div className="mt-12 grid gap-8 md:grid-cols-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="rounded-2xl border border-white/10 bg-white/5 p-6 text-center">
+                  <span className="text-3xl" aria-hidden>
+                    {i === 1 ? '🔒' : i === 2 ? '🛡️' : '✓'}
+                  </span>
+                  <p className="mt-3 font-semibold text-white">{t(`security${i}Title` as 'security1Title')}</p>
+                  <p className="mt-1 text-sm text-slate-400">{t(`security${i}Desc` as 'security1Desc')}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
 
         <section className="border-t border-white/5 bg-gradient-to-b from-slate-900/50 to-slate-950 py-16 md:py-20">
           <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">

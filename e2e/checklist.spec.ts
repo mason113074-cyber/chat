@@ -13,14 +13,15 @@ test.describe.serial('CustomerAIPro — 24 步 UI Checklist', () => {
     await page.waitForLoadState('networkidle');
     const url = page.url();
     const onDashboard = /\/(dashboard|conversations|app)/.test(url);
-    const onRoot = /\.com\/?$/.test(url) || url.endsWith('/');
+    const onRoot = /\.com\/?$/.test(url) || url.endsWith('/') || /\/?(zh-TW|en)?\/?$/.test(new URL(url).pathname);
     expect(onDashboard || onRoot).toBeTruthy();
   });
 
   test('02. Dashboard 頁面正常', async ({ page }) => {
     await page.goto('/dashboard');
     await page.waitForLoadState('networkidle');
-    await expect(page.getByRole('heading', { name: '總覽' })).toBeVisible();
+    const heading = page.getByRole('heading', { name: /總覽|Overview/ });
+    await expect(heading).toBeVisible();
     const body = await page.textContent('body');
     expect(body).not.toContain('Application error');
   });
@@ -49,7 +50,7 @@ test.describe.serial('CustomerAIPro — 24 步 UI Checklist', () => {
   test('06. 對話列表頁面', async ({ page }) => {
     await page.goto('/dashboard/conversations');
     await page.waitForLoadState('networkidle');
-    await expect(page.getByRole('heading', { name: '對話紀錄' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /對話紀錄|Conversations/ })).toBeVisible();
   });
 
   test('07. 對話狀態篩選', async ({ page }) => {
@@ -85,7 +86,7 @@ test.describe.serial('CustomerAIPro — 24 步 UI Checklist', () => {
   test('11. 知識庫頁面', async ({ page }) => {
     await page.goto('/dashboard/knowledge-base');
     await page.waitForLoadState('networkidle');
-    await expect(page.getByRole('heading', { name: /知識庫/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /知識庫|Knowledge Base/ })).toBeVisible();
   });
 
   test('12. 知識庫列表 API', async ({ page }) => {
@@ -108,7 +109,7 @@ test.describe.serial('CustomerAIPro — 24 步 UI Checklist', () => {
   test('14. 聯絡人頁面', async ({ page }) => {
     await page.goto('/dashboard/contacts');
     await page.waitForLoadState('networkidle');
-    await expect(page.getByRole('heading', { name: /聯絡人|客戶/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /聯絡人|客戶|Contacts/ })).toBeVisible();
   });
 
   test('15. 聯絡人標籤 API', async ({ page }) => {

@@ -394,7 +394,10 @@ export default function KnowledgeBasePage() {
         <p className="text-gray-500">{t('loading')}</p>
       ) : items.length === 0 ? (
         <div className="rounded-xl border border-gray-200 bg-white p-12 text-center shadow-sm">
-          <p className="text-gray-600">{t('emptyDesc')}</p>
+          <div className="rounded-full bg-indigo-100 w-20 h-20 flex items-center justify-center mx-auto mb-4 text-4xl">📚</div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('emptyTitle')}</h3>
+          <p className="text-gray-600 mb-4">{t('emptyDesc')}</p>
+          <p className="text-sm text-gray-500 mb-4">{t('downloadTxtSample')} / {t('downloadCsvSample')}</p>
           <button
             type="button"
             onClick={openAdd}

@@ -1,6 +1,13 @@
 import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
 import './globals.css';
 import { ToastProvider } from '@/components/Toast';
+
+const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-inter',
+});
 
 export const metadata: Metadata = {
   title: 'CustomerAIPro - AI 智能客服平台',
@@ -13,8 +20,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="zh-TW" suppressHydrationWarning>
-      <body className="antialiased">
+    <html lang="zh-TW" suppressHydrationWarning className={inter.variable}>
+      <body className={`${inter.className} antialiased`}>
         <ToastProvider>{children}</ToastProvider>
       </body>
     </html>

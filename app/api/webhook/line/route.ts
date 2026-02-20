@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { validateSignature, replyMessage, LineWebhookBody, LineWebhookEvent } from '@/lib/line';
 import { generateReply } from '@/lib/openai';
 import { searchKnowledgeWithSources } from '@/lib/knowledge-search';
-import { getOrCreateContactByLineUserId, getUserSettings, insertConversationMessage, type Contact } from '@/lib/supabase';
+import { getOrCreateContactByLineUserId, getUserSettings, insertConversationMessage, getRecentConversationMessages, type Contact } from '@/lib/supabase';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { getConversationUsageForUser } from '@/lib/billing-usage';
 import { autoTagContact } from '@/lib/auto-tag';
@@ -115,23 +115,76 @@ export async function POST(request: NextRequest) {
       durationMs: Date.now() - start,
       error: error instanceof Error ? error.message : String(error),
     });
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    // Return 200 so LINE does not retry (avoid duplicate processing)
+    return NextResponse.json({ success: true });
   }
 }
 
+const REPLY_IMAGE_UNSUPPORTED = '目前不支援圖片，請用文字描述您的問題。';
+const REPLY_STICKER = '感謝您傳送貼圖 😊';
+const REPLY_LOCATION_RECEIVED = '已收到您的位置資訊，感謝。';
+
 async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<void> {
-  if (event.type !== 'message' || !event.message || event.message.type !== 'text') {
+  if (event.type !== 'message' || !event.message) {
     return;
   }
 
-  const userMessage = event.message.text;
   const replyToken = event.replyToken;
-  const lineUserId = event.source.userId;
+  const lineUserId = event.source?.userId;
+  if (!replyToken) return;
 
-  if (!userMessage || !replyToken || !lineUserId) {
+  const msg = event.message;
+  const msgType = msg.type;
+
+  // Non-text message types: reply once and mark processed
+  if (msgType === 'image') {
+    try {
+      await replyMessage(replyToken, REPLY_IMAGE_UNSUPPORTED);
+    } catch (e) {
+      console.error('[LINE webhook] Failed to send image-unsupported reply', { requestId, error: e });
+    }
+    try {
+      await markAsProcessed(getEventId(event));
+    } catch {
+      // ignore
+    }
+    return;
+  }
+
+  if (msgType === 'sticker') {
+    try {
+      await replyMessage(replyToken, REPLY_STICKER);
+    } catch (e) {
+      console.error('[LINE webhook] Failed to send sticker reply', { requestId, error: e });
+    }
+    try {
+      await markAsProcessed(getEventId(event));
+    } catch {
+      // ignore
+    }
+    return;
+  }
+
+  if (msgType === 'location') {
+    try {
+      await replyMessage(replyToken, REPLY_LOCATION_RECEIVED);
+    } catch (e) {
+      console.error('[LINE webhook] Failed to send location reply', { requestId, error: e });
+    }
+    try {
+      await markAsProcessed(getEventId(event));
+    } catch {
+      // ignore
+    }
+    return;
+  }
+
+  if (msgType !== 'text') {
+    return;
+  }
+
+  const userMessage = msg.text;
+  if (!userMessage || !lineUserId) {
     return;
   }
 
@@ -215,12 +268,14 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
     const fullSystemPrompt = knowledgeText
       ? (systemPrompt?.trim() ?? '') + KNOWLEDGE_PREFIX + knowledgeText
       : (systemPrompt?.trim() ?? '') + KNOWLEDGE_EMPTY_INSTRUCTION;
+    const recentMessages = await getRecentConversationMessages(contact.id, 5);
     const aiResponse = await generateReply(
       userMessage,
       fullSystemPrompt,
       aiModel,
       ownerUserId,
-      contact.id
+      contact.id,
+      recentMessages
     );
 
     let finalReply = aiResponse;

@@ -219,8 +219,8 @@ export default async function PricingPage({ params }: Props) {
                         NT${plan.originalPrice!.toLocaleString()}
                       </span>
                     </div>
-                    <div className="flex items-baseline gap-1">
-                      <span className="text-4xl font-bold text-emerald-600">
+                    <div className="flex items-baseline gap-1 flex-wrap">
+                      <span className="text-5xl font-bold text-emerald-600 tracking-tight">
                         NT${plan.promotionPrice.toLocaleString()}
                       </span>
                       <span className="text-gray-500">{t('perMonth')}</span>
@@ -232,8 +232,8 @@ export default async function PricingPage({ params }: Props) {
                     </p>
                   </>
                 ) : (
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-4xl font-bold text-gray-900">
+                  <div className="flex items-baseline gap-1 flex-wrap">
+                    <span className="text-5xl font-bold text-gray-900 tracking-tight">
                       NT${plan.price.toLocaleString()}
                     </span>
                     <span className="text-gray-500">{t('perMonth')}</span>
@@ -244,9 +244,9 @@ export default async function PricingPage({ params }: Props) {
                 {plan.features.map((feature) => (
                   <li
                     key={feature}
-                    className="flex items-center gap-2 text-gray-700"
+                    className="flex items-start gap-2 text-gray-700"
                   >
-                    <span className="text-indigo-600 shrink-0">✓</span>
+                    <span className="text-indigo-600 shrink-0 mt-0.5" aria-hidden>✓</span>
                     <span>{feature}</span>
                   </li>
                 ))}
