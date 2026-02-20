@@ -151,11 +151,14 @@ export default function KnowledgeBasePage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title, content: formContent.trim(), category: formCategory }),
         });
+        const data = await res.json().catch(() => ({}));
         if (res.ok) {
           setModalOpen(false);
           fetchList();
           fetchStats();
           toast.show(t('toastUpdated'), 'success');
+        } else {
+          toast.show((data?.error as string) ?? t('requestFailed'), 'error');
         }
       } else {
         const res = await fetch('/api/knowledge-base', {
@@ -163,11 +166,14 @@ export default function KnowledgeBasePage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ title, content: formContent.trim(), category: formCategory }),
         });
+        const data = await res.json().catch(() => ({}));
         if (res.ok) {
           setModalOpen(false);
           fetchList();
           fetchStats();
           toast.show(t('toastAdded'), 'success');
+        } else {
+          toast.show((data?.error as string) ?? t('requestFailed'), 'error');
         }
       }
     } finally {
@@ -178,10 +184,13 @@ export default function KnowledgeBasePage() {
   const handleDelete = async (id: string) => {
     if (!confirm(t('confirmDelete'))) return;
     const res = await fetch(`/api/knowledge-base/${id}`, { method: 'DELETE' });
+    const data = await res.json().catch(() => ({}));
     if (res.ok) {
       fetchList();
       fetchStats();
       toast.show(t('toastDeleted'), 'success');
+    } else {
+      toast.show((data?.error as string) ?? t('requestFailed'), 'error');
     }
   };
 
@@ -191,9 +200,12 @@ export default function KnowledgeBasePage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_active: !item.is_active }),
     });
+    const data = await res.json().catch(() => ({}));
     if (res.ok) {
       fetchList();
       fetchStats();
+    } else {
+      toast.show((data?.error as string) ?? t('requestFailed'), 'error');
     }
   };
 
@@ -221,12 +233,15 @@ export default function KnowledgeBasePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items: importPreview }),
       });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         setImportOpen(false);
         setImportPreview([]);
         fetchList();
         fetchStats();
         toast.show(t('toastImported', { count: importPreview.length }), 'success');
+      } else {
+        toast.show((data?.error as string) ?? t('requestFailed'), 'error');
       }
     } finally {
       setImporting(false);
@@ -318,6 +333,7 @@ export default function KnowledgeBasePage() {
         >
           {t('addKnowledge')}
         </button>
+        <label className="sr-only" htmlFor="kb-import-file">{t('importFaq')}</label>
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
@@ -326,11 +342,13 @@ export default function KnowledgeBasePage() {
           {t('importFaq')}
         </button>
         <input
+          id="kb-import-file"
           ref={fileInputRef}
           type="file"
           accept=".txt,.csv"
           className="hidden"
           onChange={handleFileChange}
+          aria-label={t('importFaq')}
         />
         <a
           href="#"
@@ -346,7 +364,9 @@ export default function KnowledgeBasePage() {
         >
           {t('downloadCsvSample')}
         </a>
+        <label htmlFor="kb-search" className="sr-only">{t('searchPlaceholder')}</label>
         <input
+          id="kb-search"
           type="text"
           placeholder={t('searchPlaceholder')}
           value={search}
@@ -357,6 +377,7 @@ export default function KnowledgeBasePage() {
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
           className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+          aria-label={t('allCategories')}
         >
           <option value="">{t('allCategories')}</option>
           {CATEGORIES.map((c) => (
@@ -528,11 +549,12 @@ export default function KnowledgeBasePage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">{t('fieldCategory')}</label>
+                <label className="block text-sm font-medium text-gray-700" id="form-category-label">{t('fieldCategory')}</label>
                 <select
                   value={formCategory}
                   onChange={(e) => setFormCategory(e.target.value)}
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                  aria-labelledby="form-category-label"
                 >
                   {CATEGORIES.map((c) => (
                     <option key={c.value} value={c.value}>{t(c.labelKey)}</option>

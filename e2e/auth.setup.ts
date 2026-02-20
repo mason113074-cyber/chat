@@ -44,9 +44,9 @@ setup('登入並儲存 storageState', async ({ page }) => {
   }
 
   await page.goto('/login');
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('密碼').fill(password);
-  await page.getByRole('button', { name: '登入' }).click();
+  await page.locator('#email').fill(email);
+  await page.locator('#password').fill(password);
+  await page.getByRole('button', { name: /登入|Log in|Login/ }).click();
   await expect(page).toHaveURL(/\/dashboard/);
   await page.context().storageState({ path: authFile });
 });

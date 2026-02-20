@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { href: '/dashboard/analytics', labelKey: 'analytics' as const },
   { href: '/dashboard/knowledge-base', labelKey: 'knowledgeBase' as const },
   { href: '/dashboard/settings', labelKey: 'settings' as const },
+  { href: '/dashboard/system-test', labelKey: 'systemTest' as const },
 ] as const;
 
 export function DashboardNav({

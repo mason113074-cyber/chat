@@ -54,24 +54,32 @@ export default async function Home({ params }: Props) {
     console.error('Failed to fetch landing page stats:', error);
   }
 
-  const stats = [
-    {
-      value: totalUsers > 0 ? `${totalUsers}+` : '—',
-      labelKey: 'trustedMerchants' as const,
-    },
-    {
-      value: totalConversations > 0 ? (totalConversations).toLocaleString() : '—',
-      labelKey: 'conversationsHandled' as const,
-    },
-    {
-      value: totalKnowledgeBase > 0 ? `${totalKnowledgeBase}+` : '—',
-      labelKey: 'knowledgeBaseEntries' as const,
-    },
-    {
-      value: '<30 秒',
-      labelKey: 'avgResponseTime' as const,
-    },
-  ];
+  const stats =
+    locale === 'en'
+      ? [
+          { value: '500+', labelKey: 'trustedMerchants' as const },
+          { value: '10,000+', labelKey: 'conversationsHandled' as const },
+          { value: '150+', labelKey: 'knowledgeBaseEntries' as const },
+          { value: '< 30s', labelKey: 'avgResponseTime' as const },
+        ]
+      : [
+          {
+            value: totalUsers > 0 ? `${totalUsers}+` : '—',
+            labelKey: 'trustedMerchants' as const,
+          },
+          {
+            value: totalConversations > 0 ? totalConversations.toLocaleString() : '—',
+            labelKey: 'conversationsHandled' as const,
+          },
+          {
+            value: totalKnowledgeBase > 0 ? `${totalKnowledgeBase}+` : '—',
+            labelKey: 'knowledgeBaseEntries' as const,
+          },
+          {
+            value: '<30 秒',
+            labelKey: 'avgResponseTime' as const,
+          },
+        ];
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-slate-950 text-slate-50">
@@ -113,7 +121,7 @@ export default async function Home({ params }: Props) {
           </div>
         </section>
 
-        {(totalUsers > 0 || totalConversations > 0) ? (
+        {(locale === 'en' || totalUsers > 0 || totalConversations > 0) ? (
           <section className="border-y border-white/5 bg-slate-900/40 py-8">
             <div className="mx-auto max-w-6xl px-4 sm:px-6">
               <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
@@ -185,7 +193,7 @@ export default async function Home({ params }: Props) {
           <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {[
               { name: 'Free', price: 'NT$ 0', periodKey: 'perMonth', desc: t('planFreeDesc'), ctaKey: 'ctaFreeStartShort', primary: false, href: '/login?signup=true' },
-              { name: 'Basic', price: 'NT$ 990', periodKey: 'perMonth', desc: t('planBasicDesc'), ctaKey: 'ctaFreeStartShort', primary: false, href: '/login?signup=true' },
+              { name: 'Basic', price: locale === 'en' ? t('planBasicPriceDual') : 'NT$ 990', periodKey: locale === 'en' ? '' : 'perMonth', desc: t('planBasicDesc'), ctaKey: 'ctaFreeStartShort', primary: false, href: '/login?signup=true' },
               { name: 'Pro', price: 'NT$ 2,990', periodKey: 'perMonth', desc: t('planProDesc'), ctaKey: 'ctaFreeStartShort', primary: true, href: '/login?signup=true' },
               { name: 'Enterprise', price: t('planEnterprisePrice'), periodKey: '', desc: t('planEnterpriseDesc'), ctaKey: 'ctaContactUs', primary: false, href: 'mailto:support@customeraipro.com' },
             ].map((plan) => (

@@ -86,6 +86,7 @@ export default function SettingsPage() {
   const [lineSaving, setLineSaving] = useState(false);
   const [lineTesting, setLineTesting] = useState(false);
   const [lineTestResult, setLineTestResult] = useState<'success' | 'error' | null>(null);
+  const [lineTestError, setLineTestError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -257,15 +258,25 @@ export default function SettingsPage() {
   const handleLineTest = async () => {
     setLineTesting(true);
     setLineTestResult(null);
+    setLineTestError(null);
     try {
       const res = await fetch('/api/settings/line/test', { method: 'POST', credentials: 'include' });
+      const data = await res.json().catch(() => ({}));
       if (res.ok) {
         setLineTestResult('success');
       } else {
         setLineTestResult('error');
+        const apiError = typeof data?.error === 'string' ? data.error : '';
+        let msg = t('connectionFailed');
+        if (apiError.includes('No access token') || apiError.includes('No Access Token')) msg = t('lineTestErrorNoToken');
+        else if (apiError.includes('Invalid token') || apiError.includes('Invalid Token')) msg = t('lineTestErrorInvalidToken');
+        else if (apiError.includes('Connection failed') || apiError.includes('Connection Failed')) msg = t('lineTestErrorConnection');
+        else if (apiError) msg = apiError;
+        setLineTestError(msg);
       }
     } catch {
       setLineTestResult('error');
+      setLineTestError(t('connectionFailed'));
     } finally {
       setLineTesting(false);
     }
@@ -393,7 +404,12 @@ export default function SettingsPage() {
               <span className="flex items-center text-sm text-green-600 font-medium">✅ {t('connectionSuccess')}</span>
             )}
             {lineTestResult === 'error' && (
-              <span className="flex items-center text-sm text-red-600 font-medium">❌ {t('connectionFailed')}</span>
+              <span className="flex flex-col items-start gap-0.5">
+                <span className="flex items-center text-sm text-red-600 font-medium">❌ {t('connectionFailed')}</span>
+                {lineTestError && (
+                  <span className="text-xs text-red-500" title={lineTestError}>{lineTestError}</span>
+                )}
+              </span>
             )}
           </div>
         </div>
@@ -714,6 +730,90 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* LINE Token 設定 Modal（桌面與手機皆顯示） */}
+      {lineModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-lg">
+            <h2 className="text-lg font-semibold text-gray-900">{t('lineTokenSettings')}</h2>
+            <p className="mt-1 text-sm text-gray-600">{t('lineTokenDesc')}</p>
+
+            <div className="mt-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Channel ID</label>
+                <input
+                  type="text"
+                  value={lineChannelId}
+                  onChange={(e) => setLineChannelId(e.target.value)}
+                  placeholder="1234567890"
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Channel Secret</label>
+                <input
+                  type="password"
+                  value={lineChannelSecret}
+                  onChange={(e) => setLineChannelSecret(e.target.value)}
+                  placeholder="- - - - - - - - - - - - - - - - "
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono"
+                />
+                <p className="mt-1 text-xs text-gray-400">{t('lineSecretHint')}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Channel Access Token</label>
+                <textarea
+                  value={lineAccessToken}
+                  onChange={(e) => setLineAccessToken(e.target.value)}
+                  placeholder="- - - - - - - - - - - - - - - - "
+                  rows={3}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono resize-none"
+                />
+                <p className="mt-1 text-xs text-gray-400">{t('lineTokenHint')}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Webhook URL</label>
+                <div className="mt-1 flex items-center gap-2">
+                  <code className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 truncate">
+                    {webhookUrl}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (webhookUrl) {
+                        navigator.clipboard.writeText(webhookUrl);
+                        toast.show(t('webhookCopied'), 'success');
+                      }
+                    }}
+                    className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    {t('copy')}
+                  </button>
+                </div>
+                <p className="mt-1 text-xs text-gray-400">{t('lineIntegrationHint')}</p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setLineModalOpen(false)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+              >
+                {t('cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleLineSave}
+                disabled={lineSaving}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {lineSaving ? t('saving') : t('save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mobile: Collapsible Preview */}
       <div className="mt-8 lg:hidden">
         <button
@@ -766,90 +866,6 @@ export default function SettingsPage() {
                 ))}
               </div>
               <button type="button" onClick={() => handlePreviewReply()} disabled={previewLoading} className="w-full rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">{t('previewAiReply')}</button>
-            </div>
-          </div>
-        )}
-
-        {/* LINE Token 設定 Modal */}
-        {lineModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-lg">
-              <h2 className="text-lg font-semibold text-gray-900">{t('lineTokenSettings')}</h2>
-              <p className="mt-1 text-sm text-gray-600">{t('lineTokenDesc')}</p>
-
-              <div className="mt-4 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Channel ID</label>
-                  <input
-                    type="text"
-                    value={lineChannelId}
-                    onChange={(e) => setLineChannelId(e.target.value)}
-                    placeholder="1234567890"
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Channel Secret</label>
-                  <input
-                    type="password"
-                    value={lineChannelSecret}
-                    onChange={(e) => setLineChannelSecret(e.target.value)}
-                    placeholder="- - - - - - - - - - - - - - - - "
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono"
-                  />
-                  <p className="mt-1 text-xs text-gray-400">{t('lineSecretHint')}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Channel Access Token</label>
-                  <textarea
-                    value={lineAccessToken}
-                    onChange={(e) => setLineAccessToken(e.target.value)}
-                    placeholder="- - - - - - - - - - - - - - - - "
-                    rows={3}
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono resize-none"
-                  />
-                  <p className="mt-1 text-xs text-gray-400">{t('lineTokenHint')}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Webhook URL</label>
-                  <div className="mt-1 flex items-center gap-2">
-                    <code className="flex-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 truncate">
-                      {webhookUrl}
-                    </code>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (webhookUrl) {
-                          navigator.clipboard.writeText(webhookUrl);
-                          toast.show(t('webhookCopied'), 'success');
-                        }
-                      }}
-                      className="shrink-0 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                    >
-                      {t('copy')}
-                    </button>
-                  </div>
-                  <p className="mt-1 text-xs text-gray-400">{t('lineIntegrationHint')}</p>
-                </div>
-              </div>
-
-              <div className="mt-6 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setLineModalOpen(false)}
-                  className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-                >
-                  {t('cancel')}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleLineSave}
-                  disabled={lineSaving}
-                  className="rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-50"
-                >
-                  {lineSaving ? t('saving') : t('save')}
-                </button>
-              </div>
             </div>
           </div>
         )}
