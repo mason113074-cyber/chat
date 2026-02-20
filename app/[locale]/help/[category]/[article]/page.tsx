@@ -9,8 +9,8 @@ import { LandingFooter } from '@/app/components/LandingFooter';
 type Props = { params: Promise<{ locale: string; category: string; article: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { category, article } = await params;
-  const content = getArticleContent(category, article);
+  const { locale, category, article } = await params;
+  const content = getArticleContent(category, article, locale);
   if (!content) return { title: 'Help' };
   const t = await getTranslations('help');
   const title = t(content.titleKey);
@@ -21,7 +21,7 @@ export default async function HelpArticlePage({ params }: Props) {
   const { locale, category, article } = await params;
   setRequestLocale(locale);
 
-  const content = getArticleContent(category, article);
+  const content = getArticleContent(category, article, locale);
   if (!content) notFound();
 
   const t = await getTranslations('help');
@@ -51,7 +51,7 @@ export default async function HelpArticlePage({ params }: Props) {
 
           <div className="bg-white rounded-xl shadow-sm p-8 mb-6">
             <article
-              className="prose prose-blue max-w-none prose-headings:font-bold prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline prose-code:bg-gray-100 prose-code:px-1 prose-code:rounded"
+              className="prose prose-gray prose-blue max-w-none prose-headings:font-bold prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline prose-code:bg-gray-100 prose-code:px-1 prose-code:rounded text-gray-800"
               dangerouslySetInnerHTML={{ __html: content.contentHtml.trim() }}
             />
           </div>

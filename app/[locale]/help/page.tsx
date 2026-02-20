@@ -121,9 +121,9 @@ export default function HelpCenterPage() {
 
         <div className="bg-white rounded-xl shadow-sm p-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">{t('resources.title')}</h2>
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 gap-6">
             <Link
-              href="/help/getting-started/first-chat-test"
+              href="/help/getting-started"
               className="flex items-start gap-4 p-4 rounded-lg hover:bg-gray-50 transition-colors"
             >
               <span className="text-2xl" aria-hidden>🎬</span>
@@ -132,6 +132,7 @@ export default function HelpCenterPage() {
                 <p className="text-sm text-gray-600">{t('resources.demo.description')}</p>
               </div>
             </Link>
+            {/* API docs 暫時移除（/docs 尚未上線）
             <Link
               href="/docs"
               className="flex items-start gap-4 p-4 rounded-lg hover:bg-gray-50 transition-colors"
@@ -142,6 +143,7 @@ export default function HelpCenterPage() {
                 <p className="text-sm text-gray-600">{t('resources.docs.description')}</p>
               </div>
             </Link>
+            */}
             <Link
               href="/support"
               className="flex items-start gap-4 p-4 rounded-lg hover:bg-gray-50 transition-colors"
