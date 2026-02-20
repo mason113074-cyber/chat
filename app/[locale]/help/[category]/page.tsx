@@ -47,14 +47,14 @@ export default async function HelpCategoryPage({ params }: Props) {
       <LandingNavbar />
       <main className="pt-[72px]">
         <div className="container mx-auto px-4 py-12">
-          <nav className="flex items-center gap-2 text-sm text-gray-600 mb-6">
-            <Link href="/help" className="hover:text-blue-600">Help</Link>
+          <nav className="flex items-center gap-2 text-sm text-gray-600 mb-6" aria-label="Breadcrumb">
+            <Link href="/help" className="hover:text-blue-600">{t('breadcrumb.help')}</Link>
             <span>/</span>
             <span className="text-gray-900">{t(categoryTitleKey)}</span>
           </nav>
           <h1 className="text-3xl font-bold text-gray-900 mb-8">{t(categoryTitleKey)}</h1>
           {articles.length === 0 ? (
-            <p className="text-gray-600">No articles in this category yet.</p>
+            <p className="text-gray-600">{t('noArticles')}</p>
           ) : (
             <ul className="space-y-4">
               {articles.map((art) => (
@@ -65,13 +65,18 @@ export default async function HelpCategoryPage({ params }: Props) {
                   >
                     <h2 className="text-xl font-semibold text-gray-900 mb-1">{t(art.titleKey)}</h2>
                     <p className="text-sm text-gray-500">
-                      {art.readTime} min read · Updated {art.lastUpdated}
+                      {art.readTime} {t('minuteRead')} · Updated {art.lastUpdated}
                     </p>
                   </Link>
                 </li>
               ))}
             </ul>
           )}
+          <div className="mt-8 text-center">
+            <Link href="/help" className="text-blue-600 hover:text-blue-700 font-medium">
+              ← {t('backToHelp')}
+            </Link>
+          </div>
         </div>
       </main>
       <LandingFooter />

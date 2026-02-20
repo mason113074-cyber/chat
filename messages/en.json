@@ -679,6 +679,8 @@
       "step2Desc": "Connect your LINE Official Account. Customers can chat with your AI 24/7.",
       "step3Title": "Live chat demo",
       "step3Desc": "Try the AI chat yourself. See how replies are generated from your knowledge base.",
+      "step4Title": "Analytics dashboard",
+      "step4Desc": "Track conversations, resolution rate, and customer satisfaction in one place.",
       "next": "Next",
       "back": "Back",
       "finish": "Finish"
@@ -774,6 +776,10 @@
   },
   "help": {
     "hero": { "title": "How can we help?", "subtitle": "Search articles, watch tutorials, or contact support" },
+    "breadcrumb": { "help": "Help Center" },
+    "noArticles": "No articles in this category yet.",
+    "minuteRead": "min read",
+    "backToHelp": "Back to Help Center",
     "search": { "placeholder": "Search help articles...", "popularTopics": ["LINE setup", "Knowledge base", "Customize AI", "Billing", "API"], "resultsFound": "Found {count} article(s) for \"{query}\"", "noResults": "No articles found for \"{query}\"" },
     "categories": {
       "gettingStarted": { "title": "Getting started", "description": "Setup guides and basics" },
@@ -818,5 +824,18 @@
     "perMonth": "/mo",
     "metaTitle": "CustomerAI Pro Pricing | From NT$799/mo",
     "metaDescription": "Flexible AI customer service pricing. Starter NT$799/mo, first month NT$599. 1,000 AI conversations, LINE auto-reply."
+  },
+  "support": {
+    "title": "Contact Support",
+    "subtitle": "We're here to help. Choose your preferred contact method.",
+    "emailTitle": "Email",
+    "emailResponse": "Response within 24 hours",
+    "lineTitle": "LINE",
+    "lineResponse": "Instant response",
+    "phoneTitle": "Phone",
+    "phoneComingSoon": "Coming soon",
+    "phoneHours": "Business hours",
+    "faqHint": "Looking for quick answers? Check our Help Center first.",
+    "browseHelp": "Browse Help Center"
   }
 }

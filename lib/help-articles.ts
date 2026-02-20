@@ -32,6 +32,42 @@ const ARTICLE_LIST: Record<string, ArticleMeta[]> = {
 };
 
 const ARTICLE_CONTENT: Record<string, ArticleContent> = {
+  'getting-started/quick-start': {
+    categorySlug: 'getting-started',
+    categoryNameKey: 'categories.gettingStarted.title',
+    titleKey: 'articles.quickStart',
+    readTime: 3,
+    lastUpdated: '2026-02-15',
+    contentHtml: `
+      <h2>Quick start guide</h2>
+      <p>Get your AI customer service up and running in minutes.</p>
+      <h3>Step 1: Create your account</h3>
+      <p>Sign up at CustomerAIPro and verify your email.</p>
+      <h3>Step 2: Connect LINE (optional)</h3>
+      <p>In Dashboard → Settings → LINE, add your Channel Secret and Access Token from LINE Developers Console.</p>
+      <h3>Step 3: Add knowledge base</h3>
+      <p>Go to Knowledge Base and upload your FAQ or product info (txt, pdf, or paste text).</p>
+      <h3>Step 4: Test the chat</h3>
+      <p>Use the test chat in Settings or send a message to your LINE bot to see AI replies.</p>
+      <p><a href="/help">Back to Help Center</a></p>
+    `,
+  },
+  'getting-started/first-chat': {
+    categorySlug: 'getting-started',
+    categoryNameKey: 'categories.gettingStarted.title',
+    titleKey: 'articles.firstChat',
+    readTime: 2,
+    lastUpdated: '2026-02-14',
+    contentHtml: `
+      <h2>Send your first chat</h2>
+      <p>After setting up your knowledge base and LINE (or using the built-in test), send a message to see the AI reply.</p>
+      <h3>From LINE</h3>
+      <p>Add your bot as a friend and send any question. The AI will answer based on your knowledge base.</p>
+      <h3>From Dashboard</h3>
+      <p>In Settings you can use the test chat box to try messages without LINE.</p>
+      <p><a href="/help">Back to Help Center</a></p>
+    `,
+  },
   'line-integration/line-setup-guide': {
     categorySlug: 'line-integration',
     categoryNameKey: 'categories.lineIntegration.title',
@@ -73,6 +109,40 @@ const ARTICLE_CONTENT: Record<string, ArticleContent> = {
       <h3>步驟 6: 設定 Webhook URL</h3>
       <p>在 LINE Developers Console 的 Messaging API 分頁，將 Webhook URL 設為：<code>https://www.customeraipro.com/api/webhook/line</code>，並開啟「Use webhook」。</p>
       <p>需要協助？請查看 <a href="/help">幫助中心</a> 或 <a href="/demo">產品導覽</a>。</p>
+    `,
+  },
+  'line-integration/webhook': {
+    categorySlug: 'line-integration',
+    categoryNameKey: 'categories.lineIntegration.title',
+    titleKey: 'articles.webhook',
+    readTime: 3,
+    lastUpdated: '2026-02-10',
+    contentHtml: `
+      <h2>Webhook setup</h2>
+      <p>LINE sends events to your webhook URL. Set it in LINE Developers Console → Messaging API.</p>
+      <h3>Webhook URL</h3>
+      <p><code>https://www.customeraipro.com/api/webhook/line</code></p>
+      <h3>Enable webhook</h3>
+      <p>Turn on "Use webhook" and verify the connection. Disable "Auto-reply messages" in LINE Official Account Manager so our AI handles replies.</p>
+      <p><a href="/help">Back to Help Center</a></p>
+    `,
+  },
+  'knowledge-base/upload-faq': {
+    categorySlug: 'knowledge-base',
+    categoryNameKey: 'categories.knowledgeBase.title',
+    titleKey: 'articles.uploadFaq',
+    readTime: 4,
+    lastUpdated: '2026-02-12',
+    contentHtml: `
+      <h2>Upload FAQ to knowledge base</h2>
+      <p>Go to Dashboard → Knowledge Base. You can add entries by pasting text or uploading files (txt, pdf, docx).</p>
+      <h3>Tips</h3>
+      <ul>
+        <li>Use clear Q&A format for best results.</li>
+        <li>Include product specs, policies, and common questions.</li>
+        <li>Download our <a href="/templates/faq-template.txt" download>FAQ template</a> to get started.</li>
+      </ul>
+      <p><a href="/help">Back to Help Center</a></p>
     `,
   },
 };

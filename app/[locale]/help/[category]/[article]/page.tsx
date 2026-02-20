@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { notFound } from 'next/navigation';
-import { getArticleContent, getCategoryArticleList } from '@/lib/help-articles';
+import { getArticleContent } from '@/lib/help-articles';
 import { LandingNavbar } from '@/app/components/LandingNavbar';
 import { LandingFooter } from '@/app/components/LandingFooter';
 

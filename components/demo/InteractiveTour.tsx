@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 
-const STEP_KEYS = ['step1', 'step2', 'step3'] as const;
+const STEP_KEYS = ['step1', 'step2', 'step3', 'step4'] as const;
 
 export function InteractiveTour() {
   const t = useTranslations('demo');
