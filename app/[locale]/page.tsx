@@ -40,18 +40,23 @@ export default async function Home({ params }: Props) {
   let totalUsers = 0;
   let totalConversations = 0;
   let totalKnowledgeBase = 0;
-  try {
-    const supabase = getSupabaseAdmin();
-    const [usersRes, convsRes, kbRes] = await Promise.all([
-      supabase.from('contacts').select('*', { count: 'exact', head: true }),
-      supabase.from('conversations').select('*', { count: 'exact', head: true }),
-      supabase.from('knowledge_base').select('*', { count: 'exact', head: true }),
-    ]);
-    totalUsers = usersRes.count ?? 0;
-    totalConversations = convsRes.count ?? 0;
-    totalKnowledgeBase = kbRes.count ?? 0;
-  } catch (error) {
-    console.error('Failed to fetch landing page stats:', error);
+  const hasSupabaseAdmin =
+    typeof process.env.NEXT_PUBLIC_SUPABASE_URL === 'string' &&
+    typeof process.env.SUPABASE_SERVICE_ROLE_KEY === 'string';
+  if (hasSupabaseAdmin) {
+    try {
+      const supabase = getSupabaseAdmin();
+      const [usersRes, convsRes, kbRes] = await Promise.all([
+        supabase.from('contacts').select('*', { count: 'exact', head: true }),
+        supabase.from('conversations').select('*', { count: 'exact', head: true }),
+        supabase.from('knowledge_base').select('*', { count: 'exact', head: true }),
+      ]);
+      totalUsers = usersRes.count ?? 0;
+      totalConversations = convsRes.count ?? 0;
+      totalKnowledgeBase = kbRes.count ?? 0;
+    } catch (error) {
+      console.error('Failed to fetch landing page stats:', error);
+    }
   }
 
   const stats =
