@@ -13,6 +13,7 @@ export function LandingNavbar() {
   const navLinks = [
     { href: '/#features' as const, labelKey: 'features' as const },
     { href: '/demo' as const, labelKey: 'demo' as const },
+    { href: '/help' as const, labelKey: 'help' as const },
     { href: '/#pricing' as const, labelKey: 'pricing' as const },
     { href: '/#faq' as const, labelKey: 'faq' as const },
   ];

@@ -89,3 +89,15 @@ export function getArticleContent(categorySlug: string, articleSlug: string): Ar
 export function getAllCategorySlugs(): string[] {
   return Object.keys(ARTICLE_LIST);
 }
+
+export type SearchArticle = { categorySlug: string; slug: string; titleKey: string };
+
+export function getAllArticlesForSearch(): SearchArticle[] {
+  return getAllCategorySlugs().flatMap((categorySlug) =>
+    (ARTICLE_LIST[categorySlug] ?? []).map((art) => ({
+      categorySlug,
+      slug: art.slug,
+      titleKey: art.titleKey,
+    }))
+  );
+}

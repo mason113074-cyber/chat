@@ -36,6 +36,7 @@
     "features": "Features",
     "pricing": "Pricing",
     "demo": "Demo",
+    "help": "Help",
     "faq": "FAQ",
     "openMenu": "Open menu"
   },
@@ -773,7 +774,7 @@
   },
   "help": {
     "hero": { "title": "How can we help?", "subtitle": "Search articles, watch tutorials, or contact support" },
-    "search": { "placeholder": "Search help articles...", "popularTopics": ["LINE setup", "Knowledge base", "Customize AI", "Billing", "API"] },
+    "search": { "placeholder": "Search help articles...", "popularTopics": ["LINE setup", "Knowledge base", "Customize AI", "Billing", "API"], "resultsFound": "Found {count} article(s) for \"{query}\"", "noResults": "No articles found for \"{query}\"" },
     "categories": {
       "gettingStarted": { "title": "Getting started", "description": "Setup guides and basics" },
       "lineIntegration": { "title": "LINE integration", "description": "Connect and configure LINE Channel" },

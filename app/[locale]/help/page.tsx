@@ -1,9 +1,11 @@
 'use client';
 
+import { useState, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { LandingNavbar } from '@/app/components/LandingNavbar';
 import { LandingFooter } from '@/app/components/LandingFooter';
+import { getAllArticlesForSearch } from '@/lib/help-articles';
 
 const CATEGORIES = [
   { icon: '🚀', slug: 'getting-started', titleKey: 'categories.gettingStarted.title' as const, descKey: 'categories.gettingStarted.description' as const, articles: 8 },
@@ -14,8 +16,26 @@ const CATEGORIES = [
   { icon: '📊', slug: 'analytics', titleKey: 'categories.analytics.title' as const, descKey: 'categories.analytics.description' as const, articles: 8 },
 ] as const;
 
+const ALL_ARTICLES = getAllArticlesForSearch();
+
+const CATEGORY_TITLE_KEYS: Record<string, string> = {
+  'getting-started': 'categories.gettingStarted.title',
+  'line-integration': 'categories.lineIntegration.title',
+  'knowledge-base': 'categories.knowledgeBase.title',
+  'settings': 'categories.settings.title',
+  'billing': 'categories.billing.title',
+  'analytics': 'categories.analytics.title',
+};
+
 export default function HelpCenterPage() {
   const t = useTranslations('help');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return ALL_ARTICLES.filter((art) => t(art.titleKey).toLowerCase().includes(q));
+  }, [searchQuery, t]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -29,6 +49,8 @@ export default function HelpCenterPage() {
             <div className="relative">
               <input
                 type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t('search.placeholder')}
                 className="w-full pl-12 pr-4 py-4 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-300"
                 aria-label={t('search.placeholder')}
@@ -55,6 +77,31 @@ export default function HelpCenterPage() {
       </div>
 
       <div className="container mx-auto px-4 py-12">
+        {searchQuery.trim() ? (
+          <div className="mb-12">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              {searchResults.length > 0
+                ? t('search.resultsFound', { count: searchResults.length, query: searchQuery.trim() })
+                : t('search.noResults', { query: searchQuery.trim() })}
+            </h2>
+            {searchResults.length > 0 && (
+              <ul className="space-y-3">
+                {searchResults.map((art) => (
+                  <li key={`${art.categorySlug}-${art.slug}`}>
+                    <Link
+                      href={`/help/${art.categorySlug}/${art.slug}`}
+                      className="block bg-white rounded-xl shadow-sm hover:shadow-md p-4 transition-shadow"
+                    >
+                      <span className="font-medium text-gray-900">{t(art.titleKey)}</span>
+                      <span className="text-sm text-gray-500 ml-2">→ {t(CATEGORY_TITLE_KEYS[art.categorySlug] ?? art.categorySlug)}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ) : null}
+
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
           {CATEGORIES.map((cat) => (
             <Link

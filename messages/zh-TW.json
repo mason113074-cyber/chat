@@ -36,6 +36,7 @@
     "features": "功能",
     "pricing": "定價",
     "demo": "產品導覽",
+    "help": "幫助",
     "faq": "常見問題",
     "openMenu": "開啟選單"
   },
@@ -772,7 +773,7 @@
   },
   "help": {
     "hero": { "title": "我們能幫您什麼？", "subtitle": "搜尋文章、觀看教學影片或聯繫客服" },
-    "search": { "placeholder": "搜尋幫助文章...", "popularTopics": ["LINE 設定", "知識庫上傳", "自訂 AI 回覆", "計費問題", "API 整合"] },
+    "search": { "placeholder": "搜尋幫助文章...", "popularTopics": ["LINE 設定", "知識庫上傳", "自訂 AI 回覆", "計費問題", "API 整合"], "resultsFound": "搜尋「{query}」找到 {count} 篇", "noResults": "搜尋「{query}」沒有找到文章" },
     "categories": {
       "gettingStarted": { "title": "快速入門", "description": "新手必看的設定指南和基礎教學" },
       "lineIntegration": { "title": "LINE 整合", "description": "如何連接和設定 LINE Channel" },

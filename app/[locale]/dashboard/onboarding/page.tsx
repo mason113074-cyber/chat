@@ -116,18 +116,29 @@ function LineSetupStep({ onSkip }: OnboardingStepProps) {
   );
 }
 
+const TEMPLATE_FILES: Record<'faq' | 'productInfo' | 'policies', string> = {
+  faq: '/templates/faq-template.txt',
+  productInfo: '/templates/product-info-template.txt',
+  policies: '/templates/policies-template.txt',
+};
+
 function KnowledgeBaseStep({ onSkip }: OnboardingStepProps) {
   const t = useTranslations('onboarding.knowledgeBase');
   return (
     <div className="space-y-6">
       <div className="grid md:grid-cols-3 gap-4">
         {(['faq', 'productInfo', 'policies'] as const).map((template) => (
-          <div key={template} className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors">
+          <a
+            key={template}
+            href={TEMPLATE_FILES[template]}
+            download
+            className="block bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors text-left"
+          >
             <div className="text-4xl mb-2">📄</div>
             <h4 className="font-medium text-gray-900 mb-1">{t(`templates.${template}.title`)}</h4>
             <p className="text-sm text-gray-600 mb-3">{t(`templates.${template}.description`)}</p>
             <span className="text-sm text-blue-600 font-medium">{t('downloadTemplate')} →</span>
-          </div>
+          </a>
         ))}
       </div>
       <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
