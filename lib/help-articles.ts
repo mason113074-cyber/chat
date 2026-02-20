@@ -73,25 +73,27 @@ const ARTICLE_CONTENT: Record<string, ArticleContent> = {
     categoryNameKey: 'categories.gettingStarted.title',
     titleKey: 'articles.welcome',
     readTime: 2,
-    lastUpdated: '2026-02-20',
+    lastUpdated: '2026-02-21',
     contentHtml: `
       <h2>Welcome to CustomerAIPro</h2>
-      <p>CustomerAIPro is an AI-powered customer service platform that helps businesses automate responses via LINE messaging using GPT-4 and custom knowledge bases.</p>
-      <h3>What Can You Do?</h3>
+      <p>Thank you for choosing CustomerAIPro — your AI-powered customer service platform.</p>
+      <h3>What is CustomerAIPro?</h3>
+      <p>CustomerAIPro helps businesses automate customer support through LINE messaging using advanced AI. You can:</p>
       <ul>
-        <li><strong>Connect LINE</strong>: Integrate your LINE Official Account in minutes</li>
-        <li><strong>Upload Knowledge</strong>: Add your FAQs, product info, and policies</li>
-        <li><strong>AI Responses</strong>: Let AI handle most customer inquiries automatically</li>
-        <li><strong>Track Performance</strong>: Monitor conversation volume and satisfaction</li>
+        <li><strong>Connect LINE Official Account</strong> in about 30 seconds</li>
+        <li><strong>Upload Knowledge Base</strong> with FAQs and product information</li>
+        <li><strong>Automate Responses</strong> with GPT-4 powered AI</li>
+        <li><strong>Track Performance</strong> with real-time analytics</li>
       </ul>
-      <h3>Who Is This For?</h3>
-      <p>E-commerce businesses, customer service teams, and SMBs looking for 24/7 AI-powered support.</p>
-      <h3>Next Steps</h3>
+      <h3>Who Should Use This?</h3>
+      <p>E-commerce handling 100+ daily inquiries, customer service teams wanting to reduce workload, SMBs looking for 24/7 support, and any business with a LINE Official Account.</p>
+      <h3>Getting Started (3 Steps)</h3>
       <ol>
-        <li><a href="/help/line-integration/line-setup-guide">Set up your LINE Channel</a></li>
-        <li><a href="/help/knowledge-base/upload-first-kb">Upload your first knowledge base</a></li>
-        <li><a href="/help/getting-started/first-chat-test">Test your AI chatbot</a></li>
+        <li><strong>Set up your LINE Channel</strong> — about 5 minutes. <a href="/help/line-integration/line-setup-guide">LINE Setup Guide</a></li>
+        <li><strong>Upload Knowledge Base</strong> — add FAQs and policies. <a href="/help/knowledge-base/upload-first-kb">Upload KB Guide</a></li>
+        <li><strong>Test your AI</strong> — send a test message. <a href="/help/getting-started/first-chat-test">Testing Guide</a></li>
       </ol>
+      <p><strong>Need help?</strong> Email support@customeraipro.com, LINE @customeraipro, or <a href="/help">browse all articles</a>.</p>
       <p><a href="/help">Back to Help Center</a></p>
     `,
   },
@@ -100,15 +102,28 @@ const ARTICLE_CONTENT: Record<string, ArticleContent> = {
     categoryNameKey: 'categories.gettingStarted.title',
     titleKey: 'articles.accountSetup',
     readTime: 3,
-    lastUpdated: '2026-02-20',
+    lastUpdated: '2026-02-21',
     contentHtml: `
       <h2>Account Setup Guide</h2>
-      <p>Complete your account registration and profile so you can start using CustomerAIPro.</p>
-      <h3>Register</h3>
-      <p>Sign up with email or Google. Verify your email if you use email registration.</p>
-      <h3>Profile & Language</h3>
-      <p>Set your display name, choose language (English / 繁體中文), and timezone in Settings.</p>
-      <p><a href="/help">Back to Help Center</a></p>
+      <p>Complete your CustomerAIPro account setup in a few minutes.</p>
+      <h3>Create Your Account</h3>
+      <ol>
+        <li>Go to <a href="https://www.customeraipro.com" target="_blank" rel="noopener noreferrer">customeraipro.com</a></li>
+        <li>Click <strong>Sign Up</strong></li>
+        <li>Choose Email + Password or Google SSO (recommended)</li>
+      </ol>
+      <h3>Verify Your Email</h3>
+      <p>If you signed up with email: check your inbox, click the verification link, then you’ll be redirected to the dashboard. Didn’t receive it? Check spam, wait 2–3 minutes, or use “Resend verification email”.</p>
+      <h3>Complete Your Profile</h3>
+      <p>After logging in: set company name, industry, team size, language (English / 繁體中文), and time zone in Settings.</p>
+      <h3>What’s Next?</h3>
+      <ul>
+        <li>Connect your LINE Official Account</li>
+        <li>Upload your first knowledge base</li>
+        <li>Invite team members (optional)</li>
+        <li>Test your AI chatbot</li>
+      </ul>
+      <p><a href="/help/line-integration/line-setup-guide">Start with LINE Setup</a> · <a href="/help">Back to Help Center</a></p>
     `,
   },
   'getting-started/first-10-minutes': {
@@ -116,16 +131,34 @@ const ARTICLE_CONTENT: Record<string, ArticleContent> = {
     categoryNameKey: 'categories.gettingStarted.title',
     titleKey: 'articles.first10Minutes',
     readTime: 5,
-    lastUpdated: '2026-02-20',
+    lastUpdated: '2026-02-21',
     contentHtml: `
-      <h2>Your First 10 Minutes</h2>
-      <p>A quick checklist to get your AI customer service running.</p>
+      <h2>Your First 10 Minutes with CustomerAIPro</h2>
+      <p>Get your AI chatbot up and running in about 10 minutes.</p>
+      <h3>Minute 1–5: Connect LINE</h3>
       <ol>
-        <li><strong>Connect LINE</strong> (about 2 min) — <a href="/help/line-integration/line-setup-guide">LINE Setup Guide</a></li>
-        <li><strong>Upload a knowledge base</strong> (about 3 min) — Use our templates or paste your FAQ</li>
-        <li><strong>Test the AI</strong> (about 2 min) — Send a message from LINE or the Dashboard test chat</li>
-        <li><strong>Invite team members</strong> (optional) — <a href="/help/settings/team-management">Team Management</a></li>
+        <li>Open <a href="https://developers.line.biz/" target="_blank" rel="noopener noreferrer">LINE Developers Console</a></li>
+        <li>Create a Messaging API Channel if needed</li>
+        <li>Copy Channel Secret and Access Token</li>
+        <li>Paste them in CustomerAIPro Settings → LINE Integration</li>
+        <li>Click <strong>Test Connection</strong> — you should see “Connection Successful”</li>
       </ol>
+      <p><a href="/help/line-integration/line-setup-guide">Detailed LINE Setup Guide</a></p>
+      <h3>Minute 6–8: Upload Knowledge Base</h3>
+      <ol>
+        <li>Download our <a href="/templates/faq-template.txt" download>FAQ template</a> and fill in at least 5 Q&As</li>
+        <li>Go to Dashboard → Knowledge Base and upload the file</li>
+        <li>Wait 1–2 minutes for processing — you should see “Processing Complete”</li>
+      </ol>
+      <p><a href="/help/knowledge-base/kb-best-practices">Knowledge Base Best Practices</a></p>
+      <h3>Minute 9–10: Test Your AI</h3>
+      <p><strong>In Dashboard:</strong> Click “Test Chat”, type a question from your KB; the AI should answer correctly.</p>
+      <p><strong>On LINE:</strong> Add your bot as a friend, send a message; you should get a reply within a few seconds.</p>
+      <p><a href="/help/knowledge-base/troubleshoot-ai">Troubleshooting Guide</a></p>
+      <h3>Common First-Timer Questions</h3>
+      <p><strong>Do I need coding?</strong> No — everything is through our interface.</p>
+      <p><strong>Can I edit AI responses?</strong> Yes — update your knowledge base and the AI uses the new information.</p>
+      <p><strong>What if the AI is wrong?</strong> Add more specific Q&As; see <a href="/help/knowledge-base/kb-best-practices">KB Best Practices</a>.</p>
       <p><a href="/help">Back to Help Center</a></p>
     `,
   },
@@ -134,11 +167,29 @@ const ARTICLE_CONTENT: Record<string, ArticleContent> = {
     categoryNameKey: 'categories.gettingStarted.title',
     titleKey: 'articles.dashboardOverview',
     readTime: 4,
-    lastUpdated: '2026-02-20',
+    lastUpdated: '2026-02-21',
     contentHtml: `
-      <h2>Understanding the Dashboard</h2>
-      <p>The Dashboard shows today's conversations, AI metrics, and the latest chat list. Use the sidebar to open Conversations, Knowledge Base, Analytics, and Settings.</p>
-      <p><a href="/help">Back to Help Center</a></p>
+      <h2>Understanding Your Dashboard</h2>
+      <p>Your CustomerAIPro dashboard is your command center.</p>
+      <h3>Key Metrics (Top Section)</h3>
+      <ul>
+        <li><strong>Today’s Conversations</strong> — number of customer messages today</li>
+        <li><strong>AI Response Rate</strong> — % handled by AI (target 80%+)</li>
+        <li><strong>Average Response Time</strong> — under 2 seconds is excellent</li>
+        <li><strong>Customer Satisfaction</strong> — from feedback when enabled</li>
+      </ul>
+      <h3>Sidebar Navigation</h3>
+      <ul>
+        <li><strong>Dashboard</strong> — overview (you are here)</li>
+        <li><strong>Conversations</strong> — view and search all chats</li>
+        <li><strong>Knowledge Base</strong> — upload, edit, delete content</li>
+        <li><strong>Analytics</strong> — trends, popular questions, accuracy</li>
+        <li><strong>Settings</strong> — LINE, AI, team, billing</li>
+      </ul>
+      <h3>Main Area</h3>
+      <p>Live conversation feed with recent chats; click to view full thread and AI confidence score. Quick actions: Test Chat, Upload KB, Invite Team.</p>
+      <p>On mobile (&lt;768px) the sidebar becomes a hamburger menu.</p>
+      <p><a href="/help/analytics/understanding-analytics">Understanding Analytics</a> · <a href="/help">Back to Help Center</a></p>
     `,
   },
   'getting-started/first-chat-test': {
@@ -146,11 +197,27 @@ const ARTICLE_CONTENT: Record<string, ArticleContent> = {
     categoryNameKey: 'categories.gettingStarted.title',
     titleKey: 'articles.firstChatTest',
     readTime: 3,
-    lastUpdated: '2026-02-20',
+    lastUpdated: '2026-02-21',
     contentHtml: `
-      <h2>First Chat Test</h2>
-      <p>Test your AI in the Dashboard (Settings → test chat) or by sending a message to your LINE bot. If replies are wrong, add or refine content in your <a href="/help/knowledge-base/upload-first-kb">knowledge base</a> or adjust <a href="/help/settings/customize-ai-style">AI style</a> (temperature, max tokens).</p>
-      <p><a href="/help">Back to Help Center</a></p>
+      <h2>First Chat Test Guide</h2>
+      <p>Make sure your AI works correctly before going live.</p>
+      <h3>Method 1: Dashboard Test Chat</h3>
+      <ol>
+        <li>Go to Dashboard and click <strong>Test Chat</strong></li>
+        <li>Send a question from your knowledge base — AI should answer correctly</li>
+        <li>Ask something not in your KB — AI should say it doesn’t have that information</li>
+      </ol>
+      <h3>Method 2: LINE App</h3>
+      <p>Add your bot as a friend (QR in LINE Developers Console → Messaging API), then send real messages. Ensure “Use webhook” is enabled in LINE.</p>
+      <h3>If AI Responds Incorrectly</h3>
+      <ul>
+        <li><strong>AI says “I don’t know” but you have the info</strong> — add more Q&A variations and use the customer’s wording</li>
+        <li><strong>Wrong answer</strong> — remove contradictions in your KB and make answers more specific</li>
+        <li><strong>Wrong language</strong> — add bilingual content or adjust Settings → AI Config</li>
+      </ul>
+      <h3>Confidence Score</h3>
+      <p>Each response has a confidence score (0–100%). 90–100% is highly reliable; under 70% consider improving your KB. You can set a threshold in Settings (e.g. auto-reply only if &gt;70%).</p>
+      <p><a href="/help/knowledge-base/troubleshoot-ai">Improve AI Accuracy</a> · <a href="/help">Back to Help Center</a></p>
     `,
   },
   'line-integration/line-setup-guide': {
