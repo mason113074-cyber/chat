@@ -8,10 +8,13 @@ type PlanData = {
   price: number;
   originalPrice: number | null;
   promotionPrice: number | null;
+  priceUsd?: number;
+  promotionPriceUsd?: number;
   popular?: boolean;
   features: string[];
 };
 
+// 中文介面：與 Supabase plans 同步 — 免費/入門/專業/企業方案，799/1899/5299（NT$）
 const PLANS_ZH: PlanData[] = [
   {
     name: '免費方案',
@@ -31,8 +34,8 @@ const PLANS_ZH: PlanData[] = [
     name: '入門方案',
     nameEn: 'Starter',
     price: 799,
-    originalPrice: 799,
-    promotionPrice: 599,
+    originalPrice: null,
+    promotionPrice: null,
     popular: true,
     features: [
       '1,000 次 AI 對話/月',
@@ -47,8 +50,8 @@ const PLANS_ZH: PlanData[] = [
     name: '專業方案',
     nameEn: 'Pro',
     price: 1899,
-    originalPrice: 1899,
-    promotionPrice: 1399,
+    originalPrice: null,
+    promotionPrice: null,
     features: [
       '5,000 次 AI 對話/月',
       '1,000 條知識庫',
@@ -62,8 +65,8 @@ const PLANS_ZH: PlanData[] = [
     name: '企業方案',
     nameEn: 'Business',
     price: 5299,
-    originalPrice: 5299,
-    promotionPrice: 3999,
+    originalPrice: null,
+    promotionPrice: null,
     features: [
       '20,000 次 AI 對話/月',
       '5,000 條知識庫',
@@ -76,6 +79,7 @@ const PLANS_ZH: PlanData[] = [
   },
 ];
 
+// 英文介面：美金
 const PLANS_EN: PlanData[] = [
   {
     name: 'Free',
@@ -83,6 +87,7 @@ const PLANS_EN: PlanData[] = [
     price: 0,
     originalPrice: null,
     promotionPrice: null,
+    priceUsd: 0,
     features: [
       '100 AI conversations/month',
       '50 knowledge base items',
@@ -95,8 +100,9 @@ const PLANS_EN: PlanData[] = [
     name: 'Starter',
     nameEn: 'Starter',
     price: 799,
-    originalPrice: 799,
-    promotionPrice: 599,
+    originalPrice: null,
+    promotionPrice: null,
+    priceUsd: 24,
     popular: true,
     features: [
       '1,000 AI conversations/month',
@@ -111,8 +117,9 @@ const PLANS_EN: PlanData[] = [
     name: 'Pro',
     nameEn: 'Pro',
     price: 1899,
-    originalPrice: 1899,
-    promotionPrice: 1399,
+    originalPrice: null,
+    promotionPrice: null,
+    priceUsd: 60,
     features: [
       '5,000 AI conversations/month',
       '1,000 knowledge base items',
@@ -126,8 +133,9 @@ const PLANS_EN: PlanData[] = [
     name: 'Business',
     nameEn: 'Business',
     price: 5299,
-    originalPrice: 5299,
-    promotionPrice: 3999,
+    originalPrice: null,
+    promotionPrice: null,
+    priceUsd: 149,
     features: [
       '20,000 AI conversations/month',
       '5,000 knowledge base items',
@@ -163,7 +171,7 @@ export default async function PricingPage({ params }: Props) {
       <header className="border-b border-gray-200 bg-white/80 backdrop-blur">
         <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
           <Link href="/" className="text-xl font-bold text-indigo-600">
-            CustomerAIPro
+            CustomerAI Pro
           </Link>
           <div className="flex items-center gap-6">
             <Link
@@ -212,33 +220,42 @@ export default async function PricingPage({ params }: Props) {
               )}
               <h2 className="text-xl font-bold text-gray-900">{plan.name}</h2>
               <div className="mt-6">
-                {plan.promotionPrice != null ? (
-                  <>
-                    <div className="text-base text-gray-500 mb-1">
-                      <span className="line-through">
-                        NT${plan.originalPrice!.toLocaleString()}
-                      </span>
-                    </div>
+                {(() => {
+                  const useUsd = !isZh && (plan.priceUsd != null || plan.promotionPriceUsd != null);
+                  const currency = useUsd ? '$' : 'NT$';
+                  const orig = useUsd ? (plan.priceUsd ?? plan.originalPrice) : plan.originalPrice;
+                  const promo = useUsd ? (plan.promotionPriceUsd ?? plan.promotionPrice) : plan.promotionPrice;
+                  const regular = useUsd ? (plan.priceUsd ?? plan.price) : plan.price;
+                  const formatNum = (n: number | null) => n == null ? '' : useUsd ? n.toLocaleString('en-US') : n.toLocaleString();
+                  if (plan.promotionPrice != null && promo != null) {
+                    return (
+                      <>
+                        {orig != null && (
+                          <div className="text-base text-gray-500 mb-1">
+                            <span className="line-through">{currency}{formatNum(orig)}</span>
+                          </div>
+                        )}
+                        <div className="flex items-baseline gap-1 flex-wrap">
+                          <span className="text-5xl font-bold text-emerald-600 tracking-tight">
+                            {currency}{formatNum(promo)}
+                          </span>
+                          <span className="text-gray-500">{t('perMonth')}</span>
+                        </div>
+                        <p className="mt-2 text-sm text-gray-500 italic">
+                          {t(useUsd ? 'promotionNoteUsd' : 'promotionNote', { regularPrice: formatNum(regular) })}
+                        </p>
+                      </>
+                    );
+                  }
+                  return (
                     <div className="flex items-baseline gap-1 flex-wrap">
-                      <span className="text-5xl font-bold text-emerald-600 tracking-tight">
-                        NT${plan.promotionPrice.toLocaleString()}
+                      <span className="text-5xl font-bold text-gray-900 tracking-tight">
+                        {currency}{formatNum(regular)}
                       </span>
                       <span className="text-gray-500">{t('perMonth')}</span>
                     </div>
-                    <p className="mt-2 text-sm text-gray-500 italic">
-                      {t('promotionNote', {
-                        regularPrice: plan.price.toLocaleString(),
-                      })}
-                    </p>
-                  </>
-                ) : (
-                  <div className="flex items-baseline gap-1 flex-wrap">
-                    <span className="text-5xl font-bold text-gray-900 tracking-tight">
-                      NT${plan.price.toLocaleString()}
-                    </span>
-                    <span className="text-gray-500">{t('perMonth')}</span>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
               <ul className="mt-6 space-y-3">
                 {plan.features.map((feature) => (
@@ -268,7 +285,7 @@ export default async function PricingPage({ params }: Props) {
 
       <footer className="border-t border-gray-200 py-8 mt-auto">
         <div className="mx-auto max-w-6xl px-4 text-center text-sm text-gray-500 sm:px-6">
-          © {new Date().getFullYear()} CustomerAIPro.
+          © {new Date().getFullYear()} CustomerAI Pro.
         </div>
       </footer>
     </div>

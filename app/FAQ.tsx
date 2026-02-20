@@ -40,7 +40,7 @@ export function FAQ() {
           常見問題
         </p>
         <h2 className="mt-3 text-3xl font-bold text-white sm:text-4xl">
-          關於 CustomerAIPro
+          關於 CustomerAI Pro
         </h2>
         <p className="mt-3 text-base text-slate-200/80">
           快速了解我們的服務與功能

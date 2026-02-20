@@ -4,7 +4,6 @@ import { Link } from '@/i18n/navigation';
 import { LandingNavbar } from '@/app/components/LandingNavbar';
 import { LandingFooter } from '@/app/components/LandingFooter';
 import { LandingFAQ } from '@/app/components/LandingFAQ';
-import { getSupabaseAdmin } from '@/lib/supabase';
 
 type Props = { params: Promise<{ locale: string }> };
 
@@ -55,53 +54,19 @@ export default async function Home({ params }: Props) {
     { titleKey: 'step3Title' as const, descKey: 'step3Desc' as const },
   ];
 
-  let totalUsers = 0;
-  let totalConversations = 0;
-  let totalKnowledgeBase = 0;
-  const hasSupabaseAdmin =
-    typeof process.env.NEXT_PUBLIC_SUPABASE_URL === 'string' &&
-    typeof process.env.SUPABASE_SERVICE_ROLE_KEY === 'string';
-  if (hasSupabaseAdmin) {
-    try {
-      const supabase = getSupabaseAdmin();
-      const [usersRes, convsRes, kbRes] = await Promise.all([
-        supabase.from('contacts').select('*', { count: 'exact', head: true }),
-        supabase.from('conversations').select('*', { count: 'exact', head: true }),
-        supabase.from('knowledge_base').select('*', { count: 'exact', head: true }),
-      ]);
-      totalUsers = usersRes.count ?? 0;
-      totalConversations = convsRes.count ?? 0;
-      totalKnowledgeBase = kbRes.count ?? 0;
-    } catch (error) {
-      console.error('Failed to fetch landing page stats:', error);
-    }
-  }
-
   const stats =
     locale === 'en'
       ? [
-          { value: '500+', labelKey: 'trustedMerchants' as const },
-          { value: '10,000+', labelKey: 'conversationsHandled' as const },
-          { value: '150+', labelKey: 'knowledgeBaseEntries' as const },
+          { value: '10 min', labelKey: 'statSetup' as const },
+          { value: '24/7', labelKey: 'statAvailability' as const },
+          { value: 'RAG', labelKey: 'statKnowledge' as const },
           { value: '< 30s', labelKey: 'avgResponseTime' as const },
         ]
       : [
-          {
-            value: totalUsers > 0 ? `${totalUsers}+` : '—',
-            labelKey: 'trustedMerchants' as const,
-          },
-          {
-            value: totalConversations > 0 ? totalConversations.toLocaleString() : '—',
-            labelKey: 'conversationsHandled' as const,
-          },
-          {
-            value: totalKnowledgeBase > 0 ? `${totalKnowledgeBase}+` : '—',
-            labelKey: 'knowledgeBaseEntries' as const,
-          },
-          {
-            value: '<30 秒',
-            labelKey: 'avgResponseTime' as const,
-          },
+          { value: '10 分鐘', labelKey: 'statSetup' as const },
+          { value: '24/7', labelKey: 'statAvailability' as const },
+          { value: 'RAG', labelKey: 'statKnowledge' as const },
+          { value: '<30 秒', labelKey: 'avgResponseTime' as const },
         ];
 
   const jsonLd = {
@@ -158,28 +123,27 @@ export default async function Home({ params }: Props) {
           </div>
         </section>
 
-        {/* Client logos */}
+        {/* 技術合作夥伴 */}
         <section className="border-y border-white/5 bg-slate-900/30 py-8">
           <p className="text-center text-xs uppercase tracking-widest text-slate-500 mb-6">
             {t('trustedBy')}
           </p>
-          <div className="mx-auto max-w-6xl px-4 sm:px-6 overflow-hidden">
-            <div className="flex gap-8 md:gap-12 justify-center items-center flex-nowrap overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-transparent">
-              {([1, 2, 3, 4, 5, 6] as const).map((i) => (
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <div className="flex flex-wrap gap-6 justify-center items-center">
+              {(['partnerLINE', 'partnerOpenAI', 'partnerSupabase', 'partnerVercel'] as const).map((key) => (
                 <div
-                  key={i}
-                  className="flex-shrink-0 w-28 h-14 rounded-lg bg-slate-700/60 flex items-center justify-center text-slate-400 text-sm font-medium"
+                  key={key}
+                  className="px-5 py-2.5 rounded-lg bg-slate-700/60 text-slate-300 text-sm font-medium"
                   aria-hidden
                 >
-                  {t(`logo${i}` as 'logo1')}
+                  {t(key)}
                 </div>
               ))}
             </div>
           </div>
         </section>
 
-        {(locale === 'en' || totalUsers > 0 || totalConversations > 0) ? (
-          <section className="border-y border-white/5 bg-slate-900/40 py-8">
+        <section className="border-y border-white/5 bg-slate-900/40 py-8">
             <div className="mx-auto max-w-6xl px-4 sm:px-6">
               <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
                 {stats.map((s) => (
@@ -191,13 +155,6 @@ export default async function Home({ params }: Props) {
               </div>
             </div>
           </section>
-        ) : (
-          <section className="border-y border-white/5 bg-slate-900/40 py-6">
-            <div className="mx-auto max-w-6xl px-4 sm:px-6 text-center">
-              <p className="text-sm text-slate-400">{t('betaBanner')}</p>
-            </div>
-          </section>
-        )}
 
         <section id="features" className="mx-auto max-w-6xl px-4 py-16 sm:px-6 md:py-20">
           <div className="text-center">
@@ -300,10 +257,10 @@ export default async function Home({ params }: Props) {
           </div>
           <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { name: locale === 'zh-TW' ? '免費方案' : 'Free', price: 'NT$ 0', promotion: null, periodKey: 'perMonth', desc: t('planFreeDesc'), ctaKey: 'ctaFreeStartShort', primary: false, href: '/login?signup=true' },
-              { name: locale === 'zh-TW' ? '入門方案' : 'Starter', price: 'NT$ 799', promotion: 'NT$ 599', periodKey: 'perMonth', desc: t('planStarterDesc'), ctaKey: 'ctaFreeStartShort', primary: true, href: '/login?signup=true' },
-              { name: 'Pro', price: 'NT$ 1,899', promotion: 'NT$ 1,399', periodKey: 'perMonth', desc: t('planProDesc'), ctaKey: 'ctaFreeStartShort', primary: false, href: '/login?signup=true' },
-              { name: locale === 'zh-TW' ? '企業方案' : 'Business', price: 'NT$ 5,299', promotion: 'NT$ 3,999', periodKey: 'perMonth', desc: t('planBusinessDesc'), ctaKey: 'ctaContactUs', primary: false, href: 'mailto:support@customeraipro.com' },
+              { name: locale === 'zh-TW' ? '免費方案' : 'Free', price: locale === 'zh-TW' ? 'NT$ 0' : '$0', promotion: null, periodKey: 'perMonth', desc: t('planFreeDesc'), ctaKey: 'ctaFreeStartShort', primary: false, href: '/login?signup=true' },
+              { name: locale === 'zh-TW' ? '入門方案' : 'Starter', price: locale === 'zh-TW' ? 'NT$ 799' : '$24', promotion: null, periodKey: 'perMonth', desc: t('planStarterDesc'), ctaKey: 'ctaFreeStartShort', primary: true, href: '/login?signup=true' },
+              { name: locale === 'zh-TW' ? '專業方案' : 'Pro', price: locale === 'zh-TW' ? 'NT$ 1,899' : '$60', promotion: null, periodKey: 'perMonth', desc: t('planProDesc'), ctaKey: 'ctaFreeStartShort', primary: false, href: '/login?signup=true' },
+              { name: locale === 'zh-TW' ? '企業方案' : 'Business', price: locale === 'zh-TW' ? 'NT$ 5,299' : '$149', promotion: null, periodKey: 'perMonth', desc: t('planBusinessDesc'), ctaKey: 'ctaContactUs', primary: false, href: 'mailto:support@customeraipro.com' },
             ].map((plan) => (
               <div
                 key={plan.name}

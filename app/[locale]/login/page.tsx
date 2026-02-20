@@ -1,20 +1,29 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useRouter } from '@/i18n/navigation';
+import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { createClient } from '@/lib/supabase/client';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const t = useTranslations('login');
   const tCommon = useTranslations('common');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get('signup') === 'true') {
+      setIsSignUp(true);
+    }
+  }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -25,6 +34,11 @@ export default function LoginPage() {
       const supabase = createClient();
 
       if (isSignUp) {
+          if (password !== confirmPassword) {
+            setError(t('errorPasswordMismatch'));
+            setLoading(false);
+            return;
+          }
         const { error: signUpError } = await supabase.auth.signUp({
           email,
           password,
@@ -61,7 +75,7 @@ export default function LoginPage() {
       <header className="border-b border-gray-200 bg-white">
         <nav className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
           <Link href="/" className="text-xl font-bold text-indigo-600">
-            CustomerAIPro
+            CustomerAI Pro
           </Link>
           <Link
             href="/"
@@ -124,7 +138,30 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
+              {!isSignUp && (
+                <p className="mt-2 text-right">
+                  <Link href="/forgot-password" className="text-sm text-indigo-600 hover:text-indigo-500">
+                    {t('forgotPassword')}
+                  </Link>
+                </p>
+              )}
             </div>
+            {isSignUp && (
+              <div className="mt-4">
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+                  {t('confirmPassword')}
+                </label>
+                <input
+                  id="confirmPassword"
+                  type="password"
+                  autoComplete="new-password"
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+            )}
             <button
               type="submit"
               data-testid="login-submit"

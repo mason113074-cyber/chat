@@ -23,6 +23,11 @@
 # production
 /build
 
+# memory bank MCP data (remove this line if you want to commit it)
+memory-bank/
+# knowledge graph memory MCP (remove to commit)
+.mcp-knowledge-graph-memory.jsonl
+
 # misc
 .DS_Store
 *.pem

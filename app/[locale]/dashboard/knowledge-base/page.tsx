@@ -472,6 +472,7 @@ export default function KnowledgeBasePage() {
               <div className="mt-4 space-y-3">
                 <input
                   type="text"
+                  data-testid="kb-test-question"
                   value={testQuestion}
                   onChange={(e) => setTestQuestion(e.target.value)}
                   placeholder={t('testPlaceholder')}

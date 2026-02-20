@@ -4,7 +4,7 @@ export default function DashboardLoading() {
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900">總覽</h1>
-      <p className="mt-1 text-gray-600">歡迎使用 CustomerAIPro 後台</p>
+      <p className="mt-1 text-gray-600">歡迎使用 CustomerAI Pro 後台</p>
 
       {/* Statistics Cards Skeleton */}
       <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">

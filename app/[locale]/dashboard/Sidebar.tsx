@@ -31,7 +31,7 @@ export function Sidebar({ userEmail }: SidebarProps) {
     <>
       {/* Mobile menu button */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-        <span className="text-lg font-bold text-indigo-600">CustomerAIPro</span>
+        <span className="text-lg font-bold text-indigo-600">CustomerAI Pro</span>
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
           className="text-gray-600 hover:text-gray-900 text-2xl"
@@ -66,7 +66,7 @@ export function Sidebar({ userEmail }: SidebarProps) {
               className="text-xl font-bold text-indigo-600"
               onClick={() => setMobileOpen(false)}
             >
-              CustomerAIPro
+              CustomerAI Pro
             </Link>
           </div>
 

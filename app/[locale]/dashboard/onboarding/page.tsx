@@ -295,7 +295,7 @@ export default function OnboardingPage() {
         {step === 1 && (
           <div className="transition-opacity duration-300">
             <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">
-              歡迎使用 CustomerAIPro！
+              歡迎使用 CustomerAI Pro！
             </h1>
             <p className="mt-2 text-gray-600">
               只需 3 分鐘，完成設定就能開始用 AI 回覆客戶

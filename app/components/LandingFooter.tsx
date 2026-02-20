@@ -23,7 +23,6 @@ export function LandingFooter() {
             </ul>
             <h3 className="mt-6 text-sm font-semibold uppercase tracking-wide text-white">{t('footerCompany')}</h3>
             <ul className="mt-4 space-y-2">
-              <li><Link href="/#about" className="text-sm text-slate-300 hover:text-white">{t('footerAbout')}</Link></li>
               <li><a href="mailto:support@customeraipro.com" className="text-sm text-slate-300 hover:text-white">{t('footerContact')}</a></li>
             </ul>
             <h3 className="mt-6 text-sm font-semibold uppercase tracking-wide text-white">{t('footerLegal')}</h3>
@@ -31,9 +30,6 @@ export function LandingFooter() {
               <li><Link href="/terms" className="text-sm text-slate-300 hover:text-white">{t('footerTerms')}</Link></li>
               <li><Link href="/privacy" className="text-sm text-slate-300 hover:text-white">{t('footerPrivacy')}</Link></li>
             </ul>
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-white">{t('footerCommunity')}</h3>
           </div>
         </div>
       </div>
