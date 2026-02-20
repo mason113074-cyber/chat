@@ -790,7 +790,6 @@
     },
     "articleCount": "{count} 篇文章",
     "articles": {
-      "quickStart": "快速入門指南",
       "firstChat": "發送第一則對話",
       "lineSetupGuide": "如何設定 LINE Channel",
       "webhook": "Webhook 設定",

@@ -123,7 +123,7 @@ export default function HelpCenterPage() {
           <h2 className="text-2xl font-bold text-gray-900 mb-6">{t('resources.title')}</h2>
           <div className="grid md:grid-cols-3 gap-6">
             <Link
-              href="/help/getting-started/quick-start"
+              href="/help/getting-started/first-chat"
               className="flex items-start gap-4 p-4 rounded-lg hover:bg-gray-50 transition-colors"
             >
               <span className="text-2xl" aria-hidden>🎬</span>

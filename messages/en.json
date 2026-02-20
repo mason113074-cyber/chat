@@ -791,7 +791,6 @@
     },
     "articleCount": "{count} articles",
     "articles": {
-      "quickStart": "Quick start guide",
       "firstChat": "Send your first chat",
       "lineSetupGuide": "How to set up LINE Channel",
       "webhook": "Webhook setup",

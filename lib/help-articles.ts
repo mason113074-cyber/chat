@@ -28,7 +28,6 @@ export type ArticleContent = {
 
 const ARTICLE_LIST: Record<HelpCategorySlug, ArticleMeta[]> = {
   'getting-started': [
-    { slug: 'quick-start', titleKey: 'articles.quickStart', readTime: 3, lastUpdated: '2026-02-15' },
     { slug: 'first-chat', titleKey: 'articles.firstChat', readTime: 2, lastUpdated: '2026-02-14' },
   ],
   'line-integration': [
@@ -44,26 +43,6 @@ const ARTICLE_LIST: Record<HelpCategorySlug, ArticleMeta[]> = {
 };
 
 const ARTICLE_CONTENT: Record<string, ArticleContent> = {
-  'getting-started/quick-start': {
-    categorySlug: 'getting-started',
-    categoryNameKey: 'categories.gettingStarted.title',
-    titleKey: 'articles.quickStart',
-    readTime: 3,
-    lastUpdated: '2026-02-15',
-    contentHtml: `
-      <h2>Quick start guide</h2>
-      <p>Get your AI customer service up and running in minutes.</p>
-      <h3>Step 1: Create your account</h3>
-      <p>Sign up at CustomerAIPro and verify your email.</p>
-      <h3>Step 2: Connect LINE (optional)</h3>
-      <p>In Dashboard → Settings → LINE, add your Channel Secret and Access Token from LINE Developers Console.</p>
-      <h3>Step 3: Add knowledge base</h3>
-      <p>Go to Knowledge Base and upload your FAQ or product info (txt, pdf, or paste text).</p>
-      <h3>Step 4: Test the chat</h3>
-      <p>Use the test chat in Settings or send a message to your LINE bot to see AI replies.</p>
-      <p><a href="/help">Back to Help Center</a></p>
-    `,
-  },
   'getting-started/first-chat': {
     categorySlug: 'getting-started',
     categoryNameKey: 'categories.gettingStarted.title',
