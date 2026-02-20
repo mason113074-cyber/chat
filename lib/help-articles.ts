@@ -1,3 +1,15 @@
+/** Single source of truth: only these 6 category slugs are valid. */
+export const HELP_CATEGORIES = [
+  'getting-started',
+  'line-integration',
+  'knowledge-base',
+  'settings',
+  'billing',
+  'analytics',
+] as const;
+
+export type HelpCategorySlug = (typeof HELP_CATEGORIES)[number];
+
 export type ArticleMeta = {
   slug: string;
   titleKey: string;
@@ -14,7 +26,7 @@ export type ArticleContent = {
   contentHtml: string;
 };
 
-const ARTICLE_LIST: Record<string, ArticleMeta[]> = {
+const ARTICLE_LIST: Record<HelpCategorySlug, ArticleMeta[]> = {
   'getting-started': [
     { slug: 'quick-start', titleKey: 'articles.quickStart', readTime: 3, lastUpdated: '2026-02-15' },
     { slug: 'first-chat', titleKey: 'articles.firstChat', readTime: 2, lastUpdated: '2026-02-14' },
@@ -108,7 +120,7 @@ const ARTICLE_CONTENT: Record<string, ArticleContent> = {
       </ol>
       <h3>步驟 6: 設定 Webhook URL</h3>
       <p>在 LINE Developers Console 的 Messaging API 分頁，將 Webhook URL 設為：<code>https://www.customeraipro.com/api/webhook/line</code>，並開啟「Use webhook」。</p>
-      <p>需要協助？請查看 <a href="/help">幫助中心</a> 或 <a href="/demo">產品導覽</a>。</p>
+      <p>需要協助？請查看 <a href="/help">幫助中心</a>。</p>
     `,
   },
   'line-integration/webhook': {
@@ -147,17 +159,34 @@ const ARTICLE_CONTENT: Record<string, ArticleContent> = {
   },
 };
 
+/** Returns true if slug is a valid help category. */
+export function getCategoryBySlug(slug: string): slug is HelpCategorySlug {
+  return HELP_CATEGORIES.includes(slug as HelpCategorySlug);
+}
+
+/** Returns articles for a category (empty if invalid slug). */
+export function getArticlesByCategory(categorySlug: string): ArticleMeta[] {
+  return getCategoryBySlug(categorySlug) ? ARTICLE_LIST[categorySlug] ?? [] : [];
+}
+
+/** Alias for getArticlesByCategory. */
 export function getCategoryArticleList(categorySlug: string): ArticleMeta[] {
-  return ARTICLE_LIST[categorySlug] ?? [];
+  return getArticlesByCategory(categorySlug);
+}
+
+/** Returns article content or null if not found. */
+export function getArticle(categorySlug: string, articleSlug: string): ArticleContent | null {
+  return getArticleContent(categorySlug, articleSlug);
 }
 
 export function getArticleContent(categorySlug: string, articleSlug: string): ArticleContent | null {
+  if (!getCategoryBySlug(categorySlug)) return null;
   const key = `${categorySlug}/${articleSlug}`;
   return ARTICLE_CONTENT[key] ?? null;
 }
 
-export function getAllCategorySlugs(): string[] {
-  return Object.keys(ARTICLE_LIST);
+export function getAllCategorySlugs(): HelpCategorySlug[] {
+  return [...HELP_CATEGORIES];
 }
 
 export type SearchArticle = { categorySlug: string; slug: string; titleKey: string };

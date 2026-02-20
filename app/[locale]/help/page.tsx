@@ -123,7 +123,7 @@ export default function HelpCenterPage() {
           <h2 className="text-2xl font-bold text-gray-900 mb-6">{t('resources.title')}</h2>
           <div className="grid md:grid-cols-3 gap-6">
             <Link
-              href="/demo"
+              href="/help/getting-started/quick-start"
               className="flex items-start gap-4 p-4 rounded-lg hover:bg-gray-50 transition-colors"
             >
               <span className="text-2xl" aria-hidden>🎬</span>
@@ -132,10 +132,8 @@ export default function HelpCenterPage() {
                 <p className="text-sm text-gray-600">{t('resources.demo.description')}</p>
               </div>
             </Link>
-            <a
+            <Link
               href="/docs"
-              target="_blank"
-              rel="noopener noreferrer"
               className="flex items-start gap-4 p-4 rounded-lg hover:bg-gray-50 transition-colors"
             >
               <span className="text-2xl" aria-hidden>📄</span>
@@ -143,8 +141,8 @@ export default function HelpCenterPage() {
                 <h3 className="font-medium text-gray-900 mb-1">{t('resources.docs.title')}</h3>
                 <p className="text-sm text-gray-600">{t('resources.docs.description')}</p>
               </div>
-            </a>
-            <a
+            </Link>
+            <Link
               href="/support"
               className="flex items-start gap-4 p-4 rounded-lg hover:bg-gray-50 transition-colors"
             >
@@ -153,7 +151,7 @@ export default function HelpCenterPage() {
                 <h3 className="font-medium text-gray-900 mb-1">{t('resources.support.title')}</h3>
                 <p className="text-sm text-gray-600">{t('resources.support.description')}</p>
               </div>
-            </a>
+            </Link>
           </div>
         </div>
       </div>

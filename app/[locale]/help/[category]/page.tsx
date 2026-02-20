@@ -2,14 +2,14 @@ import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/navigation';
 import { notFound } from 'next/navigation';
-import { getCategoryArticleList, getAllCategorySlugs } from '@/lib/help-articles';
+import { getCategoryBySlug, getArticlesByCategory, getAllCategorySlugs } from '@/lib/help-articles';
 import { LandingNavbar } from '@/app/components/LandingNavbar';
 import { LandingFooter } from '@/app/components/LandingFooter';
 import { routing } from '@/i18n/routing';
 
 type Props = { params: Promise<{ locale: string; category: string }> };
 
-const CATEGORY_SLUG_TO_KEY: Record<string, string> = {
+const CATEGORY_TITLE_KEYS: Record<string, string> = {
   'getting-started': 'categories.gettingStarted.title',
   'line-integration': 'categories.lineIntegration.title',
   'knowledge-base': 'categories.knowledgeBase.title',
@@ -25,10 +25,9 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { category } = await params;
-  const key = CATEGORY_SLUG_TO_KEY[category];
-  if (!key) return { title: 'Help' };
+  if (!getCategoryBySlug(category)) return { title: 'Help' };
   const t = await getTranslations('help');
-  const title = t(key);
+  const title = t(CATEGORY_TITLE_KEYS[category]);
   return { title: `${title} | Help` };
 }
 
@@ -36,9 +35,10 @@ export default async function HelpCategoryPage({ params }: Props) {
   const { locale, category } = await params;
   setRequestLocale(locale);
 
-  const articles = getCategoryArticleList(category);
-  const categoryTitleKey = CATEGORY_SLUG_TO_KEY[category];
-  if (!categoryTitleKey) notFound();
+  if (!getCategoryBySlug(category)) notFound();
+
+  const articles = getArticlesByCategory(category);
+  const categoryTitleKey = CATEGORY_TITLE_KEYS[category];
 
   const t = await getTranslations('help');
 

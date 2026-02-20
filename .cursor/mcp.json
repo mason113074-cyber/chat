@@ -2,8 +2,20 @@
   "mcpServers": {
     "vercel": { "url": "https://mcp.vercel.com" },
     "supabase": { "url": "https://mcp.supabase.com/mcp" },
-    "operative": {
-      "command": "operative-mcp"
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "c:/dev/saas/chat"]
+    },
+    "memory-bank-mcp": {
+      "command": "npx",
+      "args": ["-y", "@movibe/memory-bank-mcp", "--path", "c:/dev/saas/chat", "--folder", "memory-bank"]
+    },
+    "knowledge-graph-memory": {
+      "command": "npx",
+      "args": ["-y", "@itseasy21/mcp-knowledge-graph"],
+      "env": {
+        "MEMORY_FILE_PATH": "c:/dev/saas/chat/.mcp-knowledge-graph-memory.jsonl"
+      }
     }
   }
 }
