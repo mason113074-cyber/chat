@@ -567,6 +567,21 @@
     "faq5Question": "資料安全嗎？",
     "faq5Answer": "我們採用 SSL/TLS 加密傳輸、密碼加密儲存，並使用 Row Level Security 隔離租戶資料。詳見隱私政策。",
     "faq6Question": "如何取消訂閱？",
-    "faq6Answer": "您可於後台「方案與計費」中隨時取消訂閱。取消後仍可使用至當期結束，不會再扣款。"
+    "faq6Answer": "您可於後台「方案與計費」中隨時取消訂閱。取消後仍可使用至當期結束，不會再扣款。",
+    "planStarterDesc": "1,000 次 AI 對話/月，200 條知識庫",
+    "planProDesc": "5,000 次 AI 對話/月，1,000 條知識庫",
+    "planBusinessDesc": "20,000 次 AI 對話/月，5,000 條知識庫"
+  },
+  "pricing": {
+    "pageTitle": "方案與定價",
+    "pageSubtitle": "選擇適合您團隊的方案，隨時可升級或調整。",
+    "badgePopular": "最受歡迎",
+    "badgePromotion": "早鳥優惠",
+    "promotionNote": "首月優惠 · 第二個月起 NT$ {regularPrice}/月",
+    "ctaFreeStart": "免費開始",
+    "ctaTryNow": "立即試用",
+    "perMonth": "/月",
+    "metaTitle": "CustomerAI Pro 定價方案 | NT$799 起",
+    "metaDescription": "靈活的 AI 客服定價方案，入門版 NT$799/月，首月優惠 NT$599。支援 1,000 次 AI 對話，LINE 自動回覆。"
   }
 }

@@ -197,10 +197,10 @@ export default async function Home({ params }: Props) {
           </div>
           <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { name: 'Free', price: 'NT$ 0', periodKey: 'perMonth', desc: t('planFreeDesc'), ctaKey: 'ctaFreeStartShort', primary: false, href: '/login?signup=true' },
-              { name: 'Basic', price: locale === 'en' ? t('planBasicPriceDual') : 'NT$ 990', periodKey: locale === 'en' ? '' : 'perMonth', desc: t('planBasicDesc'), ctaKey: 'ctaFreeStartShort', primary: false, href: '/login?signup=true' },
-              { name: 'Pro', price: 'NT$ 2,990', periodKey: 'perMonth', desc: t('planProDesc'), ctaKey: 'ctaFreeStartShort', primary: true, href: '/login?signup=true' },
-              { name: 'Enterprise', price: t('planEnterprisePrice'), periodKey: '', desc: t('planEnterpriseDesc'), ctaKey: 'ctaContactUs', primary: false, href: 'mailto:support@customeraipro.com' },
+              { name: locale === 'zh-TW' ? '免費方案' : 'Free', price: 'NT$ 0', promotion: null, periodKey: 'perMonth', desc: t('planFreeDesc'), ctaKey: 'ctaFreeStartShort', primary: false, href: '/login?signup=true' },
+              { name: locale === 'zh-TW' ? '入門方案' : 'Starter', price: 'NT$ 799', promotion: 'NT$ 599', periodKey: 'perMonth', desc: t('planStarterDesc'), ctaKey: 'ctaFreeStartShort', primary: true, href: '/login?signup=true' },
+              { name: 'Pro', price: 'NT$ 1,899', promotion: 'NT$ 1,399', periodKey: 'perMonth', desc: t('planProDesc'), ctaKey: 'ctaFreeStartShort', primary: false, href: '/login?signup=true' },
+              { name: locale === 'zh-TW' ? '企業方案' : 'Business', price: 'NT$ 5,299', promotion: 'NT$ 3,999', periodKey: 'perMonth', desc: t('planBusinessDesc'), ctaKey: 'ctaContactUs', primary: false, href: 'mailto:support@customeraipro.com' },
             ].map((plan) => (
               <div
                 key={plan.name}
@@ -211,8 +211,13 @@ export default async function Home({ params }: Props) {
                 }`}
               >
                 <h3 className="text-lg font-bold text-white">{plan.name}</h3>
-                <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-3xl font-bold text-white">{plan.price}</span>
+                <div className="mt-4 flex flex-wrap items-baseline gap-1">
+                  {plan.promotion && (
+                    <span className="text-slate-400 line-through text-lg">{plan.price}</span>
+                  )}
+                  <span className="text-3xl font-bold text-white">
+                    {plan.promotion ?? plan.price}
+                  </span>
                   {plan.periodKey && <span className="text-slate-400">{t(plan.periodKey)}</span>}
                 </div>
                 {plan.desc && <p className="mt-2 text-sm text-slate-400">{plan.desc}</p>}

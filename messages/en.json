@@ -568,6 +568,21 @@
     "faq5Answer": "We use SSL/TLS encryption, encrypted password storage, and Row Level Security to isolate tenant data. See our Privacy Policy for details.",
     "faq6Question": "How do I cancel my subscription?",
     "faq6Answer": "You can cancel anytime in the dashboard under Plans & Billing. Access continues until the end of the current period; no further charges.",
-    "planBasicPriceDual": "NT$ 990 / US$ 31 per month"
+    "planBasicPriceDual": "NT$ 990 / US$ 31 per month",
+    "planStarterDesc": "1,000 AI conversations/month, 200 knowledge base items",
+    "planProDesc": "5,000 AI conversations/month, 1,000 knowledge base items",
+    "planBusinessDesc": "20,000 AI conversations/month, 5,000 knowledge base items"
+  },
+  "pricing": {
+    "pageTitle": "Plans & Pricing",
+    "pageSubtitle": "Choose the plan that fits your team. Upgrade or change anytime.",
+    "badgePopular": "Most Popular",
+    "badgePromotion": "Early Bird Offer",
+    "promotionNote": "First month offer · Then NT$ {regularPrice}/mo",
+    "ctaFreeStart": "Get started free",
+    "ctaTryNow": "Start trial",
+    "perMonth": "/mo",
+    "metaTitle": "CustomerAI Pro Pricing | From NT$799/mo",
+    "metaDescription": "Flexible AI customer service pricing. Starter NT$799/mo, first month NT$599. 1,000 AI conversations, LINE auto-reply."
   }
 }
