@@ -693,6 +693,118 @@
       "pricing": "View pricing"
     }
   },
+  "onboarding": {
+    "progress": "Step {current} of {total}",
+    "navigation": {
+      "previous": "Previous",
+      "next": "Next",
+      "skip": "Set up later",
+      "finish": "Finish setup"
+    },
+    "welcome": {
+      "title": "Welcome to CustomerAIPro",
+      "description": "Let's complete the initial setup in about 10 minutes",
+      "greeting": "Hello!",
+      "intro": "We'll guide you through these steps:",
+      "steps": {
+        "step1": "Connect LINE Channel",
+        "step2": "Upload knowledge base",
+        "step3": "Test AI chat",
+        "step4": "Start using"
+      },
+      "timeEstimate": "Estimated time: 10 minutes"
+    },
+    "lineSetup": {
+      "title": "Connect LINE Channel",
+      "description": "Connect your LINE Official Account to CustomerAIPro",
+      "detailedGuide": "View detailed setup steps",
+      "guide": {
+        "step1": { "title": "Go to LINE Developers Console", "description": "Open developers.line.biz and sign in" },
+        "step2": { "title": "Create or select Provider", "description": "Provider is the container for your channels" },
+        "step3": { "title": "Create Messaging API Channel", "description": "Choose Messaging API and fill in basic info" },
+        "step4": { "title": "Get Channel Secret and Access Token", "description": "Find these in Basic Settings and Messaging API tabs" },
+        "step5": { "title": "Return to CustomerAIPro Settings", "description": "Paste credentials and test connection" }
+      },
+      "openLineDevelopers": "Open LINE Developers",
+      "goToSettings": "Go to Settings",
+      "skipForNow": "Set up later"
+    },
+    "knowledgeBase": {
+      "title": "Upload knowledge base",
+      "description": "Provide business info and FAQs for the AI",
+      "templates": {
+        "faq": { "title": "FAQ template", "description": "20+ sample customer service questions" },
+        "productInfo": { "title": "Product info template", "description": "Specs, pricing, features" },
+        "policies": { "title": "Policies template", "description": "Returns, privacy, terms" }
+      },
+      "downloadTemplate": "Download template",
+      "uploadInstructions": {
+        "title": "Upload notes",
+        "format": "Formats: .txt, .pdf, .docx, .csv",
+        "size": "Max file size: 10MB",
+        "content": "Suggested: FAQ, product info, policies"
+      },
+      "goToKnowledgeBase": "Go to Knowledge Base",
+      "skipForNow": "Upload later"
+    },
+    "testChat": {
+      "title": "Test AI chat",
+      "description": "Send a test message and see how the AI replies",
+      "suggestions": {
+        "title": "Try these questions:",
+        "examples": ["What are your business hours?", "How do I return an item?", "What are the product specs?", "How much is shipping?"]
+      },
+      "emptyState": "No messages yet. Send your first message!",
+      "inputPlaceholder": "Type a message...",
+      "send": "Send",
+      "error": "Sorry, something went wrong. Please try again."
+    },
+    "complete": {
+      "title": "All set!",
+      "description": "You've completed the basic setup",
+      "congratulations": "You're all set!",
+      "message": "You're ready to use CustomerAIPro for 24/7 AI customer service.",
+      "nextSteps": {
+        "customize": { "icon": "Customize", "title": "Customize replies", "description": "Adjust AI tone and style" },
+        "analytics": { "icon": "Analytics", "title": "View analytics", "description": "Track volume and satisfaction" },
+        "invite": { "icon": "Team", "title": "Invite team", "description": "Manage support together" }
+      }
+    }
+  },
+  "help": {
+    "hero": { "title": "How can we help?", "subtitle": "Search articles, watch tutorials, or contact support" },
+    "search": { "placeholder": "Search help articles...", "popularTopics": ["LINE setup", "Knowledge base", "Customize AI", "Billing", "API"] },
+    "categories": {
+      "gettingStarted": { "title": "Getting started", "description": "Setup guides and basics" },
+      "lineIntegration": { "title": "LINE integration", "description": "Connect and configure LINE Channel" },
+      "knowledgeBase": { "title": "Knowledge base", "description": "Upload, manage, and optimize" },
+      "settings": { "title": "Settings", "description": "AI style and system settings" },
+      "billing": { "title": "Billing & plans", "description": "Subscriptions, payment, invoices" },
+      "analytics": { "title": "Analytics", "description": "Reports and metrics" }
+    },
+    "articleCount": "{count} articles",
+    "articles": {
+      "quickStart": "Quick start guide",
+      "firstChat": "Send your first chat",
+      "lineSetupGuide": "How to set up LINE Channel",
+      "webhook": "Webhook setup",
+      "uploadFaq": "Upload FAQ to knowledge base"
+    },
+    "resources": {
+      "title": "Other resources",
+      "demo": { "title": "Product tour", "description": "Quick 3-minute overview" },
+      "docs": { "title": "API docs", "description": "Developer integration guide" },
+      "support": { "title": "Contact support", "description": "We're here to help" }
+    },
+    "contextual": {
+      "lineChannelSecret": {
+        "title": "What is Channel Secret?",
+        "description": "Channel Secret verifies webhook requests from LINE. Find it in LINE Developers Console under Basic Settings.",
+        "link": "/help/line-integration/line-setup-guide",
+        "linkText": "View full guide"
+      }
+    }
+  },
   "pricing": {
     "pageTitle": "Plans & Pricing",
     "pageSubtitle": "Choose the plan that fits your team. Upgrade or change anytime.",

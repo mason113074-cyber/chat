@@ -5,6 +5,7 @@ import { useTranslations, useLocale } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { useToast } from '@/components/Toast';
 import { QuickReplies } from '@/app/components/QuickReplies';
+import { ContextualHelp } from '@/components/help/ContextualHelp';
 import type { QuickReply } from '@/lib/types';
 
 /** 已知的繁中預設快捷回覆文案（含舊版），用於載入時若介面為英文則改顯示當前語系翻譯 */
@@ -815,7 +816,10 @@ export default function SettingsPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Channel Secret</label>
+                <div className="flex items-center gap-2">
+                  <label className="block text-sm font-medium text-gray-700">Channel Secret</label>
+                  <ContextualHelp topic="lineChannelSecret" position="bottom" />
+                </div>
                 <input
                   type="password"
                   value={lineChannelSecret}

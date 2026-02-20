@@ -692,6 +692,118 @@
       "pricing": "查看定價"
     }
   },
+  "onboarding": {
+    "progress": "進度: {current} / {total}",
+    "navigation": {
+      "previous": "上一步",
+      "next": "下一步",
+      "skip": "稍後設定",
+      "finish": "完成設定"
+    },
+    "welcome": {
+      "title": "歡迎使用 CustomerAIPro",
+      "description": "讓我們花 10 分鐘完成初始設定",
+      "greeting": "您好！",
+      "intro": "我們將引導您完成以下設定步驟：",
+      "steps": {
+        "step1": "連接 LINE Channel",
+        "step2": "上傳知識庫",
+        "step3": "測試 AI 對話",
+        "step4": "開始使用"
+      },
+      "timeEstimate": "預計需要 10 分鐘"
+    },
+    "lineSetup": {
+      "title": "連接 LINE Channel",
+      "description": "將您的 LINE 官方帳號連接到 CustomerAIPro",
+      "detailedGuide": "查看詳細設定步驟",
+      "guide": {
+        "step1": { "title": "前往 LINE Developers Console", "description": "開啟瀏覽器訪問 developers.line.biz 並登入" },
+        "step2": { "title": "創建或選擇 Provider", "description": "Provider 是管理多個 Channel 的容器" },
+        "step3": { "title": "創建 Messaging API Channel", "description": "選擇 Messaging API 類型並填寫基本資訊" },
+        "step4": { "title": "取得 Channel Secret 和 Access Token", "description": "在 Basic Settings 和 Messaging API 分頁中找到這些憑證" },
+        "step5": { "title": "回到 CustomerAIPro 設定頁面", "description": "貼上憑證並測試連線" }
+      },
+      "openLineDevelopers": "開啟 LINE Developers",
+      "goToSettings": "前往設定頁面",
+      "skipForNow": "稍後再設定"
+    },
+    "knowledgeBase": {
+      "title": "上傳知識庫",
+      "description": "提供 AI 需要的業務資訊和常見問題",
+      "templates": {
+        "faq": { "title": "常見問題範本", "description": "包含 20+ 個常見客服問題範例" },
+        "productInfo": { "title": "產品資訊範本", "description": "產品規格、價格、功能說明" },
+        "policies": { "title": "政策條款範本", "description": "退換貨、隱私權、服務條款" }
+      },
+      "downloadTemplate": "下載範本",
+      "uploadInstructions": {
+        "title": "上傳須知",
+        "format": "支援格式: .txt, .pdf, .docx, .csv",
+        "size": "檔案大小: 最大 10MB",
+        "content": "建議內容: FAQ、產品資訊、政策說明"
+      },
+      "goToKnowledgeBase": "前往上傳知識庫",
+      "skipForNow": "稍後再上傳"
+    },
+    "testChat": {
+      "title": "測試 AI 對話",
+      "description": "發送測試訊息，看看 AI 如何回覆",
+      "suggestions": {
+        "title": "試試這些問題：",
+        "examples": ["你們的營業時間是？", "如何退換貨？", "產品規格是什麼？", "運費怎麼算？"]
+      },
+      "emptyState": "還沒有對話，發送第一則訊息試試吧！",
+      "inputPlaceholder": "輸入訊息...",
+      "send": "發送",
+      "error": "抱歉，發生錯誤，請稍後再試"
+    },
+    "complete": {
+      "title": "設定完成！",
+      "description": "恭喜！您已完成所有基礎設定",
+      "congratulations": "太棒了！",
+      "message": "您已經準備好開始使用 CustomerAIPro 為客戶提供 24/7 AI 智能客服了！",
+      "nextSteps": {
+        "customize": { "icon": "自訂", "title": "自訂回覆風格", "description": "調整 AI 的語氣和回覆方式" },
+        "analytics": { "icon": "分析", "title": "查看數據分析", "description": "追蹤對話量和客戶滿意度" },
+        "invite": { "icon": "團隊", "title": "邀請團隊成員", "description": "讓團隊一起管理客服系統" }
+      }
+    }
+  },
+  "help": {
+    "hero": { "title": "我們能幫您什麼？", "subtitle": "搜尋文章、觀看教學影片或聯繫客服" },
+    "search": { "placeholder": "搜尋幫助文章...", "popularTopics": ["LINE 設定", "知識庫上傳", "自訂 AI 回覆", "計費問題", "API 整合"] },
+    "categories": {
+      "gettingStarted": { "title": "快速入門", "description": "新手必看的設定指南和基礎教學" },
+      "lineIntegration": { "title": "LINE 整合", "description": "如何連接和設定 LINE Channel" },
+      "knowledgeBase": { "title": "知識庫管理", "description": "上傳、管理和優化您的知識庫" },
+      "settings": { "title": "設定與自訂", "description": "調整 AI 回覆風格和系統設定" },
+      "billing": { "title": "計費與方案", "description": "訂閱方案、付款和發票相關" },
+      "analytics": { "title": "數據分析", "description": "如何解讀和使用數據報表" }
+    },
+    "articleCount": "{count} 篇文章",
+    "articles": {
+      "quickStart": "快速入門指南",
+      "firstChat": "發送第一則對話",
+      "lineSetupGuide": "如何設定 LINE Channel",
+      "webhook": "Webhook 設定",
+      "uploadFaq": "上傳 FAQ 至知識庫"
+    },
+    "resources": {
+      "title": "其他資源",
+      "demo": { "title": "互動式產品導覽", "description": "3 分鐘快速了解所有功能" },
+      "docs": { "title": "API 文檔", "description": "開發者整合指南和 API 參考" },
+      "support": { "title": "聯繫客服", "description": "無法找到答案？我們隨時為您服務" }
+    },
+    "contextual": {
+      "lineChannelSecret": {
+        "title": "什麼是 Channel Secret？",
+        "description": "Channel Secret 用於驗證 LINE 發送給您的 Webhook 請求，確保安全性。您可以在 LINE Developers Console 的 Basic Settings 分頁中找到。",
+        "link": "/help/line-integration/line-setup-guide",
+        "linkText": "查看完整說明"
+      }
+    }
+  },
   "pricing": {
     "pageTitle": "方案與定價",
     "pageSubtitle": "選擇適合您團隊的方案，隨時可升級或調整。",
