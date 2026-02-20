@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('users')
-      .select('system_prompt, ai_model, store_name, quick_replies')
+      .select('system_prompt, ai_model, store_name, quick_replies, line_login_user_id, line_login_display_name, line_login_photo_url')
       .eq('id', user.id)
       .maybeSingle();
 
@@ -58,6 +58,9 @@ export async function GET(request: NextRequest) {
       aiModel: data?.ai_model ?? 'gpt-4o-mini',
       storeName: data?.store_name ?? null,
       quickReplies,
+      lineLoginBound: !!data?.line_login_user_id,
+      lineLoginDisplayName: data?.line_login_display_name ?? null,
+      lineLoginPhotoUrl: data?.line_login_photo_url ?? null,
     });
   } catch (error) {
     console.error('Settings GET API error:', error);

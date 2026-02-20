@@ -1,0 +1,20 @@
+---
+description: High-priority context — when working on architecture, Supabase RLS, billing, multi-tenant, or plan limits, read these first. Do not overwrite or contradict them.
+globs: ["**/api/**", "**/lib/**", "**/supabase/**", "**/plans.ts", "**/billing/**"]
+---
+
+# Memory Bank — 高優先級上下文
+
+涉及以下主題時，**務必先讀取**以下文件，並以其中決策為準，**不得覆蓋或破壞既有架構**：
+
+- **架構決策、租戶模型、計費權限邏輯**：`docs/memory-bank.md`
+- **節點關係、RLS 約束、依賴版本**：`docs/knowledge-graph-memory.md`
+
+適用情境包括但不限於：
+
+- 新增或修改 Supabase 表、RLS policy、migration
+- 實作或變更計費、方案、用量檢查、多租戶權限
+- 變更認證方式、Service Role 使用方式
+- 升級或替換核心依賴（Next.js、Supabase、plans 等）
+
+方案限制以 `lib/plans.ts` 與 `docs/memory-bank.md` 一致為準。

@@ -37,6 +37,9 @@
 | **LINE** | `LINE_CHANNEL_SECRET` | 用 LINE 時 | Webhook 驗簽 |
 | | `LINE_CHANNEL_ACCESS_TOKEN` | 用 LINE 時 | 發送訊息 |
 | | `LINE_OWNER_USER_ID` | 用 LINE 時 | 綁定後台擁有者 |
+| | `LINE_LOGIN_CHANNEL_ID` | 用 LINE 登入時 | LINE Login Channel ID（需在 LINE Developers 建立 Login channel） |
+| | `LINE_LOGIN_CHANNEL_SECRET` | 用 LINE 登入時 | LINE Login Channel Secret |
+| **站點（callback）** | `NEXT_PUBLIC_APP_URL` | 用 LINE 登入時 | 正式站請設為 https://www.customeraipro.com（OAuth callback 與登入後導向用） |
 | **OpenAI** | `OPENAI_API_KEY` | ✅ | AI 回覆 |
 | | `OPENAI_MONTHLY_BUDGET`、`OPENAI_TIMEOUT_MS` 等 | 選用 | 見 .env.example |
 | **Upstash Redis** | `UPSTASH_REDIS_REST_URL` | 選用 | 未設則記憶體 fallback |

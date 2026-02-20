@@ -88,6 +88,12 @@ export default function SettingsPage() {
   const [lineTestResult, setLineTestResult] = useState<'success' | 'error' | null>(null);
   const [lineTestError, setLineTestError] = useState<string | null>(null);
 
+  // LINE 登入綁定（用 LINE 登入 / 綁定 LINE）
+  const [lineLoginBound, setLineLoginBound] = useState(false);
+  const [lineLoginDisplayName, setLineLoginDisplayName] = useState<string | null>(null);
+  const [lineLoginPhotoUrl, setLineLoginPhotoUrl] = useState<string | null>(null);
+  const [lineUnbinding, setLineUnbinding] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
     setLoadError(null);
@@ -113,6 +119,9 @@ export default function SettingsPage() {
         if (loadedPrompt) setSystemPrompt(loadedPrompt);
         if (data.storeName != null) setStoreName(data.storeName || '');
         if (data.aiModel && AI_MODELS.some((m) => m.id === data.aiModel)) setAiModel(data.aiModel);
+        if (data.lineLoginBound != null) setLineLoginBound(data.lineLoginBound);
+        if (data.lineLoginDisplayName != null) setLineLoginDisplayName(data.lineLoginDisplayName);
+        if (data.lineLoginPhotoUrl != null) setLineLoginPhotoUrl(data.lineLoginPhotoUrl);
         if (Array.isArray(data.quickReplies) && data.quickReplies.length > 0) {
           let padded: QuickReply[] = [...data.quickReplies];
           while (padded.length < 5) padded.push({ id: `slot-${padded.length}`, text: '', enabled: true });
@@ -137,6 +146,13 @@ export default function SettingsPage() {
           }
         } catch {
           // LINE 設定讀取失敗不阻塞主設定載入
+        }
+        if (typeof window !== 'undefined' && !cancelled) {
+          const params = new URLSearchParams(window.location.search);
+          if (params.get('line_bind') === 'success') {
+            toast.show(t('lineLoginBindSuccess'), 'success');
+            window.history.replaceState({}, '', window.location.pathname);
+          }
         }
       } catch (error) {
         if (!cancelled) {
@@ -410,6 +426,56 @@ export default function SettingsPage() {
                   <span className="text-xs text-red-500" title={lineTestError}>{lineTestError}</span>
                 )}
               </span>
+            )}
+          </div>
+        </div>
+
+        {/* LINE 帳號綁定：用 LINE 登入 / 綁定 LINE */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900">{t('lineLoginBinding')}</h2>
+          <p className="mt-1 text-sm text-gray-600">{t('lineLoginBindingDesc')}</p>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            {lineLoginBound ? (
+              <>
+                {lineLoginPhotoUrl && (
+                  <img src={lineLoginPhotoUrl} alt="" className="h-10 w-10 rounded-full object-cover" />
+                )}
+                <span className="text-sm font-medium text-gray-700">
+                  {t('lineLoginBoundAs')} {lineLoginDisplayName || t('lineLoginBound')}
+                </span>
+                <button
+                  type="button"
+                  disabled={lineUnbinding}
+                  onClick={async () => {
+                    setLineUnbinding(true);
+                    try {
+                      const res = await fetch('/api/auth/line/unbind', { method: 'POST', credentials: 'include' });
+                      if (res.ok) {
+                        setLineLoginBound(false);
+                        setLineLoginDisplayName(null);
+                        setLineLoginPhotoUrl(null);
+                        toast.show(t('lineLoginUnbound'), 'success');
+                      } else {
+                        toast.show(t('lineLoginUnbindFailed'), 'error');
+                      }
+                    } catch {
+                      toast.show(t('lineLoginUnbindFailed'), 'error');
+                    } finally {
+                      setLineUnbinding(false);
+                    }
+                  }}
+                  className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  {lineUnbinding ? t('unbinding') : t('lineLoginUnbind')}
+                </button>
+              </>
+            ) : (
+              <a
+                href="/api/auth/line?action=bind"
+                className="inline-flex items-center gap-2 rounded-lg bg-[#06C755] px-4 py-2 text-sm font-medium text-white hover:bg-[#05b34a]"
+              >
+                <span>{t('lineLoginBindButton')}</span>
+              </a>
             )}
           </div>
         </div>

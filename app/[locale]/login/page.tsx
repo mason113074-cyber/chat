@@ -3,12 +3,13 @@
 import { useState, useEffect, Suspense } from 'react';
 import { Link, useRouter } from '@/i18n/navigation';
 import { useSearchParams } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { createClient } from '@/lib/supabase/client';
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const locale = useLocale();
   const t = useTranslations('login');
   const tCommon = useTranslations('common');
   const [email, setEmail] = useState('');
@@ -170,6 +171,17 @@ function LoginForm() {
             >
               {loading ? (isSignUp ? t('signingUp') : t('loggingIn')) : (isSignUp ? t('signUpButton') : t('loginButton'))}
             </button>
+            <div className="mt-4 flex items-center gap-3">
+              <span className="flex-1 border-t border-gray-200" />
+              <span className="text-xs text-gray-500">{locale === 'zh-TW' ? '或' : 'or'}</span>
+              <span className="flex-1 border-t border-gray-200" />
+            </div>
+            <a
+              href="/api/auth/line?action=login"
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white py-3 font-medium text-gray-700 hover:bg-gray-50"
+            >
+              {t('loginWithLine')}
+            </a>
           </form>
 
           <p className="mt-6 text-center text-sm text-gray-600">
