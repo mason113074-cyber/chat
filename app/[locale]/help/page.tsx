@@ -8,12 +8,12 @@ import { LandingFooter } from '@/app/components/LandingFooter';
 import { getAllArticlesForSearch } from '@/lib/help-articles';
 
 const CATEGORIES = [
-  { icon: '🚀', slug: 'getting-started', titleKey: 'categories.gettingStarted.title' as const, descKey: 'categories.gettingStarted.description' as const, articles: 8 },
-  { icon: '💬', slug: 'line-integration', titleKey: 'categories.lineIntegration.title' as const, descKey: 'categories.lineIntegration.description' as const, articles: 12 },
-  { icon: '🧠', slug: 'knowledge-base', titleKey: 'categories.knowledgeBase.title' as const, descKey: 'categories.knowledgeBase.description' as const, articles: 10 },
-  { icon: '⚙️', slug: 'settings', titleKey: 'categories.settings.title' as const, descKey: 'categories.settings.description' as const, articles: 15 },
-  { icon: '💳', slug: 'billing', titleKey: 'categories.billing.title' as const, descKey: 'categories.billing.description' as const, articles: 6 },
-  { icon: '📊', slug: 'analytics', titleKey: 'categories.analytics.title' as const, descKey: 'categories.analytics.description' as const, articles: 8 },
+  { icon: '🚀', slug: 'getting-started', titleKey: 'categories.gettingStarted.title' as const, descKey: 'categories.gettingStarted.description' as const, articles: 5 },
+  { icon: '💬', slug: 'line-integration', titleKey: 'categories.lineIntegration.title' as const, descKey: 'categories.lineIntegration.description' as const, articles: 6 },
+  { icon: '🧠', slug: 'knowledge-base', titleKey: 'categories.knowledgeBase.title' as const, descKey: 'categories.knowledgeBase.description' as const, articles: 5 },
+  { icon: '⚙️', slug: 'settings', titleKey: 'categories.settings.title' as const, descKey: 'categories.settings.description' as const, articles: 4 },
+  { icon: '💳', slug: 'billing', titleKey: 'categories.billing.title' as const, descKey: 'categories.billing.description' as const, articles: 3 },
+  { icon: '📊', slug: 'analytics', titleKey: 'categories.analytics.title' as const, descKey: 'categories.analytics.description' as const, articles: 3 },
 ] as const;
 
 const ALL_ARTICLES = getAllArticlesForSearch();
@@ -123,7 +123,7 @@ export default function HelpCenterPage() {
           <h2 className="text-2xl font-bold text-gray-900 mb-6">{t('resources.title')}</h2>
           <div className="grid md:grid-cols-3 gap-6">
             <Link
-              href="/help/getting-started/first-chat"
+              href="/help/getting-started/first-chat-test"
               className="flex items-start gap-4 p-4 rounded-lg hover:bg-gray-50 transition-colors"
             >
               <span className="text-2xl" aria-hidden>🎬</span>

@@ -109,7 +109,7 @@ export default async function Home({ params }: Props) {
                 {t('ctaFreeStart')}
               </Link>
               <Link
-                href="/help/getting-started/first-chat"
+                href="/help/getting-started/first-chat-test"
                 className="rounded-xl border border-white/20 px-8 py-4 text-base font-semibold text-white transition hover:-translate-y-0.5 hover:border-white/40 hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-950"
               >
                 {t('ctaDemo')}
