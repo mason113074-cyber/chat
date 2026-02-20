@@ -201,11 +201,41 @@ const ARTICLE_CONTENT: Record<string, ArticleContent> = {
     categoryNameKey: 'categories.lineIntegration.title',
     titleKey: 'articles.webhookSetup',
     readTime: 5,
-    lastUpdated: '2026-02-20',
+    lastUpdated: '2026-02-21',
     contentHtml: `
-      <h2>Webhook Configuration</h2>
-      <p>LINE sends events to your webhook URL. Use <code>https://www.customeraipro.com/api/webhook/line</code> in LINE Developers Console → Messaging API. Turn on "Use webhook" and disable "Auto-reply messages" so our AI handles replies.</p>
-      <p><a href="/help">Back to Help Center</a></p>
+      <h2>What is a Webhook?</h2>
+      <p>A webhook lets LINE send real-time messages to CustomerAIPro when customers message you. We identify your account using the Channel Secret and Access Token you configured.</p>
+      <h3>Webhook URL</h3>
+      <p><code>https://www.customeraipro.com/api/webhook/line</code></p>
+      <p><strong>Important</strong>: No trailing slash; use <code>https://</code> (not <code>http://</code>).</p>
+      <h3>Step-by-Step Setup</h3>
+      <ol>
+        <li>Go to <a href="https://developers.line.biz/" target="_blank" rel="noopener noreferrer">LINE Developers Console</a> → your Provider → Messaging API Channel.</li>
+        <li>Open the <strong>Messaging API</strong> tab and find <strong>Webhook settings</strong>.</li>
+        <li>Click <strong>Edit</strong>, paste the webhook URL above, then <strong>Update</strong>.</li>
+        <li>Turn <strong>Use webhook</strong> to ON.</li>
+        <li>Click <strong>Verify</strong>. Success means webhook is working.</li>
+      </ol>
+      <h3>Events We Handle</h3>
+      <table class="min-w-full border border-gray-200 my-4">
+        <thead><tr class="bg-gray-50"><th class="border px-2 py-1 text-left">Event</th><th class="border px-2 py-1 text-left">Action</th></tr></thead>
+        <tbody>
+          <tr><td class="border px-2 py-1">message</td><td class="border px-2 py-1">AI responds</td></tr>
+          <tr><td class="border px-2 py-1">follow</td><td class="border px-2 py-1">Welcome message</td></tr>
+          <tr><td class="border px-2 py-1">unfollow</td><td class="border px-2 py-1">Log only</td></tr>
+          <tr><td class="border px-2 py-1">postback</td><td class="border px-2 py-1">Rich Menu action</td></tr>
+        </tbody>
+      </table>
+      <h3>Troubleshooting</h3>
+      <ul>
+        <li><strong>401 Unauthorized</strong>: Re-enter Channel Secret and Access Token in CustomerAIPro Settings → LINE. Remove extra spaces.</li>
+        <li><strong>404 Not Found</strong>: Check URL is exact; no trailing slash.</li>
+        <li><strong>500 Error</strong>: Wait 2–3 minutes and verify again; ensure LINE setup is complete in CustomerAIPro.</li>
+      </ul>
+      <p><strong>Checklist</strong>: Webhook URL correct, Use webhook ON, verification success, LINE auto-reply OFF. Test with a real LINE account.</p>
+      <h3>Security</h3>
+      <p>We verify requests from LINE and do not store display names or profile pictures. Never share your Channel Secret.</p>
+      <p><a href="/help/line-integration/line-setup-guide">LINE Setup Guide</a> · <a href="/help/line-integration/auto-reply-vs-webhook">Auto-Reply vs Webhook</a> · <a href="/help">Back to Help Center</a></p>
     `,
   },
   'line-integration/rich-menu-setup': {
@@ -213,8 +243,36 @@ const ARTICLE_CONTENT: Record<string, ArticleContent> = {
     categoryNameKey: 'categories.lineIntegration.title',
     titleKey: 'articles.richMenuSetup',
     readTime: 7,
-    lastUpdated: '2026-02-20',
-    contentHtml: `<h2>LINE Rich Menu Setup</h2><p>Create a Rich Menu in LINE Official Account Manager. Recommended sizes: 2500×1686px or 2500×843px. Add shortcuts for common actions and a "Contact support" button.</p><p><a href="/help">Back to Help Center</a></p>`,
+    lastUpdated: '2026-02-21',
+    contentHtml: `
+      <h2>What is a Rich Menu?</h2>
+      <p>A Rich Menu is a customizable menu at the bottom of your LINE chat for quick actions: contact support, track order, FAQs, etc.</p>
+      <h3>Image Specifications</h3>
+      <ul>
+        <li><strong>Full</strong>: 2500×1686 px (6–12 buttons)</li>
+        <li><strong>Half</strong>: 2500×843 px (3–6 buttons)</li>
+        <li>Format: JPG or PNG, max 1 MB</li>
+      </ul>
+      <h3>Setup in LINE Official Account Manager</h3>
+      <p>Rich Menus are set in <a href="https://manager.line.biz/" target="_blank" rel="noopener noreferrer">LINE Official Account Manager</a>, not LINE Developers Console.</p>
+      <ol>
+        <li>Go to LINE Official Account Manager → your account → <strong>Rich menus</strong>.</li>
+        <li>Click <strong>Create</strong>, upload your image (correct dimensions).</li>
+        <li><strong>Define tap areas</strong>: Add action areas over each button. Choose <strong>Text</strong> (sends a message to the bot), <strong>URI</strong> (opens a link), or <strong>Postback</strong>.</li>
+        <li>Example: Button "Contact Support" → Action: Text → Message: "I need help from a human agent".</li>
+        <li>Set display conditions (e.g. Always). Save and set <strong>Published</strong> to ON.</li>
+      </ol>
+      <h3>Best Practices</h3>
+      <ul>
+        <li>Use icon + short label (max ~10 characters).</li>
+        <li>Put most-used actions in the top row.</li>
+        <li>4–6 buttons is ideal; test on real devices.</li>
+      </ul>
+      <h3>Troubleshooting</h3>
+      <p><strong>Not showing</strong>: Ensure Published is ON and display conditions include your test account. Only one Rich Menu can be active.</p>
+      <p><strong>Tap not working</strong>: Check tap area coordinates and action type (Text vs URI).</p>
+      <p><a href="/help/line-integration/message-types">LINE Message Types</a> · <a href="/help/settings/customize-ai-style">Customize AI Style</a> · <a href="/help">Back to Help Center</a></p>
+    `,
   },
   'line-integration/message-types': {
     categorySlug: 'line-integration',
@@ -258,8 +316,35 @@ const ARTICLE_CONTENT: Record<string, ArticleContent> = {
     categoryNameKey: 'categories.knowledgeBase.title',
     titleKey: 'articles.kbBestPractices',
     readTime: 8,
-    lastUpdated: '2026-02-20',
-    contentHtml: `<h2>Knowledge Base Best Practices</h2><p>Use full Q&A sentences and concrete details. Avoid vague answers. Structure content clearly and update it regularly for better AI accuracy.</p><p><a href="/help">Back to Help Center</a></p>`,
+    lastUpdated: '2026-02-21',
+    contentHtml: `
+      <h2>Why Knowledge Base Quality Matters</h2>
+      <p>Better knowledge base = better AI responses. Good KB can reach 90%+ accuracy; vague content drops to ~50%.</p>
+      <h3>The Golden Rule: Be Specific</h3>
+      <p><strong>Good example</strong>:</p>
+      <p>Q: 運費怎麼計算？<br>A: 台灣本島滿 NT$ 1,000 免運。未滿收取 NT$ 80。離島固定 NT$ 150。</p>
+      <p><strong>Bad example</strong>: Q: 運費 A: 看情況 — too vague; AI cannot give a useful answer.</p>
+      <h3>Best Practices</h3>
+      <ol>
+        <li><strong>Use Q&A format</strong>: Every entry as Question → Answer.</li>
+        <li><strong>Include variations</strong>: "營業時間？" / "幾點開門？" / "When are you open?" — same answer.</li>
+        <li><strong>Be comprehensive</strong>: Who, what, when, where, how. Use exact numbers (e.g. "3–5 工作天" not "很快").</li>
+        <li><strong>Format clearly</strong>: Bold, bullets, numbered steps, tables for comparisons.</li>
+        <li><strong>Update regularly</strong>: Prices, new products, remove discontinued items; fix answers based on real customer questions.</li>
+      </ol>
+      <h3>Common Mistakes</h3>
+      <ul>
+        <li>Avoid pronouns without context ("這個多少錢?" → use product name in Q and A).</li>
+        <li>Don't assume context ("可以用嗎?" → specify product and scenario).</li>
+        <li>One source of truth per topic (no contradictory "運費 NT$ 80" vs "NT$ 100").</li>
+        <li>Remove outdated dates or update quarterly.</li>
+      </ul>
+      <h3>Testing Your Knowledge Base</h3>
+      <p>Use Dashboard → Test Chat; ask as a customer would. Ensure coverage for: products, pricing, shipping, returns, payment, hours, contact info.</p>
+      <h3>Maintenance</h3>
+      <p>Weekly: add 5–10 Q&As from real questions. Monthly: audit coverage, remove outdated content. Quarterly: major refresh and user feedback.</p>
+      <p><a href="/help/knowledge-base/upload-first-kb">Upload Your First KB</a> · <a href="/help/knowledge-base/using-templates">Using Templates</a> · <a href="/help/knowledge-base/troubleshoot-ai">Troubleshoot AI</a> · <a href="/help">Back to Help Center</a></p>
+    `,
   },
   'knowledge-base/using-templates': {
     categorySlug: 'knowledge-base',
