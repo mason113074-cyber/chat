@@ -97,8 +97,10 @@ export function DashboardNav({
             </Link>
           ))}
           <LocaleSwitcher className="rounded-lg px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900" />
-          <span className="text-sm text-gray-500">{userEmail}</span>
-          <SignOutButton />
+          <div className="flex flex-nowrap items-center gap-2 border-l border-gray-200 pl-4">
+            <span className="text-sm text-gray-500 truncate max-w-[140px]" title={userEmail}>{userEmail}</span>
+            <SignOutButton />
+          </div>
         </nav>
 
         <div className="md:hidden flex items-center gap-1">
@@ -152,9 +154,9 @@ export function DashboardNav({
               )}
             </Link>
           ))}
-          <div className="mt-4 border-t border-gray-100 pt-4">
+          <div className="mt-4 border-t border-gray-100 pt-4 flex flex-col gap-2">
             <p className="px-4 text-sm text-gray-500 truncate">{userEmail}</p>
-            <div className="mt-2 px-4">
+            <div className="px-4">
               <SignOutButton />
             </div>
           </div>

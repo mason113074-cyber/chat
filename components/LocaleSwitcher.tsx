@@ -15,7 +15,7 @@ export function LocaleSwitcher({ className }: Props) {
       href={pathname}
       locale={nextLocale}
       className={className ?? 'rounded-lg px-3 py-1.5 text-sm font-medium text-slate-200 hover:bg-white/10 hover:text-white transition'}
-      aria-label={locale === 'zh-TW' ? 'Switch to English' : '切換至繁體中文'}
+      aria-label={locale === 'zh-TW' ? 'Switch to English' : 'Switch to 繁體中文'}
     >
       {locale === 'zh-TW' ? 'EN' : '繁中'}
     </Link>

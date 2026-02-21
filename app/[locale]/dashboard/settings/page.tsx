@@ -34,6 +34,13 @@ function isZhDefaultSystemPrompt(prompt: string): boolean {
   return ZH_SYSTEM_PROMPT_PREFIXES.some((prefix) => firstLine.includes(prefix));
 }
 
+/** 繁中歡迎訊息預設，用於載入時若介面為英文則改顯示英文預設 */
+const ZH_WELCOME_MESSAGE_PREFIXES = ['歡迎！我是 AI 客服助手', '歡迎!我是 AI 客服助手'];
+function isZhDefaultWelcomeMessage(msg: string): boolean {
+  const trimmed = (msg ?? '').trim();
+  return ZH_WELCOME_MESSAGE_PREFIXES.some((p) => trimmed.includes(p));
+}
+
 const AI_MODELS = [
   { id: 'gpt-4o', label: 'GPT-4o', desc: 'settingsModelGpt4oDesc' },
   { id: 'gpt-4o-mini', label: 'GPT-4o Mini', desc: 'settingsModelGpt4oMiniDesc' },
@@ -134,8 +141,9 @@ export default function SettingsPage() {
   const [feedbackMessage, setFeedbackMessage] = useState('這個回覆有幫助嗎？');
   const [conversationMemoryCount, setConversationMemoryCount] = useState(5);
   const [conversationMemoryMode, setConversationMemoryMode] = useState('recent');
+  const defaultWelcomeMessage = useMemo(() => t('welcomeMessagePlaceholder'), [t]);
   const [welcomeMessageEnabled, setWelcomeMessageEnabled] = useState(false);
-  const [welcomeMessage, setWelcomeMessage] = useState('歡迎！我是 AI 客服助手，有什麼可以幫您的嗎？😊');
+  const [welcomeMessage, setWelcomeMessage] = useState(defaultWelcomeMessage);
 
   // Sprint 12: A/B Test
   const [abTests, setAbTests] = useState<{ id: string; name: string; variant_a_prompt: string; variant_b_prompt: string; traffic_split: number; status: string }[]>([]);
@@ -205,7 +213,13 @@ export default function SettingsPage() {
         if (typeof data.conversationMemoryCount === 'number') setConversationMemoryCount(data.conversationMemoryCount);
         if (['recent', 'summary'].includes(data.conversationMemoryMode)) setConversationMemoryMode(data.conversationMemoryMode);
         if (typeof data.welcomeMessageEnabled === 'boolean') setWelcomeMessageEnabled(data.welcomeMessageEnabled);
-        if (typeof data.welcomeMessage === 'string') setWelcomeMessage(data.welcomeMessage);
+        if (typeof data.welcomeMessage === 'string') {
+          let loadedWelcome = data.welcomeMessage;
+          if (loadedWelcome && locale === 'en' && isZhDefaultWelcomeMessage(loadedWelcome)) {
+            loadedWelcome = t('welcomeMessagePlaceholder');
+          }
+          setWelcomeMessage(loadedWelcome);
+        }
         try {
           const guidanceRes = await fetch('/api/settings/guidance', { credentials: 'include' });
           if (guidanceRes.ok && !cancelled) {

@@ -95,13 +95,9 @@ export function Sidebar({ userEmail }: SidebarProps) {
           </nav>
 
           {/* User info and logout */}
-          <div className="p-4 border-t border-gray-200">
-            <div className="flex items-center justify-between">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-gray-600 truncate">{userEmail}</p>
-              </div>
-              <SignOutButton />
-            </div>
+          <div className="p-4 border-t border-gray-200 flex flex-row items-center justify-between gap-3">
+            <p className="text-sm text-gray-600 truncate min-w-0 flex-1" title={userEmail}>{userEmail}</p>
+            <SignOutButton />
           </div>
         </div>
       </aside>
