@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { validateSignature, replyMessage, pushMessage, LineWebhookBody, LineWebhookEvent } from '@/lib/line';
+import { validateSignature, replyMessage, pushMessage, LineWebhookBody, LineWebhookEvent, type LineCredentials } from '@/lib/line';
 import { generateReply } from '@/lib/openai';
 import { searchKnowledgeWithSources } from '@/lib/knowledge-search';
 import { getOrCreateContactByLineUserId, getUserSettings, insertConversationMessage, getRecentConversationMessages, type Contact } from '@/lib/supabase';
@@ -129,10 +129,22 @@ const REPLY_IMAGE_UNSUPPORTED = '目前不支援圖片，請用文字描述您�
 const REPLY_STICKER = '感謝您傳送貼圖 😊';
 const REPLY_LOCATION_RECEIVED = '已收到您的位置資訊，感謝。';
 
-async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<void> {
+export type WebhookLineOverrides = {
+  ownerUserId: string;
+  credentials?: LineCredentials;
+  botId?: string;
+};
+
+export async function handleEvent(
+  event: LineWebhookEvent,
+  requestId: string,
+  overrides?: WebhookLineOverrides
+): Promise<void> {
   const replyToken = event.replyToken;
   const lineUserId = event.source?.userId;
-  const ownerUserId = process.env.LINE_OWNER_USER_ID;
+  const ownerUserId = overrides?.ownerUserId ?? process.env.LINE_OWNER_USER_ID;
+  const creds = overrides?.credentials;
+  const botId = overrides?.botId;
 
   // Sprint 10: follow event - welcome message
   if (event.type === 'follow' && lineUserId && ownerUserId && replyToken) {
@@ -140,7 +152,7 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
       const contact = await getOrCreateContactByLineUserId(lineUserId, ownerUserId);
       const settings = await getUserSettings(ownerUserId);
       if (settings.welcome_message_enabled && settings.welcome_message) {
-        await replyMessage(replyToken, settings.welcome_message);
+        await replyMessage(replyToken, settings.welcome_message, undefined, creds);
       }
     } catch (e) {
       console.error('[LINE webhook] Welcome message failed', { requestId, error: e });
@@ -162,7 +174,7 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
           rating: rating === 'positive' ? 'positive' : 'negative',
         });
         if (replyToken) {
-          await replyMessage(replyToken, rating === 'positive' ? '感謝您的回饋！😊' : '感謝您的回饋，我們會持續改進！');
+          await replyMessage(replyToken, rating === 'positive' ? '感謝您的回饋！😊' : '感謝您的回饋，我們會持續改進！', undefined, creds);
         }
       } catch (e) {
         console.warn('[LINE webhook] Feedback insert failed', { requestId, error: e });
@@ -183,12 +195,12 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
   // Non-text message types: reply once and mark processed
   if (msgType === 'image') {
     try {
-      await replyMessage(replyToken, REPLY_IMAGE_UNSUPPORTED);
+      await replyMessage(replyToken, REPLY_IMAGE_UNSUPPORTED, undefined, creds);
     } catch (e) {
       console.error('[LINE webhook] Failed to send image-unsupported reply', { requestId, error: e });
     }
     try {
-      await markAsProcessed(getEventId(event));
+      await markAsProcessed(getEventId(event), botId);
     } catch {
       // ignore
     }
@@ -197,12 +209,12 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
 
   if (msgType === 'sticker') {
     try {
-      await replyMessage(replyToken, REPLY_STICKER);
+      await replyMessage(replyToken, REPLY_STICKER, undefined, creds);
     } catch (e) {
       console.error('[LINE webhook] Failed to send sticker reply', { requestId, error: e });
     }
     try {
-      await markAsProcessed(getEventId(event));
+      await markAsProcessed(getEventId(event), botId);
     } catch {
       // ignore
     }
@@ -211,12 +223,12 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
 
   if (msgType === 'location') {
     try {
-      await replyMessage(replyToken, REPLY_LOCATION_RECEIVED);
+      await replyMessage(replyToken, REPLY_LOCATION_RECEIVED, undefined, creds);
     } catch (e) {
       console.error('[LINE webhook] Failed to send location reply', { requestId, error: e });
     }
     try {
-      await markAsProcessed(getEventId(event));
+      await markAsProcessed(getEventId(event), botId);
     } catch {
       // ignore
     }
@@ -233,7 +245,7 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
   }
 
   const eventId = getEventId(event);
-  if (await isProcessed(eventId)) {
+  if (await isProcessed(eventId, botId)) {
     console.info('[LINE webhook] Duplicate event skipped', { requestId, eventId });
     return;
   }
@@ -242,7 +254,7 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
   if (!rateLimitOk) {
     console.warn('[LINE webhook] Rate limit exceeded', { requestId, lineUserId, remaining, resetAt: resetAt.toISOString() });
     try {
-      await replyMessage(replyToken, '您發送訊息的頻率過高，請稍後再試。');
+      await replyMessage(replyToken, '您發送訊息的頻率過高，請稍後再試。', undefined, creds);
     } catch {
       // ignore
     }
@@ -259,7 +271,7 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
     });
 
     try {
-      await replyMessage(replyToken, SENSITIVE_CONTENT_REPLY);
+      await replyMessage(replyToken, SENSITIVE_CONTENT_REPLY, undefined, creds);
     } catch (replyError) {
       console.error('[LINE webhook] Failed to send sensitive-content reply', {
         requestId,
@@ -269,7 +281,7 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
     }
 
     try {
-      await markAsProcessed(eventId);
+      await markAsProcessed(eventId, botId);
     } catch (markError) {
       console.error('[LINE webhook] Failed to mark sensitive event processed', {
         requestId,
@@ -283,7 +295,7 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
   if (!ownerUserId) {
     console.error('LINE_OWNER_USER_ID is not set');
     try {
-      await replyMessage(replyToken, '抱歉，服務設定有誤，請稍後再試。');
+      await replyMessage(replyToken, '抱歉，服務設定有誤，請稍後再試。', undefined, creds);
     } catch {
       // ignore
     }
@@ -295,7 +307,7 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
     const admin = getSupabaseAdmin();
     const { limit, used } = await getConversationUsageForUser(admin, ownerUserId);
     if (limit !== -1 && used >= limit) {
-      await replyMessage(replyToken, '很抱歉，本月對話額度已用完，請聯繫商家。');
+      await replyMessage(replyToken, '很抱歉，本月對話額度已用完，請聯繫商家。', undefined, creds);
       return;
     }
 
@@ -382,7 +394,7 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
           error: result.error ?? null,
         });
 
-        await markAsProcessed(eventId);
+        await markAsProcessed(eventId, botId);
         void invalidateAnalyticsCache(ownerUserId);
         return;
       }
@@ -393,8 +405,8 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
       userMessage.toLowerCase().includes(String(word).toLowerCase())
     );
     if (customMatch) {
-      await replyMessage(replyToken, sensitiveWordReply || SENSITIVE_CONTENT_REPLY);
-      await markAsProcessed(eventId);
+      await replyMessage(replyToken, sensitiveWordReply || SENSITIVE_CONTENT_REPLY, undefined, creds);
+      await markAsProcessed(eventId, botId);
       return;
     }
 
@@ -415,14 +427,14 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
 
     if (businessHoursEnabled && !isWithinBusinessHours(businessHours)) {
       if (outsideHoursMode === 'auto_reply') {
-        await replyMessage(replyToken, outsideHoursMessage || '感謝您的訊息！目前為非營業時間，我們將在營業時間盡快回覆您。');
-        await markAsProcessed(eventId);
+        await replyMessage(replyToken, outsideHoursMessage || '感謝您的訊息！目前為非營業時間，我們將在營業時間盡快回覆您。', undefined, creds);
+        await markAsProcessed(eventId, botId);
         return;
       }
       if (outsideHoursMode === 'collect_info') {
-        await replyMessage(replyToken, (outsideHoursMessage || '') + '\n\n請留下您的問題，我們會在營業時間回覆您：');
+        await replyMessage(replyToken, (outsideHoursMessage || '') + '\n\n請留下您的問題，我們會在營業時間回覆您：', undefined, creds);
         await insertConversationMessage(contact.id, userMessage, 'user');
-        await markAsProcessed(eventId);
+        await markAsProcessed(eventId, botId);
         return;
       }
     }
@@ -547,6 +559,29 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
       }
     }
 
+    // P0 SUGGEST: when multi-bot and (no sources or low confidence), save draft and do not send to LINE
+    if (botId && (sources.length === 0 || confidence.score < threshold)) {
+      const admin = getSupabaseAdmin();
+      await insertConversationMessage(contact.id, userMessage, 'user');
+      await admin.from('ai_suggestions').insert({
+        contact_id: contact.id,
+        user_id: ownerUserId,
+        bot_id: botId,
+        event_id: eventId,
+        user_message: userMessage,
+        suggested_reply: finalReply,
+        sources_count: sources.length,
+        confidence_score: confidence.score,
+        risk_category: 'low',
+        status: 'draft',
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      });
+      await markAsProcessed(eventId, botId);
+      void invalidateAnalyticsCache(ownerUserId);
+      console.info('[LINE webhook] SUGGEST draft created', { requestId, eventId, contactId: contact.id });
+      return;
+    }
+
     // Sprint 3: 回覆延遲（模擬真人打字）
     const delayMs = (replyDelaySeconds ?? 0) * 1000;
     if (delayMs > 0) {
@@ -562,7 +597,8 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
     await replyMessage(
       replyToken,
       finalReply,
-      enabledQuickReplies.length > 0 ? enabledQuickReplies : undefined
+      enabledQuickReplies.length > 0 ? enabledQuickReplies : undefined,
+      creds
     );
 
     const userConv = await insertConversationMessage(contact.id, userMessage, 'user');
@@ -600,7 +636,7 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
               { type: 'postback', label: '👎 沒幫助', data: `feedback:negative:${inserted.id}` },
             ],
           },
-        });
+        }, creds);
       } catch (e) {
         console.warn('[LINE webhook] Feedback push failed', { requestId, error: e });
       }
@@ -609,7 +645,7 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
     void autoTagContact(contact.id, ownerUserId, userMessage);
     void invalidateAnalyticsCache(ownerUserId);
 
-    await markAsProcessed(eventId);
+    await markAsProcessed(eventId, botId);
 
     console.info('[LINE webhook] Event processed', {
       requestId,
@@ -628,7 +664,9 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
     try {
       await replyMessage(
         replyToken,
-        '抱歉，處理您的訊息時發生錯誤。請稍後再試。'
+        '抱歉，處理您的訊息時發生錯誤。請稍後再試。',
+        undefined,
+        creds
       );
     } catch (replyError) {
       console.error('Error sending error message:', replyError);
