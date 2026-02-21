@@ -69,23 +69,24 @@ async function redisSet(key: string): Promise<void> {
 
 /**
  * Returns true if this event was already processed (duplicate); false if new.
+ * When botId is provided (multi-bot), key is scoped to that bot.
  */
-export async function isProcessed(eventId: string): Promise<boolean> {
-  const key = PREFIX + eventId;
+export async function isProcessed(eventId: string, botId?: string): Promise<boolean> {
+  const key = botId ? PREFIX + botId + ':' + eventId : PREFIX + eventId;
   if (isRedisConfigured()) {
     return redisGet(key);
   }
-  return memoryGet(eventId);
+  return memoryGet(botId ? botId + ':' + eventId : eventId);
 }
 
 /**
  * Mark this event as processed so future duplicates are skipped.
  */
-export async function markAsProcessed(eventId: string): Promise<void> {
-  const key = PREFIX + eventId;
+export async function markAsProcessed(eventId: string, botId?: string): Promise<void> {
+  const key = botId ? PREFIX + botId + ':' + eventId : PREFIX + eventId;
   if (isRedisConfigured()) {
     await redisSet(key);
     return;
   }
-  memorySet(eventId);
+  memorySet(botId ? botId + ':' + eventId : eventId);
 }
