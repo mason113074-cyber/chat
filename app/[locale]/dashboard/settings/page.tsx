@@ -946,35 +946,98 @@ export default function SettingsPage() {
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900">{t('businessHours')}</h2>
           <p className="mt-1 text-sm text-gray-600">{t('businessHoursDesc')}</p>
-          <div className="mt-4 space-y-3">
+          <div className="mt-4 space-y-4">
             <label className="flex items-center gap-2">
-              <input type="checkbox" checked={businessHoursEnabled} onChange={(e) => setBusinessHoursEnabled(e.target.checked)} className="rounded" />
-              <span className="text-sm">{t('enableBusinessHours')}</span>
+              <input type="checkbox" checked={businessHoursEnabled} onChange={(e) => setBusinessHoursEnabled(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+              <span className="text-sm font-medium text-gray-700">{t('enableBusinessHours')}</span>
             </label>
             {businessHoursEnabled && (
               <>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">{t('outsideHoursMode')}</label>
-                  <select value={outsideHoursMode} onChange={(e) => setOutsideHoursMode(e.target.value)} className="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900">
-                    <option value="auto_reply">{t('modeAutoReply')}</option>
-                    <option value="ai_only">{t('modeAiOnly')}</option>
-                    <option value="collect_info">{t('modeCollectInfo')}</option>
-                  </select>
+                <div className="space-y-3 rounded-lg bg-gray-50 p-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">{t('outsideHoursMode')}</label>
+                    <select value={outsideHoursMode} onChange={(e) => setOutsideHoursMode(e.target.value)} className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                      <option value="auto_reply">{t('modeAutoReply')}</option>
+                      <option value="ai_only">{t('modeAiOnly')}</option>
+                      <option value="collect_info">{t('modeCollectInfo')}</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">{t('outsideHoursMessage')}</label>
+                    <textarea value={outsideHoursMessage} onChange={(e) => setOutsideHoursMessage(e.target.value)} rows={2} className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">{t('outsideHoursMessage')}</label>
-                  <textarea value={outsideHoursMessage} onChange={(e) => setOutsideHoursMessage(e.target.value)} rows={2} className="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400" />
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  {(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const).map((d) => (
-                    <div key={d} className="flex items-center gap-2">
-                      <input type="checkbox" checked={businessHours.schedule[d].enabled} onChange={(e) => setBusinessHours((p) => ({ ...p, schedule: { ...p.schedule, [d]: { ...p.schedule[d], enabled: e.target.checked } } }))} />
-                      <span className="w-8">{t(d)}</span>
-                      <input type="time" value={businessHours.schedule[d].start} onChange={(e) => setBusinessHours((p) => ({ ...p, schedule: { ...p.schedule, [d]: { ...p.schedule[d], start: e.target.value } } }))} className="w-20 rounded border border-gray-300 bg-white px-1 text-sm text-gray-900" />
-                      <span>-</span>
-                      <input type="time" value={businessHours.schedule[d].end} onChange={(e) => setBusinessHours((p) => ({ ...p, schedule: { ...p.schedule, [d]: { ...p.schedule[d], end: e.target.value } } }))} className="w-20 rounded border border-gray-300 bg-white px-1 text-sm text-gray-900" />
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-sm font-medium text-gray-700">{t('scheduleTitle')}</span>
+                    <div className="flex flex-wrap gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setBusinessHours((p) => {
+                          const s = { ...p.schedule };
+                          (['mon', 'tue', 'wed', 'thu', 'fri'] as const).forEach((d) => { s[d] = { enabled: true, start: '09:00', end: '18:00' }; });
+                          (['sat', 'sun'] as const).forEach((d) => { s[d] = { ...s[d], enabled: false }; });
+                          return { ...p, schedule: s };
+                        })}
+                        className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-100"
+                      >
+                        {t('presetWeekdays')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBusinessHours((p) => {
+                          const s = { ...p.schedule };
+                          (['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const).forEach((d) => { s[d] = { enabled: true, start: '09:00', end: '18:00' }; });
+                          return { ...p, schedule: s };
+                        })}
+                        className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-100"
+                      >
+                        {t('presetAllDay')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBusinessHours((p) => {
+                          const s = { ...p.schedule };
+                          (['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const).forEach((d) => { s[d] = { ...s[d], enabled: false }; });
+                          return { ...p, schedule: s };
+                        })}
+                        className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-100"
+                      >
+                        {t('presetAllOff')}
+                      </button>
                     </div>
-                  ))}
+                  </div>
+                  <div className="space-y-2">
+                    {(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const).map((d) => (
+                      <div key={d} className={`flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2 ${businessHours.schedule[d].enabled ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50'}`}>
+                        <label className="flex min-w-[4rem] cursor-pointer items-center gap-2">
+                          <input type="checkbox" checked={businessHours.schedule[d].enabled} onChange={(e) => setBusinessHours((p) => ({ ...p, schedule: { ...p.schedule, [d]: { ...p.schedule[d], enabled: e.target.checked } } }))} className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                          <span className="text-sm font-medium text-gray-700">{t(d)}</span>
+                        </label>
+                        <div className={`flex items-center gap-2 ${!businessHours.schedule[d].enabled ? 'opacity-50' : ''}`}>
+                          <input type="time" value={businessHours.schedule[d].start} onChange={(e) => setBusinessHours((p) => ({ ...p, schedule: { ...p.schedule, [d]: { ...p.schedule[d], start: e.target.value } } }))} disabled={!businessHours.schedule[d].enabled} aria-label={`${t(d)} 開始時間`} className="rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 disabled:cursor-not-allowed disabled:bg-gray-100" />
+                          <span className="text-gray-400">–</span>
+                          <input type="time" value={businessHours.schedule[d].end} onChange={(e) => setBusinessHours((p) => ({ ...p, schedule: { ...p.schedule, [d]: { ...p.schedule[d], end: e.target.value } } }))} disabled={!businessHours.schedule[d].enabled} aria-label={`${t(d)} 結束時間`} className="rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900 disabled:cursor-not-allowed disabled:bg-gray-100" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const first = (['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const).find((d) => businessHours.schedule[d].enabled);
+                      if (!first) return;
+                      const { start, end } = businessHours.schedule[first];
+                      setBusinessHours((p) => {
+                        const s = { ...p.schedule };
+                        (['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const).forEach((d) => { s[d] = { ...s[d], start, end }; });
+                        return { ...p, schedule: s };
+                      });
+                    }}
+                    className="mt-2 text-xs text-indigo-600 hover:underline"
+                  >
+                    {t('applyToAll')}
+                  </button>
                 </div>
               </>
             )}
