@@ -852,14 +852,14 @@ export default function SettingsPage() {
                   placeholder={t('ruleTitlePlaceholder')}
                   value={guidanceForm.title}
                   onChange={(e) => setGuidanceForm((p) => p && { ...p, title: e.target.value })}
-                  className="w-full rounded border px-2 py-1 text-sm"
+                  className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 placeholder:text-gray-400"
                 />
                 <textarea
                   placeholder={t('ruleContentPlaceholder')}
                   value={guidanceForm.content}
                   onChange={(e) => setGuidanceForm((p) => p && { ...p, content: e.target.value })}
                   rows={2}
-                  className="w-full rounded border px-2 py-1 text-sm"
+                  className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 placeholder:text-gray-400"
                 />
                 <div className="flex gap-2">
                   <button
@@ -923,7 +923,7 @@ export default function SettingsPage() {
               <select
                 value={lowConfidenceAction}
                 onChange={(e) => setLowConfidenceAction(e.target.value)}
-                className="mt-1 block w-full rounded border px-3 py-2 text-sm"
+                className="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
               >
                 <option value="handoff">{t('actionHandoff')}</option>
                 <option value="flag">{t('actionFlag')}</option>
@@ -936,7 +936,7 @@ export default function SettingsPage() {
                 type="text"
                 value={handoffMessage}
                 onChange={(e) => setHandoffMessage(e.target.value)}
-                className="mt-1 block w-full rounded border px-3 py-2 text-sm"
+                className="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400"
               />
             </div>
           </div>
@@ -955,7 +955,7 @@ export default function SettingsPage() {
               <>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">{t('outsideHoursMode')}</label>
-                  <select value={outsideHoursMode} onChange={(e) => setOutsideHoursMode(e.target.value)} className="mt-1 block w-full rounded border px-3 py-2 text-sm">
+                  <select value={outsideHoursMode} onChange={(e) => setOutsideHoursMode(e.target.value)} className="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900">
                     <option value="auto_reply">{t('modeAutoReply')}</option>
                     <option value="ai_only">{t('modeAiOnly')}</option>
                     <option value="collect_info">{t('modeCollectInfo')}</option>
@@ -963,16 +963,16 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">{t('outsideHoursMessage')}</label>
-                  <textarea value={outsideHoursMessage} onChange={(e) => setOutsideHoursMessage(e.target.value)} rows={2} className="mt-1 block w-full rounded border px-3 py-2 text-sm" />
+                  <textarea value={outsideHoursMessage} onChange={(e) => setOutsideHoursMessage(e.target.value)} rows={2} className="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400" />
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   {(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const).map((d) => (
                     <div key={d} className="flex items-center gap-2">
                       <input type="checkbox" checked={businessHours.schedule[d].enabled} onChange={(e) => setBusinessHours((p) => ({ ...p, schedule: { ...p.schedule, [d]: { ...p.schedule[d], enabled: e.target.checked } } }))} />
                       <span className="w-8">{t(d)}</span>
-                      <input type="time" value={businessHours.schedule[d].start} onChange={(e) => setBusinessHours((p) => ({ ...p, schedule: { ...p.schedule, [d]: { ...p.schedule[d], start: e.target.value } } }))} className="w-20 rounded border px-1" />
+                      <input type="time" value={businessHours.schedule[d].start} onChange={(e) => setBusinessHours((p) => ({ ...p, schedule: { ...p.schedule, [d]: { ...p.schedule[d], start: e.target.value } } }))} className="w-20 rounded border border-gray-300 bg-white px-1 text-sm text-gray-900" />
                       <span>-</span>
-                      <input type="time" value={businessHours.schedule[d].end} onChange={(e) => setBusinessHours((p) => ({ ...p, schedule: { ...p.schedule, [d]: { ...p.schedule[d], end: e.target.value } } }))} className="w-20 rounded border px-1" />
+                      <input type="time" value={businessHours.schedule[d].end} onChange={(e) => setBusinessHours((p) => ({ ...p, schedule: { ...p.schedule, [d]: { ...p.schedule[d], end: e.target.value } } }))} className="w-20 rounded border border-gray-300 bg-white px-1 text-sm text-gray-900" />
                     </div>
                   ))}
                 </div>
@@ -992,7 +992,7 @@ export default function SettingsPage() {
             </label>
             <div>
               <label className="block text-sm font-medium text-gray-700">{t('feedbackMessage')}</label>
-              <input type="text" value={feedbackMessage} onChange={(e) => setFeedbackMessage(e.target.value)} placeholder={t('feedbackMessagePlaceholder')} className="mt-1 block w-full rounded border px-3 py-2 text-sm" />
+              <input type="text" value={feedbackMessage} onChange={(e) => setFeedbackMessage(e.target.value)} placeholder={t('feedbackMessagePlaceholder')} className="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400" />
             </div>
           </div>
         </div>
@@ -1011,7 +1011,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">{t('memoryMode')}</label>
-              <select value={conversationMemoryMode} onChange={(e) => setConversationMemoryMode(e.target.value)} className="mt-1 block w-full rounded border px-3 py-2 text-sm">
+              <select value={conversationMemoryMode} onChange={(e) => setConversationMemoryMode(e.target.value)} className="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900">
                 <option value="recent">{t('modeRecent')}</option>
                 <option value="summary">{t('modeSummary')}</option>
               </select>
@@ -1031,7 +1031,7 @@ export default function SettingsPage() {
             </label>
             <div>
               <label className="block text-sm font-medium text-gray-700">{t('welcomeMessageContent')}</label>
-              <textarea value={welcomeMessage} onChange={(e) => setWelcomeMessage(e.target.value)} rows={3} placeholder={t('welcomeMessagePlaceholder')} className="mt-1 block w-full rounded border px-3 py-2 text-sm" />
+              <textarea value={welcomeMessage} onChange={(e) => setWelcomeMessage(e.target.value)} rows={3} placeholder={t('welcomeMessagePlaceholder')} className="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400" />
               <p className="mt-1 text-xs text-gray-500">{t('characterCount', { count: welcomeMessage.length })}</p>
             </div>
           </div>
@@ -1108,21 +1108,21 @@ export default function SettingsPage() {
                   placeholder={t('abTestName')}
                   value={abTestForm.name}
                   onChange={(e) => setAbTestForm((p) => p && { ...p, name: e.target.value })}
-                  className="w-full rounded border px-2 py-1 text-sm"
+                  className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 placeholder:text-gray-400"
                 />
                 <textarea
                   placeholder={t('abTestVariantA')}
                   value={abTestForm.variantA}
                   onChange={(e) => setAbTestForm((p) => p && { ...p, variantA: e.target.value })}
                   rows={2}
-                  className="w-full rounded border px-2 py-1 text-sm"
+                  className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 placeholder:text-gray-400"
                 />
                 <textarea
                   placeholder={t('abTestVariantB')}
                   value={abTestForm.variantB}
                   onChange={(e) => setAbTestForm((p) => p && { ...p, variantB: e.target.value })}
                   rows={2}
-                  className="w-full rounded border px-2 py-1 text-sm"
+                  className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 placeholder:text-gray-400"
                 />
                 <div className="flex items-center gap-2">
                   <label className="text-sm">{t('abTestTrafficSplit')}</label>
