@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { GlobalSearch } from '@/components/GlobalSearch';
-import { DashboardNav } from './DashboardNav';
+import { Sidebar } from './Sidebar';
+import { DashboardTopBar } from './DashboardTopBar';
 import { DashboardUsageWarning } from './DashboardUsageWarning';
+
+const SIDEBAR_STORAGE_KEY = 'dashboard-sidebar-expanded';
 
 export function DashboardLayoutClient({
   userEmail,
@@ -13,6 +16,12 @@ export function DashboardLayoutClient({
   children: React.ReactNode;
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
+  const [sidebarExpanded, setSidebarExpanded] = useState(true);
+
+  useEffect(() => {
+    const stored = typeof window !== 'undefined' ? localStorage.getItem(SIDEBAR_STORAGE_KEY) : null;
+    if (stored !== null) setSidebarExpanded(stored === 'true');
+  }, []);
 
   useEffect(() => {
     const fn = (e: KeyboardEvent) => {
@@ -25,19 +34,30 @@ export function DashboardLayoutClient({
     return () => window.removeEventListener('keydown', fn);
   }, []);
 
+  const handleSidebarExpandedChange = (expanded: boolean) => {
+    setSidebarExpanded(expanded);
+    if (typeof window !== 'undefined') localStorage.setItem(SIDEBAR_STORAGE_KEY, String(expanded));
+  };
+
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
-      <header className="border-b border-gray-200 bg-white relative">
-        <DashboardNav
-          userEmail={userEmail}
-          onOpenSearch={() => setSearchOpen(true)}
-        />
-        <DashboardUsageWarning />
-      </header>
-      <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
-      <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-8 sm:px-6">
-        {children}
-      </main>
+    <div className="min-h-screen flex bg-gray-50">
+      <Sidebar
+        userEmail={userEmail}
+        expanded={sidebarExpanded}
+        onExpandedChange={handleSidebarExpandedChange}
+      />
+      <div
+        className={`flex-1 flex flex-col min-w-0 pt-14 lg:pt-0 lg:transition-[margin] duration-200 ease-out ${sidebarExpanded ? 'lg:ml-[240px]' : 'lg:ml-16'}`}
+      >
+        <div className="sticky top-0 z-30 bg-gray-50">
+          <DashboardTopBar onOpenSearch={() => setSearchOpen(true)} userEmail={userEmail} />
+          <DashboardUsageWarning />
+        </div>
+        <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
+        <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:ml-0">
+          {children}
+        </main>
+      </div>
     </div>
   );
 }

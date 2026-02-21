@@ -1,6 +1,7 @@
-# 目前進度（2026/2/18）
+# 目前進度（2026/2/21）
 
 ## 已完成
+- **Sprint A 側邊欄導航**：頂部 Nav 改為左側 Sidebar + TopBar（lucide-react 圖示、收合/展開、localStorage、手機抽屜）
 - Sprint 1~4 全部完成
 - 15 個 API 端點全部通過 E2E 測試
 - Bearer token 認證支援

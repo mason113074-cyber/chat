@@ -17,3 +17,11 @@
 ## 認證機制
 - 瀏覽器：Cookie 認證（Supabase Auth）
 - API 測試：Bearer token 認證
+
+## Dashboard 導航架構（Sprint A，高優先級）
+- **左側 Sidebar**：取代頂部 Nav，固定左側 240px（展開）/ 64px（收合）
+- **TopBar**：搜尋 ⌘K + 語言切換 + 用戶頭像，高度 56px
+- **收合狀態**：localStorage `dashboard-sidebar-expanded` 持久化
+- **手機版**：漢堡選單打開左側抽屜（240px）
+- **導航項目**：總覽、對話紀錄、客戶聯絡人、知識庫、數據分析、設定、方案與計費、系統測試
+- **元件**：`Sidebar.tsx`、`DashboardTopBar.tsx`、`DashboardLayoutClient.tsx`（不再使用 `DashboardNav`）

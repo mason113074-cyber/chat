@@ -150,6 +150,24 @@ export default function SettingsPage() {
   const [abTests, setAbTests] = useState<{ id: string; name: string; variant_a_prompt: string; variant_b_prompt: string; traffic_split: number; status: string }[]>([]);
   const [abTestForm, setAbTestForm] = useState<{ name: string; variantA: string; variantB: string; trafficSplit: number } | null>(null);
 
+  // Tab 分頁：與 URL hash 同步
+  type TabId = 'general' | 'personality' | 'behavior' | 'experience' | 'optimize';
+  const TAB_IDS: TabId[] = ['general', 'personality', 'behavior', 'experience', 'optimize'];
+  const [activeTab, setActiveTab] = useState<TabId>(() => {
+    if (typeof window === 'undefined') return 'general';
+    const hash = window.location.hash.slice(1);
+    return TAB_IDS.includes(hash as TabId) ? (hash as TabId) : 'general';
+  });
+  useEffect(() => {
+    const onHashChange = () => {
+      const hash = window.location.hash.slice(1);
+      if (TAB_IDS.includes(hash as TabId)) setActiveTab(hash as TabId);
+    };
+    onHashChange();
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     setLoadError(null);
@@ -495,14 +513,39 @@ export default function SettingsPage() {
     );
   }
 
+  const setTab = (id: TabId) => {
+    setActiveTab(id);
+    if (typeof window !== 'undefined') window.location.hash = id;
+  };
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
       <p className="mt-1 text-gray-600">{t('subtitle')}</p>
 
+      {/* Tab 導航 */}
+      <nav className="mt-6 flex gap-1 border-b border-gray-200" aria-label={t('tabsGeneral')}>
+        {TAB_IDS.map((id) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setTab(id)}
+            className={`px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 -mb-px transition-colors ${
+              activeTab === id
+                ? 'border-indigo-600 text-indigo-600 bg-white'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            {t(id === 'general' ? 'tabsGeneral' : id === 'personality' ? 'tabsPersonality' : id === 'behavior' ? 'tabsBehavior' : id === 'experience' ? 'tabsExperience' : 'tabsOptimize')}
+          </button>
+        ))}
+      </nav>
+
       <div className="mt-8 flex flex-col lg:flex-row gap-8">
         {/* Left: Form lg:w-3/5 */}
         <div className="lg:w-3/5 space-y-6">
+        {activeTab === 'general' && (
+        <>
         {/* LINE 整合狀態 */}
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900">{t('lineIntegration')}</h2>
@@ -651,7 +694,11 @@ export default function SettingsPage() {
             ))}
           </div>
         </div>
+        </>
+        )}
 
+        {activeTab === 'personality' && (
+        <>
         {/* Sprint 1: 回覆控制 */}
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900">{t('replyControl')}</h2>
@@ -703,44 +750,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Sprint 2: 自訂敏感詞 */}
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">{t('sensitiveWords')}</h2>
-          <p className="mt-1 text-sm text-gray-600">{t('sensitiveWordsDesc')}</p>
-          <div className="mt-4 space-y-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700">{t('sensitiveWords')}</label>
-              <textarea
-                value={customSensitiveWords.join('\n')}
-                onChange={(e) =>
-                  setCustomSensitiveWords(
-                    e.target.value
-                      .split('\n')
-                      .map((w) => w.trim())
-                      .filter(Boolean)
-                  )
-                }
-                rows={4}
-                placeholder="每行輸入一個敏感詞"
-                className="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
-              />
-              <p className="mt-1 text-xs text-gray-500">{t('sensitiveWordCount', { count: customSensitiveWords.length })}</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700">{t('sensitiveWordReply')}</label>
-              <p className="text-xs text-gray-500">{t('sensitiveWordReplyDesc')}</p>
-              <input
-                type="text"
-                value={sensitiveWordReply}
-                onChange={(e) => setSensitiveWordReply(e.target.value)}
-                placeholder={t('sensitiveWordReply')}
-                className="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Sprint 3: 回覆延遲 */}
+        {/* Sprint 3: 回覆延遲 (Personality) */}
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900">{t('replyDelay')}</h2>
           <p className="mt-1 text-sm text-gray-600">{t('replyDelayDesc')}</p>
@@ -836,7 +846,47 @@ export default function SettingsPage() {
             )}
           </div>
         </div>
+        </>
+        )}
 
+        {activeTab === 'behavior' && (
+        <>
+        {/* Sprint 2: 自訂敏感詞 */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900">{t('sensitiveWords')}</h2>
+          <p className="mt-1 text-sm text-gray-600">{t('sensitiveWordsDesc')}</p>
+          <div className="mt-4 space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">{t('sensitiveWords')}</label>
+              <textarea
+                value={customSensitiveWords.join('\n')}
+                onChange={(e) =>
+                  setCustomSensitiveWords(
+                    e.target.value
+                      .split('\n')
+                      .map((w) => w.trim())
+                      .filter(Boolean)
+                  )
+                }
+                rows={4}
+                placeholder="每行輸入一個敏感詞"
+                className="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white text-gray-900 placeholder:text-gray-400"
+              />
+              <p className="mt-1 text-xs text-gray-500">{t('sensitiveWordCount', { count: customSensitiveWords.length })}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">{t('sensitiveWordReply')}</label>
+              <p className="text-xs text-gray-500">{t('sensitiveWordReplyDesc')}</p>
+              <input
+                type="text"
+                value={sensitiveWordReply}
+                onChange={(e) => setSensitiveWordReply(e.target.value)}
+                placeholder={t('sensitiveWordReply')}
+                className="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500 bg-white text-gray-900"
+              />
+            </div>
+          </div>
+        </div>
         {/* Sprint 5: Guidance */}
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900">{t('guidance')}</h2>
@@ -1058,7 +1108,11 @@ export default function SettingsPage() {
             )}
           </div>
         </div>
+        </>
+        )}
 
+        {activeTab === 'experience' && (
+        <>
         {/* Sprint 8: 滿意度回饋 */}
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900">{t('feedback')}</h2>
@@ -1114,7 +1168,11 @@ export default function SettingsPage() {
             </div>
           </div>
         </div>
+        </>
+        )}
 
+        {activeTab === 'optimize' && (
+        <>
         {/* Sprint 12: A/B 測試 */}
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900">{t('abTest')}</h2>
@@ -1254,7 +1312,11 @@ export default function SettingsPage() {
             )}
           </div>
         </div>
+        </>
+        )}
 
+        {activeTab === 'experience' && (
+        <>
         {/* 快捷回覆按鈕 */}
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900">{t('quickReplyButtons')}</h2>
@@ -1299,8 +1361,12 @@ export default function SettingsPage() {
             })()}
           </div>
         </div>
+        </>
+        )}
 
-        {/* System Prompt Editor Card */}
+        {activeTab === 'personality' && (
+        <>
+        {/* System Prompt Editor Card (AI 回覆風格) */}
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900">{t('aiReplyStyle')}</h2>
           <p className="mt-1 text-sm text-gray-600">
@@ -1374,7 +1440,11 @@ export default function SettingsPage() {
             </button>
           </div>
         </div>
+        </>
+        )}
 
+        {activeTab === 'optimize' && (
+        <>
         {/* AI 回覆測試區 */}
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-semibold text-gray-900">{t('aiReplyTest')}</h2>
@@ -1450,6 +1520,27 @@ export default function SettingsPage() {
               </div>
             </Link>
           </div>
+        </div>
+        </>
+        )}
+
+        {/* 各 Tab 共用儲存按鈕 */}
+        <div className="mt-6 flex justify-end border-t border-gray-200 pt-4">
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={isSaving}
+            className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-6 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSaving ? (
+              <>
+                <span className="animate-spin mr-2" role="status" aria-label={t('saving')}>⏳</span>
+                {t('saving')}
+              </>
+            ) : (
+              t('save')
+            )}
+          </button>
         </div>
         </div>
 
