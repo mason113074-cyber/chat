@@ -10,11 +10,15 @@ import { isProcessed, markAsProcessed } from '@/lib/idempotency';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { invalidateAnalyticsCache } from '@/lib/analytics-cache';
 import { detectSensitiveKeywords } from '@/lib/security/sensitive-keywords';
-import { calculateConfidence } from '@/lib/confidence';
 import { isWithinBusinessHours } from '@/lib/business-hours';
 import { summarizeConversation } from '@/lib/conversation-summary';
 import { WorkflowEngine, type WorkflowData } from '@/lib/workflow-engine';
 import { storeSentimentAndAlert } from '@/lib/sentiment';
+import {
+  decideReplyAction,
+  getDefaultHandoffText,
+  type ReplyDecisionSource,
+} from '@/lib/ai/reply-decision';
 
 const KNOWLEDGE_PREFIX =
   '\n\n## 以下是你可以參考的知識庫內容（只能根據以下內容回答，勿使用其他知識）：\n';
@@ -22,6 +26,7 @@ const KNOWLEDGE_EMPTY_INSTRUCTION =
   '\n\n注意：知識庫中沒有找到與此問題相關的內容，請回覆需要轉接專人，勿自行編造答案。';
 const SENSITIVE_CONTENT_REPLY = '此問題涉及敏感內容，建議聯繫人工客服。';
 const GUARDRAIL_SAFE_REPLY = '感謝您的詢問！此問題需要專員處理，我已為您記錄，會盡快回覆您。';
+const SUGGEST_ACK_REPLY = '已收到您的訊息，我們會由專員確認後盡快回覆您。';
 
 const FORBIDDEN_PATTERNS = [
   /免費送你/,
@@ -74,6 +79,22 @@ function computeResolution(
   return { status: 'ai_handled', resolved_by: 'ai', is_resolved: true };
 }
 
+function applyReplyGuardrail(reply: string): { safeReply: string; guardrailTriggered: boolean } {
+  let safeReply = reply;
+  let guardrailTriggered = false;
+  for (const pattern of FORBIDDEN_PATTERNS) {
+    if (pattern.test(reply)) {
+      safeReply = GUARDRAIL_SAFE_REPLY;
+      guardrailTriggered = true;
+      break;
+    }
+  }
+  if (safeReply.length > MAX_REPLY_LENGTH) {
+    safeReply = safeReply.substring(0, MAX_REPLY_LENGTH - 3) + '...';
+  }
+  return { safeReply, guardrailTriggered };
+}
+
 export async function POST(request: NextRequest) {
   const start = Date.now();
   const requestId = `line-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -105,8 +126,22 @@ export async function POST(request: NextRequest) {
       destination: webhookBody.destination,
     });
 
+    let hasEventErrors = false;
     for (const event of events) {
-      await handleEvent(event, requestId);
+      try {
+        await handleEvent(event, requestId);
+      } catch (eventError) {
+        hasEventErrors = true;
+        console.error('[LINE webhook] Event failed', {
+          requestId,
+          eventId: getEventId(event),
+          error: eventError instanceof Error ? eventError.message : String(eventError),
+        });
+      }
+    }
+
+    if (hasEventErrors) {
+      return NextResponse.json({ success: false, error: 'partial_failure' }, { status: 500 });
     }
 
     console.info('[LINE webhook] Success', {
@@ -120,8 +155,7 @@ export async function POST(request: NextRequest) {
       durationMs: Date.now() - start,
       error: error instanceof Error ? error.message : String(error),
     });
-    // Return 200 so LINE does not retry (avoid duplicate processing)
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: false, error: 'webhook_failed' }, { status: 500 });
   }
 }
 
@@ -179,47 +213,28 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
 
   const msg = event.message;
   const msgType = msg.type;
+  const eventId = getEventId(event);
+  if (await isProcessed(eventId)) {
+    console.info('[LINE webhook] Duplicate event skipped', { requestId, eventId });
+    return;
+  }
 
   // Non-text message types: reply once and mark processed
   if (msgType === 'image') {
-    try {
-      await replyMessage(replyToken, REPLY_IMAGE_UNSUPPORTED);
-    } catch (e) {
-      console.error('[LINE webhook] Failed to send image-unsupported reply', { requestId, error: e });
-    }
-    try {
-      await markAsProcessed(getEventId(event));
-    } catch {
-      // ignore
-    }
+    await replyMessage(replyToken, REPLY_IMAGE_UNSUPPORTED);
+    await markAsProcessed(eventId);
     return;
   }
 
   if (msgType === 'sticker') {
-    try {
-      await replyMessage(replyToken, REPLY_STICKER);
-    } catch (e) {
-      console.error('[LINE webhook] Failed to send sticker reply', { requestId, error: e });
-    }
-    try {
-      await markAsProcessed(getEventId(event));
-    } catch {
-      // ignore
-    }
+    await replyMessage(replyToken, REPLY_STICKER);
+    await markAsProcessed(eventId);
     return;
   }
 
   if (msgType === 'location') {
-    try {
-      await replyMessage(replyToken, REPLY_LOCATION_RECEIVED);
-    } catch (e) {
-      console.error('[LINE webhook] Failed to send location reply', { requestId, error: e });
-    }
-    try {
-      await markAsProcessed(getEventId(event));
-    } catch {
-      // ignore
-    }
+    await replyMessage(replyToken, REPLY_LOCATION_RECEIVED);
+    await markAsProcessed(eventId);
     return;
   }
 
@@ -229,12 +244,6 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
 
   const userMessage = msg.text;
   if (!userMessage || !lineUserId) {
-    return;
-  }
-
-  const eventId = getEventId(event);
-  if (await isProcessed(eventId)) {
-    console.info('[LINE webhook] Duplicate event skipped', { requestId, eventId });
     return;
   }
 
@@ -251,33 +260,12 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
 
   const sensitiveCheck = detectSensitiveKeywords(userMessage);
   if (sensitiveCheck.riskLevel !== 'low') {
-    console.info('[LINE webhook] Sensitive message blocked', {
+    console.info('[LINE webhook] Sensitive message detected', {
       requestId,
       eventId,
       riskLevel: sensitiveCheck.riskLevel,
       keywords: sensitiveCheck.keywords.slice(0, 5),
     });
-
-    try {
-      await replyMessage(replyToken, SENSITIVE_CONTENT_REPLY);
-    } catch (replyError) {
-      console.error('[LINE webhook] Failed to send sensitive-content reply', {
-        requestId,
-        eventId,
-        error: replyError instanceof Error ? replyError.message : String(replyError),
-      });
-    }
-
-    try {
-      await markAsProcessed(eventId);
-    } catch (markError) {
-      console.error('[LINE webhook] Failed to mark sensitive event processed', {
-        requestId,
-        eventId,
-        error: markError instanceof Error ? markError.message : String(markError),
-      });
-    }
-    return;
   }
 
   if (!ownerUserId) {
@@ -405,7 +393,6 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
       outside_hours_mode: outsideHoursMode,
       outside_hours_message: outsideHoursMessage,
       confidence_threshold: confidenceThreshold = 0.6,
-      low_confidence_action: lowConfidenceAction,
       handoff_message: handoffMessage,
       feedback_enabled: feedbackEnabled,
       feedback_message: feedbackMessage,
@@ -425,6 +412,17 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
         await markAsProcessed(eventId);
         return;
       }
+    }
+
+    const userConv = await insertConversationMessage(contact.id, userMessage, 'user');
+    if (userConv?.id) {
+      void storeSentimentAndAlert(
+        userConv.id,
+        contact.id,
+        ownerUserId,
+        userMessage,
+        contact.name ?? null
+      );
     }
 
     const { text: knowledgeText, sources } = await searchKnowledgeWithSources(
@@ -463,7 +461,8 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
           variant,
         });
       }
-      effectiveSystemPrompt = variant === 'A' ? runningTest.variant_a_prompt : runningTest.variant_b_prompt;
+      effectiveSystemPrompt =
+        variant === 'A' ? runningTest.variant_a_prompt : runningTest.variant_b_prompt;
       abTestId = runningTest.id;
       abVariant = variant;
     }
@@ -472,82 +471,86 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
       ? effectiveSystemPrompt + KNOWLEDGE_PREFIX + knowledgeText
       : effectiveSystemPrompt + KNOWLEDGE_EMPTY_INSTRUCTION;
 
-    // Sprint 5: Guidance rules
     const { data: guidanceRules } = await admin
       .from('ai_guidance_rules')
       .select('rule_title, rule_content')
       .eq('user_id', ownerUserId)
       .eq('is_enabled', true)
       .order('priority', { ascending: true });
-    const guidance = (guidanceRules ?? []).map((r) => ({ rule_title: r.rule_title, rule_content: r.rule_content }));
+    const guidance = (guidanceRules ?? []).map((r) => ({
+      rule_title: r.rule_title,
+      rule_content: r.rule_content,
+    }));
 
-    // Sprint 9: Conversation memory
-    const count = Math.max(1, Math.min(30, memoryCount ?? 5));
-    let recentMessages: { role: 'user' | 'assistant'; content: string }[];
-    if (memoryMode === 'summary' && count > 10) {
-      const allRecent = await getRecentConversationMessages(contact.id, count);
-      if (allRecent.length > 3) {
-        const toSummarize = allRecent.slice(0, -3);
-        const keepRecent = allRecent.slice(-3);
-        const summary = await summarizeConversation(toSummarize);
-        recentMessages = [
-          { role: 'assistant' as const, content: `【前面對話摘要】${summary}` },
-          ...keepRecent,
-        ];
-      } else {
-        recentMessages = allRecent;
-      }
-    } else {
-      recentMessages = await getRecentConversationMessages(contact.id, count);
-    }
-    const aiResponse = await generateReply(
+    const decisionSources: ReplyDecisionSource[] = sources.map((source) => ({
+      id: source.id,
+      title: source.title,
+      category: source.category,
+    }));
+
+    let decision = decideReplyAction({
       userMessage,
-      basePrompt,
-      aiModel,
-      ownerUserId,
-      contact.id,
-      recentMessages,
-      {
-        maxReplyLength,
-        replyTemperature,
-        replyFormat,
-        autoDetectLanguage,
-        supportedLanguages,
-        fallbackLanguage,
-        guidanceRules: guidance,
-      }
-    );
-
-    let finalReply = aiResponse;
-    let guardrailTriggered = false;
-    for (const pattern of FORBIDDEN_PATTERNS) {
-      if (pattern.test(aiResponse)) {
-        finalReply = GUARDRAIL_SAFE_REPLY;
-        guardrailTriggered = true;
-        break;
-      }
-    }
-    if (finalReply.length > MAX_REPLY_LENGTH) {
-      finalReply = finalReply.substring(0, MAX_REPLY_LENGTH - 3) + '...';
-    }
-
-    // Sprint 6: 信心分數 + 低信心動作
-    const confidence = calculateConfidence({
-      knowledgeSourceCount: sources.length,
-      aiReply: finalReply,
-      guardrailTriggered,
+      userId: ownerUserId,
+      contactId: contact.id,
+      sourcesCount: sources.length,
+      riskDetection: sensitiveCheck,
+      settings: { confidence_threshold: confidenceThreshold },
+      sources: decisionSources,
     });
-    const threshold = confidenceThreshold ?? 0.6;
-    if (confidence.score < threshold) {
-      const action = lowConfidenceAction ?? 'handoff';
-      if (action === 'handoff') {
-        finalReply = handoffMessage || '這個問題需要專人為您處理，請稍候。';
-      } else if (action === 'append_disclaimer') {
-        finalReply += '\n\n（以上回覆供參考，如需進一步協助請輸入「轉人工」）';
+
+    const shouldGenerateDraft = decision.action === 'AUTO' || decision.action === 'SUGGEST';
+    let guardrailTriggered = false;
+    if (shouldGenerateDraft) {
+      const count = Math.max(1, Math.min(30, memoryCount ?? 5));
+      let recentMessages: { role: 'user' | 'assistant'; content: string }[];
+      if (memoryMode === 'summary' && count > 10) {
+        const allRecent = await getRecentConversationMessages(contact.id, count);
+        if (allRecent.length > 3) {
+          const toSummarize = allRecent.slice(0, -3);
+          const keepRecent = allRecent.slice(-3);
+          const summary = await summarizeConversation(toSummarize);
+          recentMessages = [
+            { role: 'assistant' as const, content: `【前面對話摘要】${summary}` },
+            ...keepRecent,
+          ];
+        } else {
+          recentMessages = allRecent;
+        }
+      } else {
+        recentMessages = await getRecentConversationMessages(contact.id, count);
       }
+
+      const aiResponse = await generateReply(
+        userMessage,
+        basePrompt,
+        aiModel,
+        ownerUserId,
+        contact.id,
+        recentMessages,
+        {
+          maxReplyLength,
+          replyTemperature,
+          replyFormat,
+          autoDetectLanguage,
+          supportedLanguages,
+          fallbackLanguage,
+          guidanceRules: guidance,
+        }
+      );
+      const guardrail = applyReplyGuardrail(aiResponse);
+      guardrailTriggered = guardrail.guardrailTriggered;
+      decision = decideReplyAction({
+        userMessage,
+        userId: ownerUserId,
+        contactId: contact.id,
+        sourcesCount: sources.length,
+        riskDetection: sensitiveCheck,
+        settings: { confidence_threshold: confidenceThreshold },
+        sources: decisionSources,
+        candidateDraft: guardrail.safeReply,
+      });
     }
 
-    // Sprint 3: 回覆延遲（模擬真人打字）
     const delayMs = (replyDelaySeconds ?? 0) * 1000;
     if (delayMs > 0) {
       await new Promise((resolve) => setTimeout(resolve, delayMs));
@@ -559,51 +562,122 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
         label: (qr.text ?? '').trim().substring(0, 20),
         text: (qr.text ?? '').trim(),
       }));
-    await replyMessage(
-      replyToken,
-      finalReply,
-      enabledQuickReplies.length > 0 ? enabledQuickReplies : undefined
-    );
 
-    const userConv = await insertConversationMessage(contact.id, userMessage, 'user');
-    if (userConv?.id) void storeSentimentAndAlert(userConv.id, contact.id, ownerUserId, userMessage, contact.name ?? null);
-    const needsHumanFromUser = HUMAN_HANDOFF_KEYWORDS.some((keyword) =>
-      userMessage.toLowerCase().includes(keyword.toLowerCase())
-    );
-    const needsHumanFromAi = AI_HANDOFF_PHRASES.some((phrase) => finalReply.includes(phrase));
-    const needsHuman =
-      guardrailTriggered || needsHumanFromUser || needsHumanFromAi;
-    const resolution = needsHuman
-      ? { status: 'needs_human' as const, resolved_by: 'unresolved', is_resolved: false }
-      : computeResolution(sources.length, finalReply);
-    const inserted = await insertConversationMessage(contact.id, finalReply, 'assistant', {
-      status: resolution.status,
-      resolved_by: resolution.resolved_by,
-      is_resolved: resolution.is_resolved,
-      confidence_score: confidence.score,
-      ab_test_id: abTestId,
-      ab_variant: abVariant,
-    });
+    let insertedAssistant:
+      | Awaited<ReturnType<typeof insertConversationMessage>>
+      | null = null;
 
-    // Sprint 8: 滿意度回饋 push
-    if (feedbackEnabled && inserted?.id && lineUserId) {
-      try {
-        const feedbackText = feedbackMessage || '這個回覆有幫助嗎？';
-        await pushMessage(lineUserId, {
-          type: 'template',
-          altText: feedbackText,
-          template: {
-            type: 'confirm',
-            text: feedbackText,
-            actions: [
-              { type: 'postback', label: '👍 有幫助', data: `feedback:positive:${inserted.id}` },
-              { type: 'postback', label: '👎 沒幫助', data: `feedback:negative:${inserted.id}` },
-            ],
-          },
-        });
-      } catch (e) {
-        console.warn('[LINE webhook] Feedback push failed', { requestId, error: e });
+    if (decision.action === 'AUTO') {
+      await replyMessage(
+        replyToken,
+        decision.draftText,
+        enabledQuickReplies.length > 0 ? enabledQuickReplies : undefined
+      );
+
+      const needsHumanFromUser = HUMAN_HANDOFF_KEYWORDS.some((keyword) =>
+        userMessage.toLowerCase().includes(keyword.toLowerCase())
+      );
+      const needsHumanFromAi = AI_HANDOFF_PHRASES.some((phrase) =>
+        decision.draftText.includes(phrase)
+      );
+      const needsHuman = guardrailTriggered || needsHumanFromUser || needsHumanFromAi;
+      const resolution = needsHuman
+        ? { status: 'needs_human' as const, resolved_by: 'unresolved', is_resolved: false }
+        : computeResolution(sources.length, decision.draftText);
+
+      insertedAssistant = await insertConversationMessage(
+        contact.id,
+        decision.draftText,
+        'assistant',
+        {
+          status: resolution.status,
+          resolved_by: resolution.resolved_by,
+          is_resolved: resolution.is_resolved,
+          confidence_score: decision.confidence,
+          ab_test_id: abTestId,
+          ab_variant: abVariant,
+        }
+      );
+
+      if (feedbackEnabled && insertedAssistant?.id && lineUserId) {
+        try {
+          const feedbackText = feedbackMessage || '這個回覆有幫助嗎？';
+          await pushMessage(lineUserId, {
+            type: 'template',
+            altText: feedbackText,
+            template: {
+              type: 'confirm',
+              text: feedbackText,
+              actions: [
+                { type: 'postback', label: '👍 有幫助', data: `feedback:positive:${insertedAssistant.id}` },
+                { type: 'postback', label: '👎 沒幫助', data: `feedback:negative:${insertedAssistant.id}` },
+              ],
+            },
+          });
+        } catch (e) {
+          console.warn('[LINE webhook] Feedback push failed', { requestId, error: e });
+        }
       }
+    } else if (decision.action === 'SUGGEST') {
+      const { error: suggestionError } = await admin.from('ai_suggestions').insert({
+        user_id: ownerUserId,
+        contact_id: contact.id,
+        source_message_id: userConv?.id ?? null,
+        draft_text: decision.draftText,
+        action: decision.action,
+        category: decision.category,
+        confidence: decision.confidence,
+        reason: decision.reason,
+        sources: {
+          count: decision.sources.count,
+          titles: decision.sources.titles,
+          items: decisionSources,
+        },
+        status: 'pending',
+      });
+      if (suggestionError) {
+        throw suggestionError;
+      }
+
+      await replyMessage(replyToken, SUGGEST_ACK_REPLY);
+      insertedAssistant = await insertConversationMessage(
+        contact.id,
+        SUGGEST_ACK_REPLY,
+        'assistant',
+        {
+          status: 'needs_human',
+          resolved_by: 'unresolved',
+          is_resolved: false,
+          confidence_score: decision.confidence,
+          ab_test_id: abTestId,
+          ab_variant: abVariant,
+        }
+      );
+    } else if (decision.action === 'ASK') {
+      const askText = decision.askText || decision.draftText;
+      await replyMessage(replyToken, askText);
+      const askNeedsHuman = ['refund', 'discount', 'price', 'shipping', 'delivery', 'complaint'].includes(
+        decision.category
+      );
+      insertedAssistant = await insertConversationMessage(contact.id, askText, 'assistant', {
+        status: askNeedsHuman ? 'needs_human' : 'ai_handled',
+        resolved_by: askNeedsHuman ? 'unresolved' : 'ai',
+        is_resolved: !askNeedsHuman,
+        confidence_score: decision.confidence,
+        ab_test_id: abTestId,
+        ab_variant: abVariant,
+      });
+    } else {
+      const handoffText = handoffMessage?.trim() || getDefaultHandoffText();
+      await replyMessage(replyToken, handoffText);
+      insertedAssistant = await insertConversationMessage(contact.id, handoffText, 'assistant', {
+        status: 'needs_human',
+        resolved_by: 'unresolved',
+        is_resolved: false,
+        confidence_score: decision.confidence,
+        ab_test_id: abTestId,
+        ab_variant: abVariant,
+      });
     }
 
     void autoTagContact(contact.id, ownerUserId, userMessage);
@@ -616,6 +690,9 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
       eventId,
       contactId: contact.id,
       lineUserId,
+      action: decision.action,
+      category: decision.category,
+      confidence: decision.confidence,
     });
   } catch (error) {
     console.error('[LINE webhook] Event error', {
@@ -633,6 +710,7 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
     } catch (replyError) {
       console.error('Error sending error message:', replyError);
     }
+    throw error;
   }
 }
 
