@@ -140,7 +140,8 @@ test.describe.serial('CustomerAIPro — 24 步 UI Checklist', () => {
   test('19. Billing 頁面 + 方案卡片', async ({ page }) => {
     await page.goto('/dashboard/billing');
     await page.waitForLoadState('networkidle');
-    await expect(page.getByText(/方案與計費|Free|Basic|Pro|Enterprise/).first()).toBeVisible();
+    const plansSection = page.locator('#plans-section');
+    await expect(plansSection.getByRole('heading', { name: /Free|Basic|Pro|Enterprise|免費|進階|企業|免費試用|企業版/ }).first()).toBeVisible();
   });
 
   test('20. Billing 用量 API', async ({ page }) => {

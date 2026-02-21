@@ -437,14 +437,17 @@ export default function ContactsPage() {
                                 <p className="text-xs font-medium text-gray-500">{t('addTag')}</p>
                                 <input
                                   type="text"
+                                  id="new-tag-name"
                                   value={newTagName}
                                   onChange={(e) => setNewTagName(e.target.value)}
                                   placeholder={t('tagNamePlaceholder')}
+                                  aria-label={t('tagNamePlaceholder')}
                                   className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
                                 />
                                 <select
                                   value={newTagColor}
                                   onChange={(e) => setNewTagColor(e.target.value)}
+                                  aria-label={t('colTags')}
                                   className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
                                 >
                                   {TAG_COLORS.map((col) => (
@@ -511,8 +514,9 @@ export default function ContactsPage() {
             </div>
             <div className="mt-4 space-y-3">
               <div>
-                <label className="block text-sm text-gray-600">{t('colName')}</label>
+                <label htmlFor="detail-name" className="block text-sm text-gray-600">{t('colName')}</label>
                 <input
+                  id="detail-name"
                   value={detailForm.name}
                   onChange={(e) => setDetailForm((prev) => ({ ...prev, name: e.target.value }))}
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
@@ -525,41 +529,47 @@ export default function ContactsPage() {
                 </p>
               </div>
               <div>
-                <label className="block text-sm text-gray-600">{t('colEmail')}</label>
+                <label htmlFor="detail-email" className="block text-sm text-gray-600">{t('colEmail')}</label>
                 <input
+                  id="detail-email"
                   value={detailForm.email}
                   onChange={(e) => setDetailForm((prev) => ({ ...prev, email: e.target.value }))}
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-600">{t('colPhone')}</label>
+                <label htmlFor="detail-phone" className="block text-sm text-gray-600">{t('colPhone')}</label>
                 <input
+                  id="detail-phone"
                   value={detailForm.phone}
                   onChange={(e) => setDetailForm((prev) => ({ ...prev, phone: e.target.value }))}
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-600">{t('colCsat')}</label>
+                <label htmlFor="detail-csat" className="block text-sm text-gray-600">{t('colCsat')}</label>
                 <input
+                  id="detail-csat"
                   value={detailForm.csat_score}
                   onChange={(e) => setDetailForm((prev) => ({ ...prev, csat_score: e.target.value }))}
                   placeholder="0~5"
+                  aria-label={t('colCsat')}
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-600">{t('colTopTopic')}</label>
+                <label htmlFor="detail-top-topic" className="block text-sm text-gray-600">{t('colTopTopic')}</label>
                 <input
+                  id="detail-top-topic"
                   value={detailForm.top_topic}
                   onChange={(e) => setDetailForm((prev) => ({ ...prev, top_topic: e.target.value }))}
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-600">{t('customerNotes')}</label>
+                <label htmlFor="detail-notes" className="block text-sm text-gray-600">{t('customerNotes')}</label>
                 <textarea
+                  id="detail-notes"
                   rows={5}
                   value={detailForm.notes}
                   onChange={(e) => setDetailForm((prev) => ({ ...prev, notes: e.target.value }))}
@@ -611,11 +621,13 @@ export default function ContactsPage() {
                         type="text"
                         value={editingName}
                         onChange={(e) => setEditingName(e.target.value)}
+                        aria-label={t('tagNamePlaceholder')}
                         className="flex-1 rounded border border-gray-300 px-2 py-1 text-sm"
                       />
                       <select
                         value={editingColor}
                         onChange={(e) => setEditingColor(e.target.value)}
+                        aria-label={t('colTags')}
                         className="rounded border border-gray-300 px-2 py-1 text-sm"
                       >
                         {TAG_COLORS.map((col) => (

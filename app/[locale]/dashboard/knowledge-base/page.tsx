@@ -760,6 +760,7 @@ export default function KnowledgeBasePage() {
                   <select
                     value={urlDepth}
                     onChange={(e) => setUrlDepth(Number(e.target.value))}
+                    aria-label={t('crawlDepth')}
                     className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
                   >
                     <option value={1}>{t('depthOnePage')}</option>

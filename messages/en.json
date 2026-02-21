@@ -1,5 +1,6 @@
 {
   "common": {
+    "collapse": "Collapse",
     "search": "Search",
     "logout": "Log out",
     "loading": "Loading...",
@@ -703,6 +704,9 @@
     "confirmPassword": "Confirm password",
     "forgotPassword": "Forgot password?",
     "loginWithLine": "Sign in with LINE",
+    "lineNotLinked": "This LINE account is not linked. Please sign up first, then bind LINE in Settings.",
+    "lineNotConfigured": "LINE sign-in is not configured",
+    "bindRequiresLogin": "Please log in first to bind LINE",
     "errorPasswordMismatch": "Passwords do not match",
     "forgotPasswordHint": "Enter your email and we'll send you a reset link.",
     "forgotPasswordSent": "We've sent a password reset link to your email.",

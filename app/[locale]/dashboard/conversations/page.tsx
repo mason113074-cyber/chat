@@ -842,7 +842,7 @@ export default function ConversationsPage() {
                   </div>
                 ) : (
                   <div className="divide-y divide-gray-100">
-                    <div className="flex items-center gap-3 p-3 border-b border-gray-100 bg-gray-50/80" role="row">
+                    <div className="flex items-center gap-3 p-3 border-b border-gray-100 bg-gray-50/80">
                       <input
                         type="checkbox"
                         checked={allFilteredSelected}

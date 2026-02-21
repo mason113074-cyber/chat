@@ -1,5 +1,6 @@
 {
   "common": {
+    "collapse": "收合",
     "search": "搜尋",
     "logout": "登出",
     "loading": "載入中...",
@@ -709,6 +710,9 @@
     "confirmPassword": "確認密碼",
     "forgotPassword": "忘記密碼？",
     "loginWithLine": "用 LINE 登入",
+    "lineNotLinked": "此 LINE 帳號尚未綁定。請先註冊並登入，再到設定中綁定 LINE。",
+    "lineNotConfigured": "LINE 登入功能未設定",
+    "bindRequiresLogin": "請先登入後再綁定 LINE",
     "errorPasswordMismatch": "兩次輸入的密碼不一致",
     "forgotPasswordHint": "輸入您的 Email，我們將寄送重設密碼連結。",
     "forgotPasswordSent": "我們已寄出重設密碼連結至您的 Email，請查收。",

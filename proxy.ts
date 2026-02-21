@@ -5,23 +5,73 @@ import { routing } from './i18n/routing';
 
 const intlMiddleware = createIntlMiddleware(routing);
 
+async function getSupabaseUser(
+  request: NextRequest
+): Promise<{ user: { id: string } | null; response: NextResponse }> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  let response = NextResponse.next({ request });
+  if (!url || !anonKey) return { user: null, response };
+  const supabase = createServerClient(url, anonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet: { name: string; value: string; options?: Record<string, unknown> }[]) {
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+        response = NextResponse.next({ request });
+        cookiesToSet.forEach(({ name, value, options }) =>
+          response.cookies.set(name, value, options ?? {})
+        );
+      },
+    },
+  });
+  const { data: { user } } = await supabase.auth.getUser();
+  return { user, response };
+}
+
 export async function proxy(request: NextRequest) {
-  // Run next-intl first (redirects / to /zh-TW or /en, etc.)
+  const pathname = request.nextUrl.pathname;
+  const segments = pathname.split('/').filter(Boolean);
+  const firstSegment = segments[0] ?? '';
+  const isDashboardOrSettingsPath =
+    firstSegment === 'dashboard' ||
+    firstSegment === 'settings' ||
+    ((firstSegment === 'zh-TW' || firstSegment === 'en') &&
+      (segments[1] === 'dashboard' || segments[1] === 'settings'));
+
+  if (isDashboardOrSettingsPath) {
+    const { user } = await getSupabaseUser(request);
+    if (!user) {
+      const locale =
+        firstSegment === 'zh-TW' || firstSegment === 'en' ? firstSegment : routing.defaultLocale;
+      return NextResponse.redirect(new URL(`/${locale}/login`, request.url));
+    }
+  }
+
   const intlResponse = await intlMiddleware(request);
   if (intlResponse && (intlResponse.status === 307 || intlResponse.status === 302)) {
+    const location = intlResponse.headers.get('location') || '';
+    const targetPath = new URL(location, request.url).pathname;
+    if (/^\/(zh-TW|en)\/(dashboard|settings)/.test(targetPath)) {
+      const { user } = await getSupabaseUser(request);
+      if (!user) {
+        const locale = /^\/(zh-TW|en)/.exec(targetPath)?.[1] ?? routing.defaultLocale;
+        return NextResponse.redirect(new URL(`/${locale}/login`, request.url));
+      }
+    }
     return intlResponse;
   }
 
-  const pathname = request.nextUrl.pathname;
-  const segments = pathname.split('/').filter(Boolean);
-  const locale = segments[0] ?? '';
+  const pathSegs = request.nextUrl.pathname.split('/').filter(Boolean);
+  const locale = pathSegs[0] ?? '';
   const isLocalePath = (routing.locales as readonly string[]).includes(locale);
-  const rest = isLocalePath ? segments.slice(1) : segments;
-  const firstSegment = rest[0] ?? '';
-  const isDashboard = isLocalePath && firstSegment === 'dashboard';
-  const isSettings = isLocalePath && firstSegment === 'settings';
+  const rest = isLocalePath ? pathSegs.slice(1) : pathSegs;
+  const restFirst = rest[0] ?? '';
+  const isDashboard = isLocalePath && restFirst === 'dashboard';
+  const isSettings = isLocalePath && restFirst === 'settings';
   const isDashboardOnboarding =
-    isLocalePath && firstSegment === 'dashboard' && rest[1] === 'onboarding';
+    isLocalePath && restFirst === 'dashboard' && rest[1] === 'onboarding';
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;

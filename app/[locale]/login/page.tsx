@@ -24,7 +24,18 @@ function LoginForm() {
     if (searchParams.get('signup') === 'true') {
       setIsSignUp(true);
     }
-  }, [searchParams]);
+    const err = searchParams.get('error');
+    const hint = searchParams.get('hint');
+    if (err === 'line_not_linked') {
+      setError(hint || t('lineNotLinked'));
+    } else if (err === 'line_not_configured') {
+      setError(t('lineNotConfigured'));
+    } else if (err === 'login_failed' || err === 'line_callback_failed') {
+      setError(t('errorGeneric'));
+    } else if (err === 'bind_requires_login') {
+      setError(t('bindRequiresLogin'));
+    }
+  }, [searchParams, t]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

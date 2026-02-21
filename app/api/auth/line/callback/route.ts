@@ -93,18 +93,60 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(`${appUrl}/zh-TW/dashboard/settings?line_bind=success`);
     }
 
-    // login: find user by line_login_user_id, then magic link
+    // login: find user by line_login_user_id, or sign up new user with LINE
     const admin = getSupabaseAdmin();
-    const { data: row, error: findError } = await admin
+    let row: { id: string; email: string } | null = null;
+
+    const { data: existingRow, error: findError } = await admin
       .from('users')
       .select('id, email')
       .eq('line_login_user_id', profile.userId)
       .maybeSingle();
 
-    if (findError || !row) {
-      return NextResponse.redirect(
-        `${appUrl}/zh-TW/login?error=line_not_linked&hint=請先註冊並在設定中綁定 LINE`
-      );
+    if (!findError && existingRow) {
+      row = existingRow;
+    }
+
+    if (!row) {
+      // LINE 帳號未綁定：嘗試用 LINE 直接註冊／登入
+      const syntheticEmail = `line_${profile.userId}@line.customeraipro.com`;
+      const { data: existingByEmail } = await admin
+        .from('users')
+        .select('id, email')
+        .eq('email', syntheticEmail)
+        .maybeSingle();
+
+      if (existingByEmail) {
+        row = existingByEmail;
+        await admin
+          .from('users')
+          .update({
+            line_login_user_id: profile.userId,
+            line_login_display_name: profile.displayName ?? null,
+            line_login_photo_url: profile.pictureUrl ?? null,
+          })
+          .eq('id', row.id);
+      } else {
+        const { data: newUserData, error: createError } = await admin.auth.admin.createUser({
+          email: syntheticEmail,
+          email_confirm: true,
+        });
+        if (createError || !newUserData.user) {
+          console.error('LINE signup createUser error:', createError);
+          return NextResponse.redirect(
+            `${appUrl}/zh-TW/login?error=line_not_linked&hint=請先註冊並在設定中綁定 LINE`
+          );
+        }
+        row = { id: newUserData.user.id, email: syntheticEmail };
+        await admin
+          .from('users')
+          .update({
+            line_login_user_id: profile.userId,
+            line_login_display_name: profile.displayName ?? null,
+            line_login_photo_url: profile.pictureUrl ?? null,
+          })
+          .eq('id', row.id);
+      }
     }
 
     const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({

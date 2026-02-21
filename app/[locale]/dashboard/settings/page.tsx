@@ -705,10 +705,11 @@ export default function SettingsPage() {
           <h2 className="text-lg font-semibold text-gray-900">{t('replyControl')}</h2>
           <div className="mt-4 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700">{t('maxReplyLength')}</label>
+              <label htmlFor="max-reply-length" className="block text-sm font-medium text-gray-700">{t('maxReplyLength')}</label>
               <p className="text-xs text-gray-500">{t('maxReplyLengthDesc')}</p>
               <div className="mt-2 flex items-center gap-3">
                 <input
+                  id="max-reply-length"
                   type="range"
                   min={50}
                   max={1000}
@@ -721,10 +722,11 @@ export default function SettingsPage() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">{t('replyTemperature')}</label>
+              <label htmlFor="reply-temperature" className="block text-sm font-medium text-gray-700">{t('replyTemperature')}</label>
               <p className="text-xs text-gray-500">{t('replyTemperatureDesc')}</p>
               <div className="mt-2 flex items-center gap-3">
                 <input
+                  id="reply-temperature"
                   type="range"
                   min={0}
                   max={1}
@@ -737,8 +739,9 @@ export default function SettingsPage() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">{t('replyFormat')}</label>
+              <label htmlFor="reply-format" className="block text-sm font-medium text-gray-700">{t('replyFormat')}</label>
               <select
+                id="reply-format"
                 value={replyFormat}
                 onChange={(e) => setReplyFormat(e.target.value)}
                 className="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
@@ -757,9 +760,10 @@ export default function SettingsPage() {
           <p className="mt-1 text-sm text-gray-600">{t('replyDelayDesc')}</p>
           <div className="mt-4 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700">{t('replyDelaySeconds')}</label>
+              <label htmlFor="reply-delay" className="block text-sm font-medium text-gray-700">{t('replyDelaySeconds')}</label>
               <div className="mt-2 flex items-center gap-3">
                 <input
+                  id="reply-delay"
                   type="range"
                   min={0}
                   max={5}
@@ -829,8 +833,9 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">{t('fallbackLanguage')}</label>
+                  <label htmlFor="fallback-language" className="block text-sm font-medium text-gray-700">{t('fallbackLanguage')}</label>
                   <select
+                    id="fallback-language"
                     value={fallbackLanguage}
                     onChange={(e) => setFallbackLanguage(e.target.value)}
                     className="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
@@ -858,8 +863,9 @@ export default function SettingsPage() {
           <p className="mt-1 text-sm text-gray-600">{t('sensitiveWordsDesc')}</p>
           <div className="mt-4 space-y-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700">{t('sensitiveWords')}</label>
+              <label htmlFor="sensitive-words" className="block text-sm font-medium text-gray-700">{t('sensitiveWords')}</label>
               <textarea
+                id="sensitive-words"
                 value={customSensitiveWords.join('\n')}
                 onChange={(e) =>
                   setCustomSensitiveWords(
@@ -876,9 +882,10 @@ export default function SettingsPage() {
               <p className="mt-1 text-xs text-gray-500">{t('sensitiveWordCount', { count: customSensitiveWords.length })}</p>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">{t('sensitiveWordReply')}</label>
+              <label htmlFor="sensitive-word-reply" className="block text-sm font-medium text-gray-700">{t('sensitiveWordReply')}</label>
               <p className="text-xs text-gray-500">{t('sensitiveWordReplyDesc')}</p>
               <input
+                id="sensitive-word-reply"
                 type="text"
                 value={sensitiveWordReply}
                 onChange={(e) => setSensitiveWordReply(e.target.value)}
@@ -918,6 +925,7 @@ export default function SettingsPage() {
                   placeholder={t('ruleTitlePlaceholder')}
                   value={guidanceForm.title}
                   onChange={(e) => setGuidanceForm((p) => p && { ...p, title: e.target.value })}
+                  aria-label={t('ruleTitlePlaceholder')}
                   className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 placeholder:text-gray-400"
                 />
                 <textarea
@@ -925,6 +933,7 @@ export default function SettingsPage() {
                   value={guidanceForm.content}
                   onChange={(e) => setGuidanceForm((p) => p && { ...p, content: e.target.value })}
                   rows={2}
+                  aria-label={t('ruleContentPlaceholder')}
                   className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 placeholder:text-gray-400"
                 />
                 <div className="flex gap-2">
@@ -970,9 +979,10 @@ export default function SettingsPage() {
           <p className="mt-1 text-sm text-gray-600">{t('confidenceThresholdDesc')}</p>
           <div className="mt-4 space-y-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700">{t('confidenceThreshold')}</label>
+              <label htmlFor="confidence-threshold" className="block text-sm font-medium text-gray-700">{t('confidenceThreshold')}</label>
               <div className="flex items-center gap-2 mt-1">
                 <input
+                  id="confidence-threshold"
                   type="range"
                   min={0}
                   max={1}
@@ -985,8 +995,9 @@ export default function SettingsPage() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">{t('lowConfidenceAction')}</label>
+              <label htmlFor="low-confidence-action" className="block text-sm font-medium text-gray-700">{t('lowConfidenceAction')}</label>
               <select
+                id="low-confidence-action"
                 value={lowConfidenceAction}
                 onChange={(e) => setLowConfidenceAction(e.target.value)}
                 className="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900"
@@ -997,8 +1008,9 @@ export default function SettingsPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">{t('handoffMessage')}</label>
+              <label htmlFor="handoff-message" className="block text-sm font-medium text-gray-700">{t('handoffMessage')}</label>
               <input
+                id="handoff-message"
                 type="text"
                 value={handoffMessage}
                 onChange={(e) => setHandoffMessage(e.target.value)}
@@ -1013,24 +1025,24 @@ export default function SettingsPage() {
           <h2 className="text-lg font-semibold text-gray-900">{t('businessHours')}</h2>
           <p className="mt-1 text-sm text-gray-600">{t('businessHoursDesc')}</p>
           <div className="mt-4 space-y-4">
-            <label className="flex items-center gap-2">
-              <input type="checkbox" checked={businessHoursEnabled} onChange={(e) => setBusinessHoursEnabled(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+            <label htmlFor="business-hours-enabled" className="flex items-center gap-2">
+              <input id="business-hours-enabled" type="checkbox" checked={businessHoursEnabled} onChange={(e) => setBusinessHoursEnabled(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
               <span className="text-sm font-medium text-gray-700">{t('enableBusinessHours')}</span>
             </label>
             {businessHoursEnabled && (
               <>
                 <div className="space-y-3 rounded-lg bg-gray-50 p-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">{t('outsideHoursMode')}</label>
-                    <select value={outsideHoursMode} onChange={(e) => setOutsideHoursMode(e.target.value)} className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                    <label htmlFor="outside-hours-mode" className="block text-sm font-medium text-gray-700">{t('outsideHoursMode')}</label>
+                    <select id="outside-hours-mode" value={outsideHoursMode} onChange={(e) => setOutsideHoursMode(e.target.value)} className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
                       <option value="auto_reply">{t('modeAutoReply')}</option>
                       <option value="ai_only">{t('modeAiOnly')}</option>
                       <option value="collect_info">{t('modeCollectInfo')}</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">{t('outsideHoursMessage')}</label>
-                    <textarea value={outsideHoursMessage} onChange={(e) => setOutsideHoursMessage(e.target.value)} rows={2} className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
+                    <label htmlFor="outside-hours-message" className="block text-sm font-medium text-gray-700">{t('outsideHoursMessage')}</label>
+                    <textarea id="outside-hours-message" value={outsideHoursMessage} onChange={(e) => setOutsideHoursMessage(e.target.value)} rows={2} className="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" />
                   </div>
                 </div>
                 <div>
@@ -1136,15 +1148,15 @@ export default function SettingsPage() {
           <p className="mt-1 text-sm text-gray-600">{t('memoryCountDesc')}</p>
           <div className="mt-4 space-y-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700">{t('memoryCount')}</label>
+              <label htmlFor="memory-count" className="block text-sm font-medium text-gray-700">{t('memoryCount')}</label>
               <div className="flex items-center gap-2 mt-1">
-                <input type="range" min={1} max={30} value={conversationMemoryCount} onChange={(e) => setConversationMemoryCount(Number(e.target.value))} className="flex-1" />
+                <input id="memory-count" type="range" min={1} max={30} value={conversationMemoryCount} onChange={(e) => setConversationMemoryCount(Number(e.target.value))} className="flex-1" />
                 <span className="text-sm w-8">{conversationMemoryCount}</span>
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">{t('memoryMode')}</label>
-              <select value={conversationMemoryMode} onChange={(e) => setConversationMemoryMode(e.target.value)} className="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900">
+              <label htmlFor="memory-mode" className="block text-sm font-medium text-gray-700">{t('memoryMode')}</label>
+              <select id="memory-mode" value={conversationMemoryMode} onChange={(e) => setConversationMemoryMode(e.target.value)} className="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900">
                 <option value="recent">{t('modeRecent')}</option>
                 <option value="summary">{t('modeSummary')}</option>
               </select>
@@ -1163,8 +1175,8 @@ export default function SettingsPage() {
               <span className="text-sm">{t('enableWelcomeMessage')}</span>
             </label>
             <div>
-              <label className="block text-sm font-medium text-gray-700">{t('welcomeMessageContent')}</label>
-              <textarea value={welcomeMessage} onChange={(e) => setWelcomeMessage(e.target.value)} rows={3} placeholder={t('welcomeMessagePlaceholder')} className="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400" />
+              <label htmlFor="welcome-message" className="block text-sm font-medium text-gray-700">{t('welcomeMessageContent')}</label>
+              <textarea id="welcome-message" value={welcomeMessage} onChange={(e) => setWelcomeMessage(e.target.value)} rows={3} placeholder={t('welcomeMessagePlaceholder')} className="mt-1 block w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400" />
               <p className="mt-1 text-xs text-gray-500">{t('characterCount', { count: welcomeMessage.length })}</p>
             </div>
           </div>
@@ -1262,8 +1274,9 @@ export default function SettingsPage() {
                   className="w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 placeholder:text-gray-400"
                 />
                 <div className="flex items-center gap-2">
-                  <label className="text-sm">{t('abTestTrafficSplit')}</label>
+                  <label htmlFor="ab-test-traffic" className="text-sm">{t('abTestTrafficSplit')}</label>
                   <input
+                    id="ab-test-traffic"
                     type="range"
                     min={0}
                     max={100}
@@ -1549,7 +1562,7 @@ export default function SettingsPage() {
         <div className="hidden lg:block lg:w-2/5 lg:sticky lg:top-24 self-start">
           <div className="rounded-xl bg-gradient-to-br from-indigo-50 to-purple-50 p-4 shadow-sm border border-indigo-100">
             <h2 className="text-lg font-semibold text-gray-900 mb-3">{t('livePreview')}</h2>
-            <div className="mx-auto max-w-sm rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden" style={{ height: '500px' }}>
+            <div className="mx-auto max-w-sm h-[500px] rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden">
               <div className="bg-indigo-600 text-white px-4 py-3 flex items-center gap-2">
                 <span className="font-medium text-base truncate">{storeName || t('storeNamePlaceholder')}</span>
                 <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" title="線上" />
@@ -1721,7 +1734,7 @@ export default function SettingsPage() {
         </button>
         {previewOpen && (
           <div className="mt-2 rounded-xl bg-gradient-to-br from-indigo-50 to-purple-50 p-4 shadow-sm border border-indigo-100">
-            <div className="mx-auto max-w-sm rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden" style={{ height: '500px' }}>
+            <div className="mx-auto max-w-sm h-[500px] rounded-xl border border-gray-200 bg-white shadow-lg overflow-hidden">
               <div className="bg-indigo-600 text-white px-4 py-3 flex items-center gap-2">
                 <span className="font-medium text-base truncate">{storeName || t('storeNamePlaceholder')}</span>
                 <span className="w-2 h-2 rounded-full bg-green-400 shrink-0" />

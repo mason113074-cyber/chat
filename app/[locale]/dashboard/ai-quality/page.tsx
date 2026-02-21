@@ -78,7 +78,7 @@ export default function AIQualityPage() {
               <span className="w-16 text-sm">{d.range}</span>
               <div className="flex-1 bg-gray-200 rounded-full h-4">
                 <div
-                  className="bg-indigo-500 rounded-full h-4"
+                  className="bg-indigo-500 rounded-full h-4 shrink-0"
                   style={{ width: `${(d.count / maxCount) * 100}%` }}
                 />
               </div>
