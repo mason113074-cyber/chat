@@ -12,8 +12,9 @@ export default function AIQualityPage() {
     avgConfidenceScore: number;
     feedbackStats: { positiveRate: number; total: number };
     confidenceDistribution: { range: string; count: number }[];
-    topLowConfidenceQuestions: { question: string; confidence: number }[];
+    topLowConfidenceQuestions: { conversation_id: string; question: string; confidence: number }[];
   } | null>(null);
+  const [addingToKb, setAddingToKb] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -95,9 +96,44 @@ export default function AIQualityPage() {
             <li className="text-gray-400">{t('noData') ?? '尚無數據'}</li>
           ) : (
             data.topLowConfidenceQuestions.map((q, i) => (
-              <li key={i} className="flex justify-between text-sm">
+              <li key={i} className="flex items-center justify-between gap-2 text-sm">
                 <span className="truncate flex-1">{q.question}</span>
-                <span className="text-orange-600 ml-2">{(q.confidence * 100).toFixed(0)}%</span>
+                <span className="text-orange-600 shrink-0">{(q.confidence * 100).toFixed(0)}%</span>
+                <button
+                  type="button"
+                  disabled={addingToKb === q.conversation_id}
+                  onClick={async () => {
+                    if (!('conversation_id' in q)) return;
+                    setAddingToKb(q.conversation_id);
+                    try {
+                      const res = await fetch('/api/knowledge-base/from-conversation', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          conversation_id: q.conversation_id,
+                          title: q.question.slice(0, 100) || '低信心回覆',
+                        }),
+                      });
+                      if (res.ok) {
+                        setData((d) =>
+                          d
+                            ? {
+                                ...d,
+                                topLowConfidenceQuestions: d.topLowConfidenceQuestions.filter(
+                                  (x) => x.conversation_id !== q.conversation_id
+                                ),
+                              }
+                            : d
+                        );
+                      }
+                    } finally {
+                      setAddingToKb(null);
+                    }
+                  }}
+                  className="shrink-0 rounded bg-indigo-100 px-2 py-0.5 text-xs text-indigo-800 hover:bg-indigo-200 disabled:opacity-50"
+                >
+                  {addingToKb === q.conversation_id ? '處理中…' : '納入知識庫'}
+                </button>
               </li>
             ))
           )}

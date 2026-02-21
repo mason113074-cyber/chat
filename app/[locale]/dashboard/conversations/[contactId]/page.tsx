@@ -25,7 +25,12 @@ type Contact = {
   name: string | null;
   line_user_id: string;
   tags: ContactTag[];
+  ticket_number?: string | null;
+  ticket_priority?: string | null;
+  assigned_to_id?: string | null;
 };
+
+type Note = { id: string; body: string; created_at: string; user_id: string };
 
 type ConversationStatus = 'ai_handled' | 'needs_human' | 'resolved' | 'closed';
 
@@ -48,6 +53,9 @@ export default function ConversationDetailPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [statusSaving, setStatusSaving] = useState(false);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [noteInput, setNoteInput] = useState('');
+  const [noteSaving, setNoteSaving] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -76,6 +84,12 @@ export default function ConversationDetailPage() {
       if (tagsRes.ok) {
         const tagsJson = await tagsRes.json();
         setAllTags(tagsJson.tags ?? []);
+      }
+
+      const notesRes = await fetch(`/api/contacts/${contactId}/notes`);
+      if (notesRes.ok) {
+        const notesJson = await notesRes.json();
+        setNotes(notesJson.notes ?? []);
       }
 
       const { data: conversationsData } = await supabase
@@ -256,6 +270,73 @@ export default function ConversationDetailPage() {
             </button>
           ))}
           {allTags.length === 0 && <span className="text-xs text-gray-400">尚無標籤，請至客戶管理建立</span>}
+        </div>
+      </div>
+
+      {/* 工單（可選） */}
+      {(contact.ticket_number || contact.ticket_priority || contact.assigned_to_id) && (
+        <div className="bg-amber-50 border-b border-amber-100 p-4">
+          <h3 className="text-sm font-medium text-amber-800 mb-2">工單</h3>
+          <div className="flex flex-wrap gap-2 text-sm">
+            {contact.ticket_number && (
+              <span className="rounded bg-amber-200 px-2 py-0.5 font-mono text-amber-900">{contact.ticket_number}</span>
+            )}
+            {contact.ticket_priority && (
+              <span className="rounded bg-amber-100 px-2 py-0.5 text-amber-800">優先：{contact.ticket_priority}</span>
+            )}
+            {contact.assigned_to_id && (
+              <span className="rounded bg-amber-100 px-2 py-0.5 text-amber-800">指派：{contact.assigned_to_id.slice(0, 8)}…</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 內部備註（僅團隊可見） */}
+      <div className="bg-white border-b border-gray-200 p-4">
+        <h3 className="text-sm font-medium text-gray-700 mb-2">內部備註</h3>
+        <p className="text-xs text-gray-500 mb-2">僅團隊可見，不會傳送給客戶</p>
+        <ul className="mb-3 space-y-1 max-h-32 overflow-y-auto">
+          {notes.map((n) => (
+            <li key={n.id} className="rounded bg-gray-100 px-2 py-1.5 text-sm text-gray-800">
+              {n.body}
+              <span className="ml-2 text-xs text-gray-400">{new Date(n.created_at).toLocaleString('zh-TW')}</span>
+            </li>
+          ))}
+          {notes.length === 0 && <li className="text-xs text-gray-400">尚無備註</li>}
+        </ul>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={noteInput}
+            onChange={(e) => setNoteInput(e.target.value)}
+            placeholder="新增備註…"
+            className="flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm"
+          />
+          <button
+            type="button"
+            disabled={noteSaving || !noteInput.trim()}
+            onClick={async () => {
+              if (!noteInput.trim()) return;
+              setNoteSaving(true);
+              try {
+                const res = await fetch(`/api/contacts/${contactId}/notes`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ body: noteInput.trim() }),
+                });
+                if (res.ok) {
+                  const json = await res.json();
+                  setNotes((prev) => [...prev, json.note]);
+                  setNoteInput('');
+                }
+              } finally {
+                setNoteSaving(false);
+              }
+            }}
+            className="rounded bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700 disabled:opacity-50"
+          >
+            新增
+          </button>
         </div>
       </div>
 

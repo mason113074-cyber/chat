@@ -120,21 +120,23 @@ test.describe.serial('E2E 稽核', () => {
     expect(stayedOnLogin).toBeTruthy();
   });
 
-  test('A3. 未登入訪問 /dashboard 應導向登入', async ({ playwright, baseURL }) => {
+  test('A3. 未登入訪問 /dashboard 應導向登入', async ({ browser, baseURL }) => {
     test.skip(
-      baseURL.includes('customeraipro.com'),
+      baseURL?.includes('customeraipro.com'),
       'A3 需對 localhost 測試；production 須 deploy proxy auth 修正後再驗證'
     );
-    const ctx = await playwright.request.newContext({ baseURL });
-    const res = await ctx.get('/dashboard', { maxRedirects: 5 });
-    const finalUrl = res.url();
-    const redirectedToLogin = /\/(zh-TW|en)\/login/.test(finalUrl);
-    await ctx.dispose();
+    // Next.js 多為 client-side 導向，用瀏覽器測未登入訪問
+    const ctx = await browser.newContext({ baseURL, storageState: { cookies: [], origins: [] } });
+    const page = await ctx.newPage();
+    await page.goto('/dashboard', { waitUntil: 'networkidle' });
+    const url = page.url();
+    const redirectedToLogin = /\/(zh-TW|en)\/login/.test(url);
+    await ctx.close();
     if (!redirectedToLogin) {
       auditCritical.push({
         scenario: 'A3 未登入應被導向登入頁',
         trigger: '未帶 session 直接訪問 /dashboard',
-        errorLog: `預期最終導向 /login，實際 URL: ${finalUrl}. Status: ${res.status()}`,
+        errorLog: `預期最終導向 /login，實際 URL: ${url}`,
       });
     }
     expect(redirectedToLogin).toBeTruthy();
@@ -334,19 +336,23 @@ test.describe.serial('E2E 稽核', () => {
     await page.waitForLoadState('networkidle').catch(() => {});
     const signOut = page.getByRole('button', { name: /登出|Sign out|Log out/ });
     if (await signOut.isVisible()) {
-      await signOut.click();
-      await page.waitForURL(/\/(login|zh-TW\/login|en\/login)/, { timeout: 8000 }).catch(() => {});
+      await signOut.click({ force: true });
+      await page.waitForURL(/\/(login|zh-TW\/login|en\/login)/, { timeout: 12000 }).catch(() => {});
     }
     const urlAfter = page.url();
     const onLogin = /\/login/.test(urlAfter);
     if (!onLogin) {
       auditWarning.push({
         scenario: 'A4',
-        description: '登出後未確認是否導向登入頁（可能無登出按鈕或選擇器變更）',
+        description: '登出後未導向登入頁（可能無登出按鈕或選擇器變更）',
       });
     }
+    expect(onLogin).toBeTruthy();
+    if (!onLogin) return;
     await page.goto('/dashboard');
     await page.waitForLoadState('networkidle').catch(() => {});
+    // Client-side 導向可能稍慢，再等一次 URL 穩定
+    await page.waitForURL(/\/(login|zh-TW\/login|en\/login|dashboard)/, { timeout: 10000 }).catch(() => {});
     const finalUrl = page.url();
     const blocked = /\/login/.test(finalUrl);
     if (!blocked) {

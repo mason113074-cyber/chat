@@ -89,7 +89,8 @@ export async function GET(request: NextRequest) {
       .filter((c: { confidence_score?: number }) => c.confidence_score != null && c.confidence_score < 0.6)
       .sort((a: { created_at: string }, b: { created_at: string }) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .slice(0, 10)
-      .map((c: { message: string; confidence_score: number; created_at: string }) => ({
+      .map((c: { id: string; message: string; confidence_score: number; created_at: string }) => ({
+        conversation_id: c.id,
         question: c.message?.slice(0, 80) ?? '',
         confidence: c.confidence_score,
         date: c.created_at,

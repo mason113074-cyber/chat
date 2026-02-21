@@ -12,14 +12,24 @@ export async function GET(_request: Request, { params }: RouteParams) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const baseCols = 'id, name, line_user_id, email, phone, notes, csat_score, top_topic, created_at';
     const { data: contact, error: contactError } = await supabase
       .from('contacts')
-      .select('id, name, line_user_id, email, phone, notes, csat_score, top_topic, created_at')
+      .select(baseCols)
       .eq('id', contactId)
       .eq('user_id', user.id)
       .single();
 
     if (contactError || !contact) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    let ticketFields: { ticket_number?: string | null; ticket_priority?: string | null; assigned_to_id?: string | null } = {};
+    const { data: ticketRow } = await supabase
+      .from('contacts')
+      .select('ticket_number, ticket_priority, assigned_to_id')
+      .eq('id', contactId)
+      .eq('user_id', user.id)
+      .single();
+    if (ticketRow) ticketFields = ticketRow;
 
     const { data: assignments } = await supabase
       .from('contact_tag_assignments')
@@ -42,7 +52,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
       })
       .filter(Boolean) as { id: string; name: string; color: string; assigned_by: string }[];
 
-    return NextResponse.json({ contact: { ...contact, tags } });
+    return NextResponse.json({ contact: { ...contact, ...ticketFields, tags } });
   } catch (err) {
     console.error('GET /api/contacts/[id] error:', err);
     return NextResponse.json({ error: 'Failed to fetch contact' }, { status: 500 });
@@ -66,6 +76,9 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       notes?: string | null;
       csat_score?: number | null;
       top_topic?: string | null;
+      ticket_number?: string | null;
+      ticket_priority?: string | null;
+      assigned_to_id?: string | null;
     } = {};
 
     if (typeof body.name === 'string') updates.name = body.name.trim() || null;
@@ -76,13 +89,18 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     if (typeof body.csat_score === 'number') {
       updates.csat_score = Number.isFinite(body.csat_score) ? Math.max(0, Math.min(5, body.csat_score)) : null;
     }
+    if (typeof body.ticket_number === 'string') updates.ticket_number = body.ticket_number.trim() || null;
+    if (['low', 'medium', 'high', 'urgent'].includes(body.ticket_priority)) updates.ticket_priority = body.ticket_priority;
+    if (body.assigned_to_id === null || (typeof body.assigned_to_id === 'string' && body.assigned_to_id.trim())) {
+      updates.assigned_to_id = body.assigned_to_id?.trim() || null;
+    }
 
     const { data, error } = await supabase
       .from('contacts')
       .update(updates)
       .eq('id', contactId)
       .eq('user_id', user.id)
-      .select('id, name, line_user_id, email, phone, notes, csat_score, top_topic, created_at')
+      .select('id, name, line_user_id, email, phone, notes, csat_score, top_topic, created_at, ticket_number, ticket_priority, assigned_to_id')
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
