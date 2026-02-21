@@ -18,6 +18,7 @@ export function Sidebar({ userEmail }: SidebarProps) {
     { emoji: '💬', label: '對話紀錄', href: '/dashboard/conversations' },
     { emoji: '👥', label: '客戶管理', href: '/dashboard/contacts' },
     { emoji: '⚙️', label: 'AI 設定', href: '/dashboard/settings' },
+    { emoji: '📈', label: 'AI 品質', href: '/dashboard/ai-quality' },
   ];
 
   const isActive = (href: string) => {

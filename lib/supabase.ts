@@ -203,13 +203,23 @@ export async function insertConversationMessage(
   contactId: string,
   message: string,
   role: 'user' | 'assistant' | 'system',
-  options?: { status?: string; resolved_by?: string; is_resolved?: boolean }
+  options?: {
+    status?: string;
+    resolved_by?: string;
+    is_resolved?: boolean;
+    confidence_score?: number;
+    ab_test_id?: string;
+    ab_variant?: string;
+  }
 ) {
   const client = getSupabaseAdmin();
   const row: Record<string, unknown> = { contact_id: contactId, message, role };
   if (options?.status != null) row.status = options.status;
   if (options?.resolved_by != null) row.resolved_by = options.resolved_by;
   if (options?.is_resolved != null) row.is_resolved = options.is_resolved;
+  if (options?.confidence_score != null) row.confidence_score = options.confidence_score;
+  if (options?.ab_test_id != null) row.ab_test_id = options.ab_test_id;
+  if (options?.ab_variant != null) row.ab_variant = options.ab_variant;
   const { data, error } = await client
     .from('conversations')
     .insert([row])
@@ -243,20 +253,31 @@ export async function getUserSystemPrompt(userId: string): Promise<string | null
 export interface UserSettings {
   system_prompt: string | null;
   ai_model: string | null;
-  // Sprint 1
+  // Sprint 1–4
   max_reply_length?: number;
   reply_temperature?: number;
   reply_format?: string;
-  // Sprint 2
   custom_sensitive_words?: string[];
   sensitive_word_reply?: string | null;
-  // Sprint 3
   reply_delay_seconds?: number;
   show_typing_indicator?: boolean;
-  // Sprint 4
   auto_detect_language?: boolean;
   supported_languages?: string[];
   fallback_language?: string;
+  // Sprint 6–10
+  confidence_threshold?: number;
+  low_confidence_action?: string;
+  handoff_message?: string | null;
+  business_hours_enabled?: boolean;
+  business_hours?: { timezone?: string; schedule?: Record<string, { enabled: boolean; start: string; end: string }> } | null;
+  outside_hours_mode?: string;
+  outside_hours_message?: string | null;
+  feedback_enabled?: boolean;
+  feedback_message?: string | null;
+  conversation_memory_count?: number;
+  conversation_memory_mode?: string;
+  welcome_message_enabled?: boolean;
+  welcome_message?: string | null;
 }
 
 /** Fetch user settings (e.g. for webhook). Cached 10 min. */
@@ -274,7 +295,12 @@ export async function getUserSettings(userId: string): Promise<UserSettings> {
           max_reply_length, reply_temperature, reply_format,
           custom_sensitive_words, sensitive_word_reply,
           reply_delay_seconds, show_typing_indicator,
-          auto_detect_language, supported_languages, fallback_language
+          auto_detect_language, supported_languages, fallback_language,
+          confidence_threshold, low_confidence_action, handoff_message,
+          business_hours_enabled, business_hours, outside_hours_mode, outside_hours_message,
+          feedback_enabled, feedback_message,
+          conversation_memory_count, conversation_memory_mode,
+          welcome_message_enabled, welcome_message
         `)
         .eq('id', userId)
         .maybeSingle();
@@ -301,6 +327,19 @@ export async function getUserSettings(userId: string): Promise<UserSettings> {
           ? data.supported_languages
           : ['zh-TW'],
         fallback_language: data?.fallback_language ?? 'zh-TW',
+        confidence_threshold: Number(data?.confidence_threshold ?? 0.6),
+        low_confidence_action: data?.low_confidence_action ?? 'handoff',
+        handoff_message: data?.handoff_message ?? null,
+        business_hours_enabled: Boolean(data?.business_hours_enabled),
+        business_hours: data?.business_hours ?? null,
+        outside_hours_mode: data?.outside_hours_mode ?? 'auto_reply',
+        outside_hours_message: data?.outside_hours_message ?? null,
+        feedback_enabled: Boolean(data?.feedback_enabled),
+        feedback_message: data?.feedback_message ?? null,
+        conversation_memory_count: Number(data?.conversation_memory_count ?? 5),
+        conversation_memory_mode: data?.conversation_memory_mode ?? 'recent',
+        welcome_message_enabled: Boolean(data?.welcome_message_enabled),
+        welcome_message: data?.welcome_message ?? null,
       };
     },
     { ttl: USER_SETTINGS_CACHE_TTL }

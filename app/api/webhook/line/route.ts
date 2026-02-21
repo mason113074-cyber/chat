@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { validateSignature, replyMessage, LineWebhookBody, LineWebhookEvent } from '@/lib/line';
+import { validateSignature, replyMessage, pushMessage, LineWebhookBody, LineWebhookEvent } from '@/lib/line';
 import { generateReply } from '@/lib/openai';
 import { searchKnowledgeWithSources } from '@/lib/knowledge-search';
 import { getOrCreateContactByLineUserId, getUserSettings, insertConversationMessage, getRecentConversationMessages, type Contact } from '@/lib/supabase';
@@ -10,6 +10,9 @@ import { isProcessed, markAsProcessed } from '@/lib/idempotency';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { invalidateAnalyticsCache } from '@/lib/analytics-cache';
 import { detectSensitiveKeywords } from '@/lib/security/sensitive-keywords';
+import { calculateConfidence } from '@/lib/confidence';
+import { isWithinBusinessHours } from '@/lib/business-hours';
+import { summarizeConversation } from '@/lib/conversation-summary';
 
 const KNOWLEDGE_PREFIX =
   '\n\n## 以下是你可以參考的知識庫內容（只能根據以下內容回答，勿使用其他知識）：\n';
@@ -125,12 +128,51 @@ const REPLY_STICKER = '感謝您傳送貼圖 😊';
 const REPLY_LOCATION_RECEIVED = '已收到您的位置資訊，感謝。';
 
 async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<void> {
+  const replyToken = event.replyToken;
+  const lineUserId = event.source?.userId;
+  const ownerUserId = process.env.LINE_OWNER_USER_ID;
+
+  // Sprint 10: follow event - welcome message
+  if (event.type === 'follow' && lineUserId && ownerUserId && replyToken) {
+    try {
+      const contact = await getOrCreateContactByLineUserId(lineUserId, ownerUserId);
+      const settings = await getUserSettings(ownerUserId);
+      if (settings.welcome_message_enabled && settings.welcome_message) {
+        await replyMessage(replyToken, settings.welcome_message);
+      }
+    } catch (e) {
+      console.error('[LINE webhook] Welcome message failed', { requestId, error: e });
+    }
+    return;
+  }
+
+  // Sprint 8: postback - feedback
+  if (event.type === 'postback' && event.postback?.data?.startsWith('feedback:') && lineUserId && ownerUserId) {
+    const [, rating, convId] = event.postback.data.split(':');
+    if ((rating === 'positive' || rating === 'negative') && convId) {
+      try {
+        const admin = getSupabaseAdmin();
+        const contact = await getOrCreateContactByLineUserId(lineUserId, ownerUserId);
+        await admin.from('ai_feedback').insert({
+          user_id: ownerUserId,
+          contact_id: contact.id,
+          conversation_id: convId,
+          rating: rating === 'positive' ? 'positive' : 'negative',
+        });
+        if (replyToken) {
+          await replyMessage(replyToken, rating === 'positive' ? '感謝您的回饋！😊' : '感謝您的回饋，我們會持續改進！');
+        }
+      } catch (e) {
+        console.warn('[LINE webhook] Feedback insert failed', { requestId, error: e });
+      }
+    }
+    return;
+  }
+
   if (event.type !== 'message' || !event.message) {
     return;
   }
 
-  const replyToken = event.replyToken;
-  const lineUserId = event.source?.userId;
   if (!replyToken) return;
 
   const msg = event.message;
@@ -236,7 +278,6 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
     return;
   }
 
-  const ownerUserId = process.env.LINE_OWNER_USER_ID;
   if (!ownerUserId) {
     console.error('LINE_OWNER_USER_ID is not set');
     try {
@@ -282,19 +323,112 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
       await markAsProcessed(eventId);
       return;
     }
+
+    // Sprint 7: 營業時間
+    const {
+      business_hours_enabled: businessHoursEnabled,
+      business_hours: businessHours,
+      outside_hours_mode: outsideHoursMode,
+      outside_hours_message: outsideHoursMessage,
+      confidence_threshold: confidenceThreshold = 0.6,
+      low_confidence_action: lowConfidenceAction,
+      handoff_message: handoffMessage,
+      feedback_enabled: feedbackEnabled,
+      feedback_message: feedbackMessage,
+      conversation_memory_count: memoryCount = 5,
+      conversation_memory_mode: memoryMode,
+    } = settings;
+
+    if (businessHoursEnabled && !isWithinBusinessHours(businessHours)) {
+      if (outsideHoursMode === 'auto_reply') {
+        await replyMessage(replyToken, outsideHoursMessage || '感謝您的訊息！目前為非營業時間，我們將在營業時間盡快回覆您。');
+        await markAsProcessed(eventId);
+        return;
+      }
+      if (outsideHoursMode === 'collect_info') {
+        await replyMessage(replyToken, (outsideHoursMessage || '') + '\n\n請留下您的問題，我們會在營業時間回覆您：');
+        await insertConversationMessage(contact.id, userMessage, 'user');
+        await markAsProcessed(eventId);
+        return;
+      }
+    }
+
     const { text: knowledgeText, sources } = await searchKnowledgeWithSources(
       ownerUserId,
       userMessage,
       3,
       2000
     );
-    const fullSystemPrompt = knowledgeText
-      ? (systemPrompt?.trim() ?? '') + KNOWLEDGE_PREFIX + knowledgeText
-      : (systemPrompt?.trim() ?? '') + KNOWLEDGE_EMPTY_INSTRUCTION;
-    const recentMessages = await getRecentConversationMessages(contact.id, 5);
+
+    // Sprint 12: A/B test
+    let effectiveSystemPrompt = systemPrompt?.trim() ?? '';
+    const { data: runningTest } = await admin
+      .from('ab_tests')
+      .select('id, variant_a_prompt, variant_b_prompt, traffic_split')
+      .eq('user_id', ownerUserId)
+      .eq('status', 'running')
+      .maybeSingle();
+
+    let abTestId: string | undefined;
+    let abVariant: string | undefined;
+    if (runningTest) {
+      const { data: assignment } = await admin
+        .from('ab_test_assignments')
+        .select('variant')
+        .eq('ab_test_id', runningTest.id)
+        .eq('contact_id', contact.id)
+        .maybeSingle();
+      let variant: 'A' | 'B';
+      if (assignment?.variant) {
+        variant = assignment.variant as 'A' | 'B';
+      } else {
+        variant = Math.random() * 100 < (runningTest.traffic_split ?? 50) ? 'A' : 'B';
+        await admin.from('ab_test_assignments').insert({
+          ab_test_id: runningTest.id,
+          contact_id: contact.id,
+          variant,
+        });
+      }
+      effectiveSystemPrompt = variant === 'A' ? runningTest.variant_a_prompt : runningTest.variant_b_prompt;
+      abTestId = runningTest.id;
+      abVariant = variant;
+    }
+
+    const basePrompt = knowledgeText
+      ? effectiveSystemPrompt + KNOWLEDGE_PREFIX + knowledgeText
+      : effectiveSystemPrompt + KNOWLEDGE_EMPTY_INSTRUCTION;
+
+    // Sprint 5: Guidance rules
+    const { data: guidanceRules } = await admin
+      .from('ai_guidance_rules')
+      .select('rule_title, rule_content')
+      .eq('user_id', ownerUserId)
+      .eq('is_enabled', true)
+      .order('priority', { ascending: true });
+    const guidance = (guidanceRules ?? []).map((r) => ({ rule_title: r.rule_title, rule_content: r.rule_content }));
+
+    // Sprint 9: Conversation memory
+    const count = Math.max(1, Math.min(30, memoryCount ?? 5));
+    let recentMessages: { role: 'user' | 'assistant'; content: string }[];
+    if (memoryMode === 'summary' && count > 10) {
+      const allRecent = await getRecentConversationMessages(contact.id, count);
+      if (allRecent.length > 3) {
+        const toSummarize = allRecent.slice(0, -3);
+        const keepRecent = allRecent.slice(-3);
+        const summary = await summarizeConversation(toSummarize);
+        recentMessages = [
+          { role: 'assistant' as const, content: `【前面對話摘要】${summary}` },
+          ...keepRecent,
+        ];
+      } else {
+        recentMessages = allRecent;
+      }
+    } else {
+      recentMessages = await getRecentConversationMessages(contact.id, count);
+    }
     const aiResponse = await generateReply(
       userMessage,
-      fullSystemPrompt,
+      basePrompt,
       aiModel,
       ownerUserId,
       contact.id,
@@ -306,6 +440,7 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
         autoDetectLanguage,
         supportedLanguages,
         fallbackLanguage,
+        guidanceRules: guidance,
       }
     );
 
@@ -320,6 +455,22 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
     }
     if (finalReply.length > MAX_REPLY_LENGTH) {
       finalReply = finalReply.substring(0, MAX_REPLY_LENGTH - 3) + '...';
+    }
+
+    // Sprint 6: 信心分數 + 低信心動作
+    const confidence = calculateConfidence({
+      knowledgeSourceCount: sources.length,
+      aiReply: finalReply,
+      guardrailTriggered,
+    });
+    const threshold = confidenceThreshold ?? 0.6;
+    if (confidence.score < threshold) {
+      const action = lowConfidenceAction ?? 'handoff';
+      if (action === 'handoff') {
+        finalReply = handoffMessage || '這個問題需要專人為您處理，請稍候。';
+      } else if (action === 'append_disclaimer') {
+        finalReply += '\n\n（以上回覆供參考，如需進一步協助請輸入「轉人工」）';
+      }
     }
 
     // Sprint 3: 回覆延遲（模擬真人打字）
@@ -340,11 +491,35 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
     const resolution = needsHuman
       ? { status: 'needs_human' as const, resolved_by: 'unresolved', is_resolved: false }
       : computeResolution(sources.length, finalReply);
-    await insertConversationMessage(contact.id, finalReply, 'assistant', {
+    const inserted = await insertConversationMessage(contact.id, finalReply, 'assistant', {
       status: resolution.status,
       resolved_by: resolution.resolved_by,
       is_resolved: resolution.is_resolved,
+      confidence_score: confidence.score,
+      ab_test_id: abTestId,
+      ab_variant: abVariant,
     });
+
+    // Sprint 8: 滿意度回饋 push
+    if (feedbackEnabled && inserted?.id && lineUserId) {
+      try {
+        const feedbackText = feedbackMessage || '這個回覆有幫助嗎？';
+        await pushMessage(lineUserId, {
+          type: 'template',
+          altText: feedbackText,
+          template: {
+            type: 'confirm',
+            text: feedbackText,
+            actions: [
+              { type: 'postback', label: '👍 有幫助', data: `feedback:positive:${inserted.id}` },
+              { type: 'postback', label: '👎 沒幫助', data: `feedback:negative:${inserted.id}` },
+            ],
+          },
+        });
+      } catch (e) {
+        console.warn('[LINE webhook] Feedback push failed', { requestId, error: e });
+      }
+    }
 
     void autoTagContact(contact.id, ownerUserId, userMessage);
     void invalidateAnalyticsCache(ownerUserId);

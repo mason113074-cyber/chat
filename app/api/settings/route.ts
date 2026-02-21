@@ -42,7 +42,12 @@ export async function GET(request: NextRequest) {
         max_reply_length, reply_temperature, reply_format,
         custom_sensitive_words, sensitive_word_reply,
         reply_delay_seconds, show_typing_indicator,
-        auto_detect_language, supported_languages, fallback_language
+        auto_detect_language, supported_languages, fallback_language,
+        confidence_threshold, low_confidence_action, handoff_message,
+        business_hours_enabled, business_hours, outside_hours_mode, outside_hours_message,
+        feedback_enabled, feedback_message,
+        conversation_memory_count, conversation_memory_mode,
+        welcome_message_enabled, welcome_message
       `)
       .eq('id', user.id)
       .maybeSingle();
@@ -78,6 +83,20 @@ export async function GET(request: NextRequest) {
       autoDetectLanguage: Boolean(data?.auto_detect_language),
       supportedLanguages: Array.isArray(data?.supported_languages) ? data.supported_languages : ['zh-TW'],
       fallbackLanguage: data?.fallback_language ?? 'zh-TW',
+      // Sprint 6–10
+      confidenceThreshold: Number(data?.confidence_threshold ?? 0.6),
+      lowConfidenceAction: data?.low_confidence_action ?? 'handoff',
+      handoffMessage: data?.handoff_message ?? '這個問題需要專人為您處理，請稍候。',
+      businessHoursEnabled: Boolean(data?.business_hours_enabled),
+      businessHours: data?.business_hours ?? { timezone: 'Asia/Taipei', schedule: {} },
+      outsideHoursMode: data?.outside_hours_mode ?? 'auto_reply',
+      outsideHoursMessage: data?.outside_hours_message ?? '感謝您的訊息！目前為非營業時間，我們將在營業時間盡快回覆您。',
+      feedbackEnabled: Boolean(data?.feedback_enabled),
+      feedbackMessage: data?.feedback_message ?? '這個回覆有幫助嗎？',
+      conversationMemoryCount: Number(data?.conversation_memory_count ?? 5),
+      conversationMemoryMode: data?.conversation_memory_mode ?? 'recent',
+      welcomeMessageEnabled: Boolean(data?.welcome_message_enabled),
+      welcomeMessage: data?.welcome_message ?? '歡迎！我是 AI 客服助手，有什麼可以幫您的嗎？😊',
     });
   } catch (error) {
     console.error('Settings GET API error:', error);
@@ -115,6 +134,19 @@ export async function POST(request: NextRequest) {
       autoDetectLanguage,
       supportedLanguages,
       fallbackLanguage,
+      confidenceThreshold,
+      lowConfidenceAction,
+      handoffMessage,
+      businessHoursEnabled,
+      businessHours,
+      outsideHoursMode,
+      outsideHoursMessage,
+      feedbackEnabled,
+      feedbackMessage,
+      conversationMemoryCount,
+      conversationMemoryMode,
+      welcomeMessageEnabled,
+      welcomeMessage,
     } = body;
 
     if (typeof systemPrompt !== 'string') {
@@ -180,6 +212,29 @@ export async function POST(request: NextRequest) {
     if (typeof fallbackLanguage === 'string' && ['zh-TW', 'en', 'ja', 'ko', 'th', 'vi'].includes(fallbackLanguage)) {
       updates.fallback_language = fallbackLanguage;
     }
+    if (typeof confidenceThreshold === 'number' && confidenceThreshold >= 0 && confidenceThreshold <= 1) {
+      updates.confidence_threshold = confidenceThreshold;
+    }
+    if (typeof lowConfidenceAction === 'string' && ['handoff', 'flag', 'append_disclaimer'].includes(lowConfidenceAction)) {
+      updates.low_confidence_action = lowConfidenceAction;
+    }
+    if (typeof handoffMessage === 'string') updates.handoff_message = handoffMessage.trim().slice(0, 500) || null;
+    if (typeof businessHoursEnabled === 'boolean') updates.business_hours_enabled = businessHoursEnabled;
+    if (businessHours && typeof businessHours === 'object') updates.business_hours = businessHours;
+    if (typeof outsideHoursMode === 'string' && ['auto_reply', 'ai_only', 'collect_info'].includes(outsideHoursMode)) {
+      updates.outside_hours_mode = outsideHoursMode;
+    }
+    if (typeof outsideHoursMessage === 'string') updates.outside_hours_message = outsideHoursMessage.trim().slice(0, 500) || null;
+    if (typeof feedbackEnabled === 'boolean') updates.feedback_enabled = feedbackEnabled;
+    if (typeof feedbackMessage === 'string') updates.feedback_message = feedbackMessage.trim().slice(0, 200) || null;
+    if (typeof conversationMemoryCount === 'number' && conversationMemoryCount >= 1 && conversationMemoryCount <= 30) {
+      updates.conversation_memory_count = conversationMemoryCount;
+    }
+    if (typeof conversationMemoryMode === 'string' && ['recent', 'summary'].includes(conversationMemoryMode)) {
+      updates.conversation_memory_mode = conversationMemoryMode;
+    }
+    if (typeof welcomeMessageEnabled === 'boolean') updates.welcome_message_enabled = welcomeMessageEnabled;
+    if (typeof welcomeMessage === 'string') updates.welcome_message = welcomeMessage.trim().slice(0, 500) || null;
     if (Array.isArray(quickReplies)) {
       const valid = quickReplies
         .filter(

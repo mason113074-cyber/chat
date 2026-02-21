@@ -62,6 +62,15 @@ export async function replyMessage(
   }
 }
 
+/** Sprint 8: Push message (used after replyToken consumed, e.g. feedback template) */
+export async function pushMessage(
+  userId: string,
+  message: line.messagingApi.Message
+): Promise<void> {
+  const client = getLineClient();
+  await client.pushMessage({ to: userId, messages: [message] });
+}
+
 // LINE webhook event types (see https://developers.line.biz/en/docs/messaging-api/receiving-messages)
 export interface LineWebhookEvent {
   type: string;
@@ -79,6 +88,7 @@ export interface LineWebhookEvent {
     id: string;
     text?: string;
   };
+  postback?: { data: string };
   timestamp: number;
 }
 

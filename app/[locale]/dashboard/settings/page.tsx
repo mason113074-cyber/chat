@@ -107,6 +107,40 @@ export default function SettingsPage() {
   const [supportedLanguages, setSupportedLanguages] = useState<string[]>(['zh-TW']);
   const [fallbackLanguage, setFallbackLanguage] = useState('zh-TW');
 
+  // Sprint 5: Guidance（獨立 API）
+  const [guidanceRules, setGuidanceRules] = useState<{ id: string; rule_title: string; rule_content: string; is_enabled: boolean }[]>([]);
+  const [guidanceForm, setGuidanceForm] = useState<{ title: string; content: string } | null>(null);
+
+  // Sprint 6–10
+  const [confidenceThreshold, setConfidenceThreshold] = useState(0.6);
+  const [lowConfidenceAction, setLowConfidenceAction] = useState('handoff');
+  const [handoffMessage, setHandoffMessage] = useState('這個問題需要專人為您處理，請稍候。');
+  const [businessHoursEnabled, setBusinessHoursEnabled] = useState(false);
+  const [businessHours, setBusinessHours] = useState({
+    timezone: 'Asia/Taipei',
+    schedule: {
+      mon: { enabled: true, start: '09:00', end: '18:00' },
+      tue: { enabled: true, start: '09:00', end: '18:00' },
+      wed: { enabled: true, start: '09:00', end: '18:00' },
+      thu: { enabled: true, start: '09:00', end: '18:00' },
+      fri: { enabled: true, start: '09:00', end: '18:00' },
+      sat: { enabled: false, start: '09:00', end: '18:00' },
+      sun: { enabled: false, start: '09:00', end: '18:00' },
+    },
+  });
+  const [outsideHoursMode, setOutsideHoursMode] = useState('auto_reply');
+  const [outsideHoursMessage, setOutsideHoursMessage] = useState('感謝您的訊息！目前為非營業時間，我們將在營業時間盡快回覆您。');
+  const [feedbackEnabled, setFeedbackEnabled] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState('這個回覆有幫助嗎？');
+  const [conversationMemoryCount, setConversationMemoryCount] = useState(5);
+  const [conversationMemoryMode, setConversationMemoryMode] = useState('recent');
+  const [welcomeMessageEnabled, setWelcomeMessageEnabled] = useState(false);
+  const [welcomeMessage, setWelcomeMessage] = useState('歡迎！我是 AI 客服助手，有什麼可以幫您的嗎？😊');
+
+  // Sprint 12: A/B Test
+  const [abTests, setAbTests] = useState<{ id: string; name: string; variant_a_prompt: string; variant_b_prompt: string; traffic_split: number; status: string }[]>([]);
+  const [abTestForm, setAbTestForm] = useState<{ name: string; variantA: string; variantB: string; trafficSplit: number } | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     setLoadError(null);
@@ -159,6 +193,37 @@ export default function SettingsPage() {
         if (typeof data.autoDetectLanguage === 'boolean') setAutoDetectLanguage(data.autoDetectLanguage);
         if (Array.isArray(data.supportedLanguages)) setSupportedLanguages(data.supportedLanguages);
         if (['zh-TW', 'en', 'ja', 'ko', 'th', 'vi'].includes(data.fallbackLanguage)) setFallbackLanguage(data.fallbackLanguage);
+        if (typeof data.confidenceThreshold === 'number') setConfidenceThreshold(data.confidenceThreshold);
+        if (['handoff', 'flag', 'append_disclaimer'].includes(data.lowConfidenceAction)) setLowConfidenceAction(data.lowConfidenceAction);
+        if (typeof data.handoffMessage === 'string') setHandoffMessage(data.handoffMessage);
+        if (typeof data.businessHoursEnabled === 'boolean') setBusinessHoursEnabled(data.businessHoursEnabled);
+        if (data.businessHours && typeof data.businessHours === 'object') setBusinessHours(data.businessHours);
+        if (['auto_reply', 'ai_only', 'collect_info'].includes(data.outsideHoursMode)) setOutsideHoursMode(data.outsideHoursMode);
+        if (typeof data.outsideHoursMessage === 'string') setOutsideHoursMessage(data.outsideHoursMessage);
+        if (typeof data.feedbackEnabled === 'boolean') setFeedbackEnabled(data.feedbackEnabled);
+        if (typeof data.feedbackMessage === 'string') setFeedbackMessage(data.feedbackMessage);
+        if (typeof data.conversationMemoryCount === 'number') setConversationMemoryCount(data.conversationMemoryCount);
+        if (['recent', 'summary'].includes(data.conversationMemoryMode)) setConversationMemoryMode(data.conversationMemoryMode);
+        if (typeof data.welcomeMessageEnabled === 'boolean') setWelcomeMessageEnabled(data.welcomeMessageEnabled);
+        if (typeof data.welcomeMessage === 'string') setWelcomeMessage(data.welcomeMessage);
+        try {
+          const guidanceRes = await fetch('/api/settings/guidance', { credentials: 'include' });
+          if (guidanceRes.ok && !cancelled) {
+            const g = await guidanceRes.json();
+            if (Array.isArray(g.rules)) setGuidanceRules(g.rules);
+          }
+        } catch {
+          /* ignore */
+        }
+        try {
+          const abRes = await fetch('/api/settings/ab-test', { credentials: 'include' });
+          if (abRes.ok && !cancelled) {
+            const ab = await abRes.json();
+            if (Array.isArray(ab.tests)) setAbTests(ab.tests);
+          }
+        } catch {
+          /* ignore */
+        }
         try {
           const lineRes = await fetch('/api/settings/line', { credentials: 'include' });
           if (lineRes.ok && !cancelled) {
@@ -227,6 +292,19 @@ export default function SettingsPage() {
           autoDetectLanguage,
           supportedLanguages,
           fallbackLanguage,
+          confidenceThreshold,
+          lowConfidenceAction,
+          handoffMessage,
+          businessHoursEnabled,
+          businessHours,
+          outsideHoursMode,
+          outsideHoursMessage,
+          feedbackEnabled,
+          feedbackMessage,
+          conversationMemoryCount,
+          conversationMemoryMode,
+          welcomeMessageEnabled,
+          welcomeMessage,
         }),
       });
       if (!response.ok) throw new Error(t('savedError'));
@@ -740,6 +818,361 @@ export default function SettingsPage() {
                   </select>
                 </div>
               </>
+            )}
+          </div>
+        </div>
+
+        {/* Sprint 5: Guidance */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900">{t('guidance')}</h2>
+          <p className="mt-1 text-sm text-gray-600">{t('guidanceDesc')}</p>
+          <div className="mt-4 space-y-2">
+            {guidanceRules.map((r) => (
+              <div key={r.id} className="flex items-start gap-2 rounded border p-3">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm">{r.rule_title}</p>
+                  <p className="text-xs text-gray-500 truncate">{r.rule_content}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!confirm(t('confirmDelete'))) return;
+                    const res = await fetch(`/api/settings/guidance?id=${r.id}`, { method: 'DELETE', credentials: 'include' });
+                    if (res.ok) setGuidanceRules((p) => p.filter((x) => x.id !== r.id));
+                  }}
+                  className="text-red-600 text-sm"
+                >
+                  {t('delete')}
+                </button>
+              </div>
+            ))}
+            {guidanceForm ? (
+              <div className="rounded border p-3 space-y-2">
+                <input
+                  placeholder={t('ruleTitlePlaceholder')}
+                  value={guidanceForm.title}
+                  onChange={(e) => setGuidanceForm((p) => p && { ...p, title: e.target.value })}
+                  className="w-full rounded border px-2 py-1 text-sm"
+                />
+                <textarea
+                  placeholder={t('ruleContentPlaceholder')}
+                  value={guidanceForm.content}
+                  onChange={(e) => setGuidanceForm((p) => p && { ...p, content: e.target.value })}
+                  rows={2}
+                  className="w-full rounded border px-2 py-1 text-sm"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!guidanceForm.title.trim()) return;
+                      const res = await fetch('/api/settings/guidance', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ rule_title: guidanceForm.title, rule_content: guidanceForm.content }),
+                        credentials: 'include',
+                      });
+                      const d = await res.json();
+                      if (d.rule) setGuidanceRules((p) => [...p, d.rule]);
+                      setGuidanceForm(null);
+                    }}
+                    className="rounded bg-indigo-600 px-3 py-1 text-white text-sm"
+                  >
+                    {t('save')}
+                  </button>
+                  <button type="button" onClick={() => setGuidanceForm(null)} className="text-gray-500 text-sm">
+                    {t('cancel')}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setGuidanceForm({ title: '', content: '' })}
+                disabled={guidanceRules.length >= 20}
+                className="rounded border border-dashed px-3 py-2 text-sm text-gray-500 hover:border-indigo-500"
+              >
+                {guidanceRules.length >= 20 ? t('maxRulesReached') : t('addRule')}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Sprint 6: 信心分數 */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900">{t('confidenceScore')}</h2>
+          <p className="mt-1 text-sm text-gray-600">{t('confidenceThresholdDesc')}</p>
+          <div className="mt-4 space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">{t('confidenceThreshold')}</label>
+              <div className="flex items-center gap-2 mt-1">
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={confidenceThreshold}
+                  onChange={(e) => setConfidenceThreshold(Number(e.target.value))}
+                  className="flex-1"
+                />
+                <span className="text-sm w-12">{(confidenceThreshold * 100).toFixed(0)}%</span>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">{t('lowConfidenceAction')}</label>
+              <select
+                value={lowConfidenceAction}
+                onChange={(e) => setLowConfidenceAction(e.target.value)}
+                className="mt-1 block w-full rounded border px-3 py-2 text-sm"
+              >
+                <option value="handoff">{t('actionHandoff')}</option>
+                <option value="flag">{t('actionFlag')}</option>
+                <option value="append_disclaimer">{t('actionDisclaimer')}</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">{t('handoffMessage')}</label>
+              <input
+                type="text"
+                value={handoffMessage}
+                onChange={(e) => setHandoffMessage(e.target.value)}
+                className="mt-1 block w-full rounded border px-3 py-2 text-sm"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Sprint 7: 營業時間 */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900">{t('businessHours')}</h2>
+          <p className="mt-1 text-sm text-gray-600">{t('businessHoursDesc')}</p>
+          <div className="mt-4 space-y-3">
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={businessHoursEnabled} onChange={(e) => setBusinessHoursEnabled(e.target.checked)} className="rounded" />
+              <span className="text-sm">{t('enableBusinessHours')}</span>
+            </label>
+            {businessHoursEnabled && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">{t('outsideHoursMode')}</label>
+                  <select value={outsideHoursMode} onChange={(e) => setOutsideHoursMode(e.target.value)} className="mt-1 block w-full rounded border px-3 py-2 text-sm">
+                    <option value="auto_reply">{t('modeAutoReply')}</option>
+                    <option value="ai_only">{t('modeAiOnly')}</option>
+                    <option value="collect_info">{t('modeCollectInfo')}</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">{t('outsideHoursMessage')}</label>
+                  <textarea value={outsideHoursMessage} onChange={(e) => setOutsideHoursMessage(e.target.value)} rows={2} className="mt-1 block w-full rounded border px-3 py-2 text-sm" />
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  {(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const).map((d) => (
+                    <div key={d} className="flex items-center gap-2">
+                      <input type="checkbox" checked={businessHours.schedule[d].enabled} onChange={(e) => setBusinessHours((p) => ({ ...p, schedule: { ...p.schedule, [d]: { ...p.schedule[d], enabled: e.target.checked } } }))} />
+                      <span className="w-8">{t(d)}</span>
+                      <input type="time" value={businessHours.schedule[d].start} onChange={(e) => setBusinessHours((p) => ({ ...p, schedule: { ...p.schedule, [d]: { ...p.schedule[d], start: e.target.value } } }))} className="w-20 rounded border px-1" />
+                      <span>-</span>
+                      <input type="time" value={businessHours.schedule[d].end} onChange={(e) => setBusinessHours((p) => ({ ...p, schedule: { ...p.schedule, [d]: { ...p.schedule[d], end: e.target.value } } }))} className="w-20 rounded border px-1" />
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Sprint 8: 滿意度回饋 */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900">{t('feedback')}</h2>
+          <p className="mt-1 text-sm text-gray-600">{t('feedbackDesc')}</p>
+          <div className="mt-4 space-y-3">
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={feedbackEnabled} onChange={(e) => setFeedbackEnabled(e.target.checked)} className="rounded" />
+              <span className="text-sm">{t('enableFeedback')}</span>
+            </label>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">{t('feedbackMessage')}</label>
+              <input type="text" value={feedbackMessage} onChange={(e) => setFeedbackMessage(e.target.value)} placeholder={t('feedbackMessagePlaceholder')} className="mt-1 block w-full rounded border px-3 py-2 text-sm" />
+            </div>
+          </div>
+        </div>
+
+        {/* Sprint 9: 對話記憶 */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900">{t('conversationMemory')}</h2>
+          <p className="mt-1 text-sm text-gray-600">{t('memoryCountDesc')}</p>
+          <div className="mt-4 space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">{t('memoryCount')}</label>
+              <div className="flex items-center gap-2 mt-1">
+                <input type="range" min={1} max={30} value={conversationMemoryCount} onChange={(e) => setConversationMemoryCount(Number(e.target.value))} className="flex-1" />
+                <span className="text-sm w-8">{conversationMemoryCount}</span>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">{t('memoryMode')}</label>
+              <select value={conversationMemoryMode} onChange={(e) => setConversationMemoryMode(e.target.value)} className="mt-1 block w-full rounded border px-3 py-2 text-sm">
+                <option value="recent">{t('modeRecent')}</option>
+                <option value="summary">{t('modeSummary')}</option>
+              </select>
+              <p className="mt-1 text-xs text-gray-500">{t('memorySummaryNote')}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Sprint 10: 歡迎訊息 */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900">{t('welcomeMessage')}</h2>
+          <p className="mt-1 text-sm text-gray-600">{t('welcomeMessageDesc')}</p>
+          <div className="mt-4 space-y-3">
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={welcomeMessageEnabled} onChange={(e) => setWelcomeMessageEnabled(e.target.checked)} className="rounded" />
+              <span className="text-sm">{t('enableWelcomeMessage')}</span>
+            </label>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">{t('welcomeMessageContent')}</label>
+              <textarea value={welcomeMessage} onChange={(e) => setWelcomeMessage(e.target.value)} rows={3} placeholder={t('welcomeMessagePlaceholder')} className="mt-1 block w-full rounded border px-3 py-2 text-sm" />
+              <p className="mt-1 text-xs text-gray-500">{t('characterCount', { count: welcomeMessage.length })}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Sprint 12: A/B 測試 */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900">{t('abTest')}</h2>
+          <p className="mt-1 text-sm text-gray-600">{t('abTestDesc')}</p>
+          <div className="mt-4 space-y-3">
+            {abTests.map((test) => (
+              <div key={test.id} className="rounded border p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-sm">{test.name}</span>
+                  <span className="text-xs text-gray-500">
+                    {test.status === 'draft' && t('abTestDraft')}
+                    {test.status === 'running' && t('abTestRunning')}
+                    {test.status === 'completed' && t('abTestCompleted')}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 truncate">A: {test.variant_a_prompt.slice(0, 50)}... | B: {test.variant_b_prompt.slice(0, 50)}... | {test.traffic_split}%</p>
+                <div className="flex gap-2">
+                  {test.status === 'draft' && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const res = await fetch('/api/settings/ab-test', {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ id: test.id, status: 'running' }),
+                          credentials: 'include',
+                        });
+                        if (res.ok) setAbTests((p) => p.map((x) => (x.id === test.id ? { ...x, status: 'running' } : x)));
+                      }}
+                      className="rounded bg-green-600 px-2 py-1 text-white text-xs"
+                    >
+                      {t('abTestStart')}
+                    </button>
+                  )}
+                  {test.status === 'running' && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const res = await fetch('/api/settings/ab-test', {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ id: test.id, status: 'completed' }),
+                          credentials: 'include',
+                        });
+                        if (res.ok) setAbTests((p) => p.map((x) => (x.id === test.id ? { ...x, status: 'completed' } : x)));
+                      }}
+                      className="rounded bg-amber-600 px-2 py-1 text-white text-xs"
+                    >
+                      {t('abTestStop')}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!confirm(t('confirmDelete'))) return;
+                      const res = await fetch(`/api/settings/ab-test?id=${test.id}`, { method: 'DELETE', credentials: 'include' });
+                      if (res.ok) setAbTests((p) => p.filter((x) => x.id !== test.id));
+                    }}
+                    className="text-red-600 text-xs"
+                  >
+                    {t('delete')}
+                  </button>
+                </div>
+              </div>
+            ))}
+            {abTestForm ? (
+              <div className="rounded border p-3 space-y-2">
+                <input
+                  placeholder={t('abTestName')}
+                  value={abTestForm.name}
+                  onChange={(e) => setAbTestForm((p) => p && { ...p, name: e.target.value })}
+                  className="w-full rounded border px-2 py-1 text-sm"
+                />
+                <textarea
+                  placeholder={t('abTestVariantA')}
+                  value={abTestForm.variantA}
+                  onChange={(e) => setAbTestForm((p) => p && { ...p, variantA: e.target.value })}
+                  rows={2}
+                  className="w-full rounded border px-2 py-1 text-sm"
+                />
+                <textarea
+                  placeholder={t('abTestVariantB')}
+                  value={abTestForm.variantB}
+                  onChange={(e) => setAbTestForm((p) => p && { ...p, variantB: e.target.value })}
+                  rows={2}
+                  className="w-full rounded border px-2 py-1 text-sm"
+                />
+                <div className="flex items-center gap-2">
+                  <label className="text-sm">{t('abTestTrafficSplit')}</label>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={abTestForm.trafficSplit}
+                    onChange={(e) => setAbTestForm((p) => p && { ...p, trafficSplit: Number(e.target.value) })}
+                    className="flex-1"
+                  />
+                  <span className="text-sm w-12">{abTestForm.trafficSplit}%</span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!abTestForm.name.trim() || !abTestForm.variantA.trim() || !abTestForm.variantB.trim()) return;
+                      const res = await fetch('/api/settings/ab-test', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          name: abTestForm.name,
+                          variant_a_prompt: abTestForm.variantA,
+                          variant_b_prompt: abTestForm.variantB,
+                          traffic_split: abTestForm.trafficSplit,
+                        }),
+                        credentials: 'include',
+                      });
+                      const d = await res.json();
+                      if (d.test) setAbTests((p) => [...p, d.test]);
+                      setAbTestForm(null);
+                    }}
+                    className="rounded bg-indigo-600 px-3 py-1 text-white text-sm"
+                  >
+                    {t('save')}
+                  </button>
+                  <button type="button" onClick={() => setAbTestForm(null)} className="text-gray-500 text-sm">
+                    {t('cancel')}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAbTestForm({ name: '', variantA: '', variantB: '', trafficSplit: 50 })}
+                className="rounded border border-dashed px-3 py-2 text-sm text-gray-500 hover:border-indigo-500"
+              >
+                {t('abTestAdd')}
+              </button>
             )}
           </div>
         </div>

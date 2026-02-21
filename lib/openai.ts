@@ -40,6 +40,7 @@ export interface GenerateReplyOptions {
   autoDetectLanguage?: boolean;
   supportedLanguages?: string[];
   fallbackLanguage?: string;
+  guidanceRules?: { rule_title: string; rule_content: string }[];
 }
 
 export async function generateReply(
@@ -72,6 +73,15 @@ export async function generateReply(
     basePrompt =
       `【語言指示】請自動偵測用戶的語言。如果用戶使用以下語言之一：${supported}，請用該語言回覆。否則用 ${fallback} 回覆。無論使用何種語言，都要保持相同的專業語氣。\n\n` +
       basePrompt;
+  }
+
+  // Sprint 5: Guidance 行為指令
+  const rules = options?.guidanceRules ?? [];
+  if (rules.length > 0) {
+    basePrompt += '\n\n## AI 行為指令（你必須嚴格遵守以下規則）：\n';
+    basePrompt += rules
+      .map((r, i) => `${i + 1}. 【${r.rule_title}】${r.rule_content}`)
+      .join('\n');
   }
 
   // === 安全防護 Step 1：檢查使用者輸入 ===
