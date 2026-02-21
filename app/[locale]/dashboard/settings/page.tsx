@@ -812,7 +812,7 @@ export default function SettingsPage() {
                   value={lineChannelId}
                   onChange={(e) => setLineChannelId(e.target.value)}
                   placeholder="1234567890"
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono"
+                  className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-mono text-gray-900 placeholder:text-gray-400"
                 />
               </div>
               <div>
@@ -825,7 +825,7 @@ export default function SettingsPage() {
                   value={lineChannelSecret}
                   onChange={(e) => setLineChannelSecret(e.target.value)}
                   placeholder="- - - - - - - - - - - - - - - - "
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono"
+                  className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-mono text-gray-900 placeholder:text-gray-400"
                 />
                 <p className="mt-1 text-xs text-gray-400">{t('lineSecretHint')}</p>
               </div>
@@ -836,7 +836,7 @@ export default function SettingsPage() {
                   onChange={(e) => setLineAccessToken(e.target.value)}
                   placeholder="- - - - - - - - - - - - - - - - "
                   rows={3}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono resize-none"
+                  className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-mono text-gray-900 placeholder:text-gray-400 resize-none"
                 />
                 <p className="mt-1 text-xs text-gray-400">{t('lineTokenHint')}</p>
               </div>

@@ -74,6 +74,23 @@
       "recent": "Recent"
     }
   },
+  "globalSearch": {
+    "placeholder": "Search conversations, contacts, knowledge base...",
+    "ariaLabel": "Global search",
+    "pageNav": "Page navigation",
+    "navConversations": "Conversations",
+    "navContacts": "Contacts",
+    "navKnowledgeBase": "Knowledge Base",
+    "navAnalytics": "Analytics",
+    "navBilling": "Billing",
+    "navSettings": "Settings",
+    "sectionConversations": "Conversations",
+    "sectionContacts": "Contacts",
+    "sectionKnowledge": "Knowledge base",
+    "searching": "Searching...",
+    "noResults": "No matching results",
+    "shortcuts": "ESC Close · ↑↓ Select · Enter Jump"
+  },
   "dashboard": {
     "title": "Overview",
     "welcome": "Welcome to CustomerAIPro",

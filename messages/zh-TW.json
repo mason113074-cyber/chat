@@ -74,6 +74,23 @@
       "recent": "最近"
     }
   },
+  "globalSearch": {
+    "placeholder": "搜尋對話、聯絡人、知識庫...",
+    "ariaLabel": "全域搜尋",
+    "pageNav": "頁面導航",
+    "navConversations": "對話紀錄",
+    "navContacts": "客戶管理",
+    "navKnowledgeBase": "知識庫",
+    "navAnalytics": "數據分析",
+    "navBilling": "帳單管理",
+    "navSettings": "設定",
+    "sectionConversations": "對話",
+    "sectionContacts": "聯絡人",
+    "sectionKnowledge": "知識庫",
+    "searching": "搜尋中...",
+    "noResults": "找不到符合的結果",
+    "shortcuts": "ESC 關閉 · ↑↓ 選擇 · Enter 跳轉"
+  },
   "dashboard": {
     "title": "總覽",
     "welcome": "歡迎使用 CustomerAIPro 後台",

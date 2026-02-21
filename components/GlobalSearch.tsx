@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from '@/i18n/navigation';
+import { useTranslations } from 'next-intl';
 import {
   useCallback,
   useEffect,
@@ -9,13 +10,13 @@ import {
   useState,
 } from 'react';
 
-const PAGE_NAV_ITEMS: { label: string; href: string }[] = [
-  { label: '對話紀錄', href: '/dashboard/conversations' },
-  { label: '客戶管理', href: '/dashboard/contacts' },
-  { label: '知識庫', href: '/dashboard/knowledge-base' },
-  { label: '數據分析', href: '/dashboard/analytics' },
-  { label: '帳單管理', href: '/dashboard/billing' },
-  { label: '設定', href: '/dashboard/settings' },
+const PAGE_NAV_ITEMS: { labelKey: string; href: string }[] = [
+  { labelKey: 'navConversations', href: '/dashboard/conversations' },
+  { labelKey: 'navContacts', href: '/dashboard/contacts' },
+  { labelKey: 'navKnowledgeBase', href: '/dashboard/knowledge-base' },
+  { labelKey: 'navAnalytics', href: '/dashboard/analytics' },
+  { labelKey: 'navBilling', href: '/dashboard/billing' },
+  { labelKey: 'navSettings', href: '/dashboard/settings' },
 ];
 
 type SearchConversation = {
@@ -79,6 +80,8 @@ export function GlobalSearch({
   open: boolean;
   onClose: () => void;
 }) {
+  const t = useTranslations('globalSearch');
+  const tConversations = useTranslations('conversations');
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
@@ -91,9 +94,18 @@ export function GlobalSearch({
   } | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const pageNavItems = useMemo(
+    () =>
+      PAGE_NAV_ITEMS.map((p) => ({
+        ...p,
+        label: t(p.labelKey),
+      })),
+    [t]
+  );
+
   const filteredPages = useMemo(() => {
-    return PAGE_NAV_ITEMS.filter((p) => fuzzyMatch(p.label, query));
-  }, [query]);
+    return pageNavItems.filter((p) => fuzzyMatch(p.label, query));
+  }, [pageNavItems, query]);
 
   const flatItems = useMemo((): FlatItem[] => {
     const items: FlatItem[] = [];
@@ -117,7 +129,7 @@ export function GlobalSearch({
           type: 'contact',
           id: c.id,
           href: `/dashboard/conversations/${c.id}`,
-          name: c.name ?? '未命名',
+          name: c.name ?? tConversations('unnamedCustomer'),
           line_user_id: c.line_user_id,
           tags: c.tags,
           globalIndex: idx++,
@@ -239,7 +251,7 @@ export function GlobalSearch({
       className="fixed inset-0 z-[100] flex items-start justify-center bg-black/50 pt-[20vh] px-4 animate-fade-in"
       role="dialog"
       aria-modal="true"
-      aria-label="全域搜尋"
+      aria-label={t('ariaLabel')}
     >
       <div
         className="absolute inset-0"
@@ -257,7 +269,7 @@ export function GlobalSearch({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="搜尋對話、聯絡人、知識庫..."
+            placeholder={t('placeholder')}
             className="w-full rounded-lg border-0 bg-transparent py-2 text-lg text-gray-900 placeholder-gray-400 focus:ring-0"
             autoComplete="off"
           />
@@ -266,18 +278,18 @@ export function GlobalSearch({
           {loading && (
             <div className="flex items-center justify-center gap-2 py-8 text-gray-500">
               <span className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
-              <span>搜尋中...</span>
+              <span>{t('searching')}</span>
             </div>
           )}
           {!loading && totalCount === 0 && (
-            <p className="py-8 text-center text-gray-500">找不到符合的結果</p>
+            <p className="py-8 text-center text-gray-500">{t('noResults')}</p>
           )}
           {!loading && totalCount > 0 && (
             <>
               {filteredPages.length > 0 && (
                 <div className="px-2 pb-2">
                   <p className="mb-1 px-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                    📄 頁面導航
+                    📄 {t('pageNav')}
                   </p>
                   {filteredPages.map((p) => {
                     const item = flatItems.find(
@@ -303,7 +315,7 @@ export function GlobalSearch({
               {results && results.conversations.length > 0 && (
                 <div className="border-t border-gray-100 px-2 py-2">
                   <p className="mb-1 px-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                    💬 對話
+                    💬 {t('sectionConversations')}
                   </p>
                   {results.conversations.map((c) => {
                     const item = flatItems.find(
@@ -334,7 +346,7 @@ export function GlobalSearch({
               {results && results.contacts.length > 0 && (
                 <div className="border-t border-gray-100 px-2 py-2">
                   <p className="mb-1 px-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                    👥 聯絡人
+                    👥 {t('sectionContacts')}
                   </p>
                   {results.contacts.map((c) => {
                     const item = flatItems.find(
@@ -352,7 +364,7 @@ export function GlobalSearch({
                       >
                         <span className="text-lg">👥</span>
                         <div className="min-w-0 flex-1">
-                          <p className="font-medium text-gray-900">{c.name ?? '未命名'}</p>
+                          <p className="font-medium text-gray-900">{c.name ?? tConversations('unnamedCustomer')}</p>
                           <p className="text-sm text-gray-500">{c.line_user_id}</p>
                           {c.tags.length > 0 && (
                             <p className="mt-0.5 text-xs text-gray-400">
@@ -368,7 +380,7 @@ export function GlobalSearch({
               {results && results.knowledge.length > 0 && (
                 <div className="border-t border-gray-100 px-2 py-2">
                   <p className="mb-1 px-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                    📚 知識庫
+                    📚 {t('sectionKnowledge')}
                   </p>
                   {results.knowledge.map((k) => {
                     const flatItem = flatItems.find(
@@ -401,7 +413,7 @@ export function GlobalSearch({
           )}
         </div>
         <div className="border-t border-gray-100 px-4 py-2 text-center text-xs text-gray-400">
-          ESC 關閉 · ↑↓ 選擇 · Enter 跳轉
+          {t('shortcuts')}
         </div>
       </div>
     </div>
