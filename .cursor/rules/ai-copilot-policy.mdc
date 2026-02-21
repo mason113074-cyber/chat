@@ -1,0 +1,51 @@
+---
+description: Enforce AI copilot-only behavior in webhook, reply, and suggestion flows.
+alwaysApply: true
+---
+
+# AI Copilot 不可違反工程規則
+
+## 核心原則
+
+- AI 只能當副駕（copilot），不得越權做最終商務承諾。
+- 任何可能造成金錢、時效、法律承諾的內容，預設不可自動直送。
+
+## 禁止自動承諾（除非模板或知識庫有明文）
+
+以下類別不可由 AI 自動承諾：
+
+1. 退款 / 賠償
+2. 折扣 / 優惠
+3. 價格 / 報價承諾
+4. 運費 / 到貨時程保證
+5. 客訴爭議結論
+
+若程式碼涉及這些類別：
+
+- 不得走 AUTO 直送。
+- 必須走 SUGGEST、ASK 或 HANDOFF。
+
+## 決策層強制規則（AUTO / SUGGEST / ASK / HANDOFF）
+
+1. **高風險類別永不 AUTO**（refund/discount/price/shipping/complaint）。
+2. **sourcesCount = 0 且非簡單問題** 時，不可硬答；必須 ASK 或 HANDOFF。
+3. **confidence < threshold** 時，只能 SUGGEST 或 ASK。
+4. 僅當 **低風險 + sourcesCount > 0 + confidence >= threshold** 才允許 AUTO。
+5. 高風險模板優先；缺必要欄位（如退款缺訂單編號）必須 ASK。
+
+## 模板優先類別
+
+- 退款、退換貨、折扣、付款、發票、運費、到貨、保固、客訴。
+
+實作時必須先檢查必要欄位，缺資料先問 1–3 題澄清問題。
+
+## 資料落地與稽核
+
+- SUGGEST 不可直接發送給客戶，必須保存草稿與理由。
+- 每筆 AI 建議需可追溯（action/category/confidence/sources/status）。
+- 人工送出後必須更新建議狀態為 sent 並寫入 sent_at（避免重送）。
+
+## 錯誤韌性
+
+- webhook 流程不得讓錯誤被悄悄吞沒。
+- 保持可重試與冪等；避免因暫時錯誤造成訊息遺失。
