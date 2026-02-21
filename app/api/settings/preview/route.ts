@@ -21,6 +21,12 @@ export async function POST(request: NextRequest) {
     const question = typeof body?.question === 'string' ? body.question.trim() : '';
     const system_prompt = typeof body?.system_prompt === 'string' ? body.system_prompt : '';
     const ai_model = typeof body?.ai_model === 'string' ? body.ai_model : 'gpt-4o-mini';
+    const maxReplyLength = typeof body?.maxReplyLength === 'number' ? body.maxReplyLength : 500;
+    const replyTemperature = typeof body?.replyTemperature === 'number' ? body.replyTemperature : 0.2;
+    const replyFormat = typeof body?.replyFormat === 'string' ? body.replyFormat : 'plain';
+    const autoDetectLanguage = Boolean(body?.autoDetectLanguage);
+    const supportedLanguages = Array.isArray(body?.supportedLanguages) ? body.supportedLanguages : ['zh-TW'];
+    const fallbackLanguage = typeof body?.fallbackLanguage === 'string' ? body.fallbackLanguage : 'zh-TW';
 
     if (!question) return NextResponse.json({ error: '請提供 question' }, { status: 400 });
 
@@ -35,7 +41,22 @@ export async function POST(request: NextRequest) {
       ? (system_prompt?.trim() ?? '') + KNOWLEDGE_PREFIX + knowledgeText
       : system_prompt?.trim() ?? null;
 
-    const answer = await generateReply(question, fullSystemPrompt, ai_model);
+    const answer = await generateReply(
+      question,
+      fullSystemPrompt,
+      ai_model,
+      user.id,
+      undefined,
+      undefined,
+      {
+        maxReplyLength,
+        replyTemperature,
+        replyFormat,
+        autoDetectLanguage,
+        supportedLanguages,
+        fallbackLanguage,
+      }
+    );
 
     return NextResponse.json({
       answer,

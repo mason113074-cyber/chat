@@ -41,7 +41,15 @@
   contact_tags   → auth.uid() = user_id
   contact_tag_assignments → via contact_id → contacts.user_id = auth.uid()
   openai_usage   → auth.uid() = user_id (SELECT only)
+  ai_feedback    → auth.uid() = user_id（AI 滿意度回饋，待 migration）
 ```
+
+[AI 回覆加強 — 高優先級]
+  ├─ 設定來源 → users.ai_reply_config (jsonb)
+  ├─ 滿意度 → ai_feedback 表（待建）
+  ├─ 整合點 → /api/chat, /api/webhook/line, /api/settings
+  ├─ Guidance → guidance_style, guidance_forbidden, guidance_escalation 併入 system prompt
+  └─ 不可破壞 → 既有 system_prompt, ai_model, quick_replies 欄位
 
 ---
 
@@ -61,7 +69,8 @@
 2. **方案**：有效方案僅由 `subscriptions` + 當前週期決定；`lib/plans.ts` 與 DB plans 的 limits 須對齊。
 3. **權限**：用量/方案檢查只在應用層；不在 DB trigger 或 RLS 內實作 limit 邏輯。
 4. **認證**：前端僅用 anon key；service role 僅 server 端、且僅在需跨租戶/系統操作時使用。
+5. **AI 回覆加強**：`users.ai_reply_config` 為擴展點；不可覆蓋既有 `system_prompt`、`ai_model`、`quick_replies`；`ai_feedback` 表須 RLS `auth.uid() = user_id`。
 
 ---
 
-*與 memory-bank.md 同步維護；多租戶/計費相關開發前請先讀取兩份文件。*
+*與 memory-bank.md 同步維護；多租戶/計費/AI 回覆相關開發前請先讀取兩份文件。*

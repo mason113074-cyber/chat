@@ -258,7 +258,30 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
 
     contact = await getOrCreateContactByLineUserId(lineUserId, ownerUserId);
 
-    const { system_prompt: systemPrompt, ai_model: aiModel } = await getUserSettings(ownerUserId);
+    const settings = await getUserSettings(ownerUserId);
+    const {
+      system_prompt: systemPrompt,
+      ai_model: aiModel,
+      custom_sensitive_words: customSensitiveWords = [],
+      sensitive_word_reply: sensitiveWordReply,
+      max_reply_length: maxReplyLength,
+      reply_temperature: replyTemperature,
+      reply_format: replyFormat,
+      auto_detect_language: autoDetectLanguage,
+      supported_languages: supportedLanguages,
+      fallback_language: fallbackLanguage,
+      reply_delay_seconds: replyDelaySeconds = 0,
+    } = settings;
+
+    // Sprint 2: 自訂敏感詞檢查（在內建敏感詞之後）
+    const customMatch = customSensitiveWords?.some((word: string) =>
+      userMessage.toLowerCase().includes(String(word).toLowerCase())
+    );
+    if (customMatch) {
+      await replyMessage(replyToken, sensitiveWordReply || SENSITIVE_CONTENT_REPLY);
+      await markAsProcessed(eventId);
+      return;
+    }
     const { text: knowledgeText, sources } = await searchKnowledgeWithSources(
       ownerUserId,
       userMessage,
@@ -275,7 +298,15 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
       aiModel,
       ownerUserId,
       contact.id,
-      recentMessages
+      recentMessages,
+      {
+        maxReplyLength,
+        replyTemperature,
+        replyFormat,
+        autoDetectLanguage,
+        supportedLanguages,
+        fallbackLanguage,
+      }
     );
 
     let finalReply = aiResponse;
@@ -289,6 +320,12 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
     }
     if (finalReply.length > MAX_REPLY_LENGTH) {
       finalReply = finalReply.substring(0, MAX_REPLY_LENGTH - 3) + '...';
+    }
+
+    // Sprint 3: 回覆延遲（模擬真人打字）
+    const delayMs = (replyDelaySeconds ?? 0) * 1000;
+    if (delayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
 
     await replyMessage(replyToken, finalReply);

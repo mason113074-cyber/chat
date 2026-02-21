@@ -95,6 +95,18 @@ export default function SettingsPage() {
   const [lineLoginPhotoUrl, setLineLoginPhotoUrl] = useState<string | null>(null);
   const [lineUnbinding, setLineUnbinding] = useState(false);
 
+  // Sprint 1–4: 回覆控制、敏感詞、延遲、多語言
+  const [maxReplyLength, setMaxReplyLength] = useState(500);
+  const [replyTemperature, setReplyTemperature] = useState(0.2);
+  const [replyFormat, setReplyFormat] = useState('plain');
+  const [customSensitiveWords, setCustomSensitiveWords] = useState<string[]>([]);
+  const [sensitiveWordReply, setSensitiveWordReply] = useState('此問題涉及敏感內容，建議聯繫人工客服。');
+  const [replyDelaySeconds, setReplyDelaySeconds] = useState(0);
+  const [showTypingIndicator, setShowTypingIndicator] = useState(false);
+  const [autoDetectLanguage, setAutoDetectLanguage] = useState(false);
+  const [supportedLanguages, setSupportedLanguages] = useState<string[]>(['zh-TW']);
+  const [fallbackLanguage, setFallbackLanguage] = useState('zh-TW');
+
   useEffect(() => {
     let cancelled = false;
     setLoadError(null);
@@ -137,6 +149,16 @@ export default function SettingsPage() {
           }
           setQuickReplies(padded);
         }
+        if (typeof data.maxReplyLength === 'number') setMaxReplyLength(data.maxReplyLength);
+        if (typeof data.replyTemperature === 'number') setReplyTemperature(data.replyTemperature);
+        if (['plain', 'bullet', 'concise'].includes(data.replyFormat)) setReplyFormat(data.replyFormat);
+        if (Array.isArray(data.customSensitiveWords)) setCustomSensitiveWords(data.customSensitiveWords);
+        if (typeof data.sensitiveWordReply === 'string') setSensitiveWordReply(data.sensitiveWordReply);
+        if (typeof data.replyDelaySeconds === 'number') setReplyDelaySeconds(data.replyDelaySeconds);
+        if (typeof data.showTypingIndicator === 'boolean') setShowTypingIndicator(data.showTypingIndicator);
+        if (typeof data.autoDetectLanguage === 'boolean') setAutoDetectLanguage(data.autoDetectLanguage);
+        if (Array.isArray(data.supportedLanguages)) setSupportedLanguages(data.supportedLanguages);
+        if (['zh-TW', 'en', 'ja', 'ko', 'th', 'vi'].includes(data.fallbackLanguage)) setFallbackLanguage(data.fallbackLanguage);
         try {
           const lineRes = await fetch('/api/settings/line', { credentials: 'include' });
           if (lineRes.ok && !cancelled) {
@@ -195,6 +217,16 @@ export default function SettingsPage() {
           storeName,
           aiModel,
           quickReplies: quickReplies.filter((r) => r.text.trim()).slice(0, 5),
+          maxReplyLength,
+          replyTemperature,
+          replyFormat,
+          customSensitiveWords,
+          sensitiveWordReply,
+          replyDelaySeconds,
+          showTypingIndicator,
+          autoDetectLanguage,
+          supportedLanguages,
+          fallbackLanguage,
         }),
       });
       if (!response.ok) throw new Error(t('savedError'));
@@ -226,6 +258,12 @@ export default function SettingsPage() {
           question: questionText,
           system_prompt: systemPrompt,
           ai_model: aiModel,
+          maxReplyLength,
+          replyTemperature,
+          replyFormat,
+          autoDetectLanguage,
+          supportedLanguages,
+          fallbackLanguage,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -518,6 +556,191 @@ export default function SettingsPage() {
                 </div>
               </label>
             ))}
+          </div>
+        </div>
+
+        {/* Sprint 1: 回覆控制 */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900">{t('replyControl')}</h2>
+          <div className="mt-4 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">{t('maxReplyLength')}</label>
+              <p className="text-xs text-gray-500">{t('maxReplyLengthDesc')}</p>
+              <div className="mt-2 flex items-center gap-3">
+                <input
+                  type="range"
+                  min={50}
+                  max={1000}
+                  step={50}
+                  value={maxReplyLength}
+                  onChange={(e) => setMaxReplyLength(Number(e.target.value))}
+                  className="flex-1 h-2 rounded-lg appearance-none cursor-pointer bg-gray-200"
+                />
+                <span className="text-sm font-medium text-gray-600 w-16">{maxReplyLength}</span>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">{t('replyTemperature')}</label>
+              <p className="text-xs text-gray-500">{t('replyTemperatureDesc')}</p>
+              <div className="mt-2 flex items-center gap-3">
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.1}
+                  value={replyTemperature}
+                  onChange={(e) => setReplyTemperature(Number(e.target.value))}
+                  className="flex-1 h-2 rounded-lg appearance-none cursor-pointer bg-gray-200"
+                />
+                <span className="text-sm font-medium text-gray-600 w-12">{replyTemperature.toFixed(1)}</span>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">{t('replyFormat')}</label>
+              <select
+                value={replyFormat}
+                onChange={(e) => setReplyFormat(e.target.value)}
+                className="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+              >
+                <option value="plain">{t('replyFormatPlain')}</option>
+                <option value="bullet">{t('replyFormatBullet')}</option>
+                <option value="concise">{t('replyFormatConcise')}</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Sprint 2: 自訂敏感詞 */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900">{t('sensitiveWords')}</h2>
+          <p className="mt-1 text-sm text-gray-600">{t('sensitiveWordsDesc')}</p>
+          <div className="mt-4 space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">{t('sensitiveWords')}</label>
+              <textarea
+                value={customSensitiveWords.join('\n')}
+                onChange={(e) =>
+                  setCustomSensitiveWords(
+                    e.target.value
+                      .split('\n')
+                      .map((w) => w.trim())
+                      .filter(Boolean)
+                  )
+                }
+                rows={4}
+                placeholder="每行輸入一個敏感詞"
+                className="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+              />
+              <p className="mt-1 text-xs text-gray-500">{t('sensitiveWordCount', { count: customSensitiveWords.length })}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">{t('sensitiveWordReply')}</label>
+              <p className="text-xs text-gray-500">{t('sensitiveWordReplyDesc')}</p>
+              <input
+                type="text"
+                value={sensitiveWordReply}
+                onChange={(e) => setSensitiveWordReply(e.target.value)}
+                placeholder={t('sensitiveWordReply')}
+                className="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Sprint 3: 回覆延遲 */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900">{t('replyDelay')}</h2>
+          <p className="mt-1 text-sm text-gray-600">{t('replyDelayDesc')}</p>
+          <div className="mt-4 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">{t('replyDelaySeconds')}</label>
+              <div className="mt-2 flex items-center gap-3">
+                <input
+                  type="range"
+                  min={0}
+                  max={5}
+                  step={0.5}
+                  value={replyDelaySeconds}
+                  onChange={(e) => setReplyDelaySeconds(Number(e.target.value))}
+                  className="flex-1 h-2 rounded-lg appearance-none cursor-pointer bg-gray-200"
+                />
+                <span className="text-sm font-medium text-gray-600 w-14">{t('replyDelaySecondsValue', { seconds: replyDelaySeconds })}</span>
+              </div>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showTypingIndicator}
+                onChange={(e) => setShowTypingIndicator(e.target.checked)}
+                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <span className="text-sm text-gray-700">{t('showTypingIndicator')}</span>
+            </label>
+            <p className="text-xs text-gray-500">{t('showTypingIndicatorDesc')}</p>
+          </div>
+        </div>
+
+        {/* Sprint 4: 多語言 */}
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900">{t('multiLanguage')}</h2>
+          <p className="mt-1 text-sm text-gray-600">{t('autoDetectLanguageDesc')}</p>
+          <div className="mt-4 space-y-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={autoDetectLanguage}
+                onChange={(e) => setAutoDetectLanguage(e.target.checked)}
+                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <span className="text-sm font-medium text-gray-700">{t('autoDetectLanguage')}</span>
+            </label>
+            {autoDetectLanguage && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">{t('supportedLanguages')}</label>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {(
+                      [
+                        ['zh-TW', 'langZhTW'],
+                        ['en', 'langEn'],
+                        ['ja', 'langJa'],
+                        ['ko', 'langKo'],
+                        ['th', 'langTh'],
+                        ['vi', 'langVi'],
+                      ] as const
+                    ).map(([lang, key]) => (
+                      <label key={lang} className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={supportedLanguages.includes(lang)}
+                          onChange={(e) => {
+                            if (e.target.checked) setSupportedLanguages((p) => [...p, lang]);
+                            else setSupportedLanguages((p) => p.filter((l) => l !== lang));
+                          }}
+                          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span className="text-sm text-gray-700">{t(key)}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">{t('fallbackLanguage')}</label>
+                  <select
+                    value={fallbackLanguage}
+                    onChange={(e) => setFallbackLanguage(e.target.value)}
+                    className="mt-2 block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                  >
+                    <option value="zh-TW">{t('langZhTW')}</option>
+                    <option value="en">{t('langEn')}</option>
+                    <option value="ja">{t('langJa')}</option>
+                    <option value="ko">{t('langKo')}</option>
+                    <option value="th">{t('langTh')}</option>
+                    <option value="vi">{t('langVi')}</option>
+                  </select>
+                </div>
+              </>
+            )}
           </div>
         </div>
 

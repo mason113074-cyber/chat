@@ -36,13 +36,19 @@ export async function GET(request: NextRequest) {
 
     const { data, error } = await supabase
       .from('users')
-      .select('system_prompt, ai_model, store_name, quick_replies, line_login_user_id, line_login_display_name, line_login_photo_url')
+      .select(`
+        system_prompt, ai_model, store_name, quick_replies,
+        line_login_user_id, line_login_display_name, line_login_photo_url,
+        max_reply_length, reply_temperature, reply_format,
+        custom_sensitive_words, sensitive_word_reply,
+        reply_delay_seconds, show_typing_indicator,
+        auto_detect_language, supported_languages, fallback_language
+      `)
       .eq('id', user.id)
       .maybeSingle();
 
     if (error) {
       console.error('Error fetching settings:', error);
-      // 查詢失敗時仍回傳預設值，讓設定頁可載入（例如 production 尚未跑完 migrations）
       return NextResponse.json({
         systemPrompt: null,
         aiModel: 'gpt-4o-mini',
@@ -61,6 +67,17 @@ export async function GET(request: NextRequest) {
       lineLoginBound: !!data?.line_login_user_id,
       lineLoginDisplayName: data?.line_login_display_name ?? null,
       lineLoginPhotoUrl: data?.line_login_photo_url ?? null,
+      // Sprint 1–4
+      maxReplyLength: data?.max_reply_length ?? 500,
+      replyTemperature: Number(data?.reply_temperature ?? 0.2),
+      replyFormat: data?.reply_format ?? 'plain',
+      customSensitiveWords: Array.isArray(data?.custom_sensitive_words) ? data.custom_sensitive_words : [],
+      sensitiveWordReply: data?.sensitive_word_reply ?? '此問題涉及敏感內容，建議聯繫人工客服。',
+      replyDelaySeconds: Number(data?.reply_delay_seconds ?? 0),
+      showTypingIndicator: Boolean(data?.show_typing_indicator),
+      autoDetectLanguage: Boolean(data?.auto_detect_language),
+      supportedLanguages: Array.isArray(data?.supported_languages) ? data.supported_languages : ['zh-TW'],
+      fallbackLanguage: data?.fallback_language ?? 'zh-TW',
     });
   } catch (error) {
     console.error('Settings GET API error:', error);
@@ -83,7 +100,22 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { systemPrompt, storeName, aiModel, quickReplies } = body;
+    const {
+      systemPrompt,
+      storeName,
+      aiModel,
+      quickReplies,
+      maxReplyLength,
+      replyTemperature,
+      replyFormat,
+      customSensitiveWords,
+      sensitiveWordReply,
+      replyDelaySeconds,
+      showTypingIndicator,
+      autoDetectLanguage,
+      supportedLanguages,
+      fallbackLanguage,
+    } = body;
 
     if (typeof systemPrompt !== 'string') {
       return NextResponse.json(
@@ -106,15 +138,47 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const updates: {
-      system_prompt: string;
-      store_name?: string | null;
-      ai_model?: string;
-      quick_replies?: unknown;
-    } = { system_prompt: systemPrompt };
+    const updates: Record<string, unknown> = { system_prompt: systemPrompt };
     if (typeof storeName === 'string') updates.store_name = storeName.trim().slice(0, 100) || null;
     if (typeof aiModel === 'string' && ['gpt-4o', 'gpt-4o-mini', 'gpt-3.5-turbo'].includes(aiModel)) {
       updates.ai_model = aiModel;
+    }
+    if (typeof maxReplyLength === 'number' && maxReplyLength >= 50 && maxReplyLength <= 1000) {
+      updates.max_reply_length = Math.round(maxReplyLength);
+    }
+    if (typeof replyTemperature === 'number' && replyTemperature >= 0 && replyTemperature <= 1) {
+      updates.reply_temperature = replyTemperature;
+    }
+    if (typeof replyFormat === 'string' && ['plain', 'bullet', 'concise'].includes(replyFormat)) {
+      updates.reply_format = replyFormat;
+    }
+    if (Array.isArray(customSensitiveWords)) {
+      const valid = customSensitiveWords
+        .filter((w: unknown) => typeof w === 'string' && w.trim().length > 0)
+        .map((w: string) => w.trim().slice(0, 50))
+        .slice(0, 200);
+      updates.custom_sensitive_words = valid;
+    }
+    if (typeof sensitiveWordReply === 'string') {
+      updates.sensitive_word_reply = sensitiveWordReply.trim().slice(0, 500) || null;
+    }
+    if (typeof replyDelaySeconds === 'number' && replyDelaySeconds >= 0 && replyDelaySeconds <= 5) {
+      updates.reply_delay_seconds = replyDelaySeconds;
+    }
+    if (typeof showTypingIndicator === 'boolean') {
+      updates.show_typing_indicator = showTypingIndicator;
+    }
+    if (typeof autoDetectLanguage === 'boolean') {
+      updates.auto_detect_language = autoDetectLanguage;
+    }
+    if (Array.isArray(supportedLanguages)) {
+      const valid = supportedLanguages.filter((l: unknown) =>
+        typeof l === 'string' && ['zh-TW', 'en', 'ja', 'ko', 'th', 'vi'].includes(l)
+      );
+      if (valid.length > 0) updates.supported_languages = valid;
+    }
+    if (typeof fallbackLanguage === 'string' && ['zh-TW', 'en', 'ja', 'ko', 'th', 'vi'].includes(fallbackLanguage)) {
+      updates.fallback_language = fallbackLanguage;
     }
     if (Array.isArray(quickReplies)) {
       const valid = quickReplies

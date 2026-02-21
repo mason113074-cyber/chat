@@ -33,19 +33,46 @@ const defaultSystemPrompt =
 
 export type PreviousMessage = { role: 'user' | 'assistant'; content: string };
 
+export interface GenerateReplyOptions {
+  maxReplyLength?: number;
+  replyTemperature?: number;
+  replyFormat?: string;
+  autoDetectLanguage?: boolean;
+  supportedLanguages?: string[];
+  fallbackLanguage?: string;
+}
+
 export async function generateReply(
   userMessage: string,
   systemPrompt?: string | null,
   model?: string | null,
   userId?: string,
   contactId?: string, // 用於安全日誌
-  previousMessages?: PreviousMessage[] // 最近對話歷史，會加入 prompt context
+  previousMessages?: PreviousMessage[], // 最近對話歷史，會加入 prompt context
+  options?: GenerateReplyOptions
 ): Promise<string> {
   const modelId = model?.trim() || DEFAULT_MODEL;
-  const basePrompt =
+  let basePrompt =
     systemPrompt?.trim() && systemPrompt.trim().length > 0
       ? systemPrompt.trim()
       : defaultSystemPrompt;
+
+  // 格式要求（依 options.replyFormat）
+  const replyFormat = options?.replyFormat ?? 'plain';
+  if (replyFormat === 'bullet') {
+    basePrompt += '\n\n【格式要求】請用條列式（bullet points）回覆，每點以「• 」開頭。';
+  } else if (replyFormat === 'concise') {
+    basePrompt += '\n\n【格式要求】請用 50 字以內的極簡短方式回覆。';
+  }
+
+  // 多語言自動偵測（Sprint 4）
+  if (options?.autoDetectLanguage) {
+    const supported = (options?.supportedLanguages ?? ['zh-TW']).join(', ');
+    const fallback = options?.fallbackLanguage ?? 'zh-TW';
+    basePrompt =
+      `【語言指示】請自動偵測用戶的語言。如果用戶使用以下語言之一：${supported}，請用該語言回覆。否則用 ${fallback} 回覆。無論使用何種語言，都要保持相同的專業語氣。\n\n` +
+      basePrompt;
+  }
 
   // === 安全防護 Step 1：檢查使用者輸入 ===
   const riskDetection = detectSensitiveKeywords(userMessage);
@@ -89,13 +116,22 @@ export async function generateReply(
       { role: 'user', content: userMessage },
     ];
 
+    const maxTokens = Math.min(
+      Math.max(50, options?.maxReplyLength ?? 500),
+      1000
+    );
+    const temperature = Math.max(
+      0,
+      Math.min(1, options?.replyTemperature ?? 0.2)
+    );
+
     const completion = await retryWithBackoff(
       async () => {
         return await getOpenAI().chat.completions.create({
           model: modelId,
           messages: apiMessages,
-          temperature: 0.2, // 客服場景建議 0.1–0.3，降低幻覺
-          max_tokens: 500,
+          temperature,
+          max_tokens: maxTokens,
         });
       },
       {

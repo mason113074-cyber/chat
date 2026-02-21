@@ -243,9 +243,23 @@ export async function getUserSystemPrompt(userId: string): Promise<string | null
 export interface UserSettings {
   system_prompt: string | null;
   ai_model: string | null;
+  // Sprint 1
+  max_reply_length?: number;
+  reply_temperature?: number;
+  reply_format?: string;
+  // Sprint 2
+  custom_sensitive_words?: string[];
+  sensitive_word_reply?: string | null;
+  // Sprint 3
+  reply_delay_seconds?: number;
+  show_typing_indicator?: boolean;
+  // Sprint 4
+  auto_detect_language?: boolean;
+  supported_languages?: string[];
+  fallback_language?: string;
 }
 
-/** Fetch system_prompt and ai_model for a user (e.g. for webhook). Cached 10 min. */
+/** Fetch user settings (e.g. for webhook). Cached 10 min. */
 export async function getUserSettings(userId: string): Promise<UserSettings> {
   const cacheKey = USER_SETTINGS_CACHE_PREFIX + userId;
 
@@ -255,7 +269,13 @@ export async function getUserSettings(userId: string): Promise<UserSettings> {
       const client = getSupabaseAdmin();
       const { data, error } = await client
         .from('users')
-        .select('system_prompt, ai_model')
+        .select(`
+          system_prompt, ai_model,
+          max_reply_length, reply_temperature, reply_format,
+          custom_sensitive_words, sensitive_word_reply,
+          reply_delay_seconds, show_typing_indicator,
+          auto_detect_language, supported_languages, fallback_language
+        `)
         .eq('id', userId)
         .maybeSingle();
 
@@ -267,6 +287,20 @@ export async function getUserSettings(userId: string): Promise<UserSettings> {
       return {
         system_prompt: data?.system_prompt ?? null,
         ai_model: data?.ai_model ?? null,
+        max_reply_length: data?.max_reply_length ?? 500,
+        reply_temperature: data?.reply_temperature ?? 0.2,
+        reply_format: data?.reply_format ?? 'plain',
+        custom_sensitive_words: Array.isArray(data?.custom_sensitive_words)
+          ? data.custom_sensitive_words
+          : [],
+        sensitive_word_reply: data?.sensitive_word_reply ?? null,
+        reply_delay_seconds: Number(data?.reply_delay_seconds ?? 0),
+        show_typing_indicator: Boolean(data?.show_typing_indicator),
+        auto_detect_language: Boolean(data?.auto_detect_language),
+        supported_languages: Array.isArray(data?.supported_languages)
+          ? data.supported_languages
+          : ['zh-TW'],
+        fallback_language: data?.fallback_language ?? 'zh-TW',
       };
     },
     { ttl: USER_SETTINGS_CACHE_TTL }
