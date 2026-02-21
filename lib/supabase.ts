@@ -278,6 +278,7 @@ export interface UserSettings {
   conversation_memory_mode?: string;
   welcome_message_enabled?: boolean;
   welcome_message?: string | null;
+  quick_replies?: QuickReply[] | null;
 }
 
 /** Fetch user settings (e.g. for webhook). Cached 10 min. */
@@ -291,7 +292,7 @@ export async function getUserSettings(userId: string): Promise<UserSettings> {
       const { data, error } = await client
         .from('users')
         .select(`
-          system_prompt, ai_model,
+          system_prompt, ai_model, quick_replies,
           max_reply_length, reply_temperature, reply_format,
           custom_sensitive_words, sensitive_word_reply,
           reply_delay_seconds, show_typing_indicator,
@@ -340,6 +341,7 @@ export async function getUserSettings(userId: string): Promise<UserSettings> {
         conversation_memory_mode: data?.conversation_memory_mode ?? 'recent',
         welcome_message_enabled: Boolean(data?.welcome_message_enabled),
         welcome_message: data?.welcome_message ?? null,
+        quick_replies: Array.isArray(data?.quick_replies) ? data.quick_replies : [],
       };
     },
     { ttl: USER_SETTINGS_CACHE_TTL }

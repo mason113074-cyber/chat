@@ -43,18 +43,32 @@ export function validateSignature(
 // Reply message to user
 export async function replyMessage(
   replyToken: string,
-  text: string
+  text: string,
+  quickReplyItems?: { label: string; text: string }[]
 ): Promise<void> {
   try {
     const client = getLineClient();
+    const message: line.messagingApi.TextMessage = {
+      type: 'text',
+      text,
+    };
+
+    if (quickReplyItems && quickReplyItems.length > 0) {
+      message.quickReply = {
+        items: quickReplyItems.slice(0, 13).map((item) => ({
+          type: 'action' as const,
+          action: {
+            type: 'message' as const,
+            label: item.label.substring(0, 20),
+            text: item.text,
+          },
+        })),
+      };
+    }
+
     await client.replyMessage({
       replyToken,
-      messages: [
-        {
-          type: 'text',
-          text,
-        },
-      ],
+      messages: [message],
     });
   } catch (error) {
     console.error('Error replying to LINE message:', error);

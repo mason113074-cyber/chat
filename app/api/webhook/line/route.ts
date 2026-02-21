@@ -312,6 +312,7 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
       supported_languages: supportedLanguages,
       fallback_language: fallbackLanguage,
       reply_delay_seconds: replyDelaySeconds = 0,
+      quick_replies: quickReplies = [],
     } = settings;
 
     // Sprint 2: 自訂敏感詞檢查（在內建敏感詞之後）
@@ -479,7 +480,17 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
 
-    await replyMessage(replyToken, finalReply);
+    const enabledQuickReplies = (quickReplies ?? [])
+      .filter((qr: { enabled?: boolean; text?: string }) => qr.enabled !== false && (qr.text ?? '').trim())
+      .map((qr: { text?: string }) => ({
+        label: (qr.text ?? '').trim().substring(0, 20),
+        text: (qr.text ?? '').trim(),
+      }));
+    await replyMessage(
+      replyToken,
+      finalReply,
+      enabledQuickReplies.length > 0 ? enabledQuickReplies : undefined
+    );
 
     await insertConversationMessage(contact.id, userMessage, 'user');
     const needsHumanFromUser = HUMAN_HANDOFF_KEYWORDS.some((keyword) =>
