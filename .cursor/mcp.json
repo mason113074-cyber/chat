@@ -1,5 +1,22 @@
 {
   "mcpServers": {
+    "puppeteer": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-puppeteer"]
+    },
+    "fetch": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-fetch"]
+    },
+    "brave-search": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+      "env": { "BRAVE_API_KEY": "YOUR_BRAVE_API_KEY" }
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"]
+    },
     "vercel": { "url": "https://mcp.vercel.com" },
     "supabase": { "url": "https://mcp.supabase.com/mcp" },
     "filesystem": {
@@ -13,9 +30,8 @@
     "knowledge-graph-memory": {
       "command": "npx",
       "args": ["-y", "@itseasy21/mcp-knowledge-graph"],
-      "env": {
-        "MEMORY_FILE_PATH": "c:/dev/saas/chat/.mcp-knowledge-graph-memory.jsonl"
-      }
+      "env": { "MEMORY_FILE_PATH": "c:/dev/saas/chat/.mcp-knowledge-graph-memory.jsonl"
+    }
     }
   }
 }

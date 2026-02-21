@@ -13,12 +13,28 @@ export async function GET(request: NextRequest) {
       user = u;
     }
 
-    const { data: contacts } = await supabase
+    const cols = 'id, line_user_id, name, email, phone, notes, csat_score, top_topic, created_at, conversations(id, created_at, message)';
+    let contacts: Array<Record<string, unknown>> | null = null;
+    const { data: data1, error: selErr } = await supabase
       .from('contacts')
-      .select('id, line_user_id, name, email, phone, notes, csat_score, top_topic, created_at, conversations(id, created_at, message)')
+      .select(cols + ', source, lifecycle_stage')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
+    if (selErr?.code === '42703') {
+      const { data: fallback } = await supabase
+        .from('contacts')
+        .select(cols)
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      for (const c of fallback ?? []) {
+        (c as Record<string, unknown>).source = 'line';
+        (c as Record<string, unknown>).lifecycle_stage = 'new_customer';
+      }
+      contacts = fallback ?? [];
+    } else {
+      contacts = data1 as Array<Record<string, unknown>> | null;
+    }
     if (!contacts) return NextResponse.json({ contacts: [] });
 
     const contactIds = contacts.map((c) => c.id);
@@ -43,7 +59,8 @@ export async function GET(request: NextRequest) {
     }
 
     type Conv = { id: string; created_at: string; message?: string | null };
-    const out = contacts.map((c) => {
+    type Row = Record<string, unknown> & { id: string };
+    const out = (contacts as Row[]).map((c) => {
       const convs = (c.conversations as Conv[]) ?? [];
       const conversationCount = convs.length;
       const lastInteraction = convs.length > 0
@@ -76,6 +93,8 @@ export async function GET(request: NextRequest) {
         csat_score: c.csat_score ?? null,
         top_topic: c.top_topic ?? computedTopTopic,
         created_at: c.created_at,
+        source: (c.source as string | undefined) ?? 'line',
+        lifecycle_stage: (c.lifecycle_stage as string | undefined) ?? 'new_customer',
         conversationCount,
         lastInteraction,
         tags: assignmentsByContact.get(c.id) ?? [],

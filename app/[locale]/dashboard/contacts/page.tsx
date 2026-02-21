@@ -21,6 +21,17 @@ type Contact = {
   conversationCount: number;
   lastInteraction: string | null;
   tags: ContactTag[];
+  source?: string;
+  lifecycle_stage?: string;
+};
+
+type Stats = {
+  totalContacts: number;
+  activeContacts: number;
+  segmentCount: number;
+  weeklyNewContacts: number;
+  weeklyNewPercent: number;
+  avgClv: number | null;
 };
 
 const ITEMS_PER_PAGE = 20;
@@ -43,6 +54,8 @@ export default function ContactsPage() {
   const t = useTranslations('contacts');
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [viewMode, setViewMode] = useState<'list' | 'kanban' | 'segment'>('list');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -67,10 +80,17 @@ export default function ContactsPage() {
   const popoverRef = useRef<HTMLDivElement>(null);
 
   const fetchContacts = useCallback(async () => {
-    const res = await fetch('/api/contacts');
-    if (res.ok) {
-      const json = await res.json();
+    const [resContacts, resStats] = await Promise.all([
+      fetch('/api/contacts'),
+      fetch('/api/contacts/stats'),
+    ]);
+    if (resContacts.ok) {
+      const json = await resContacts.json();
       setContacts(json.contacts ?? []);
+    }
+    if (resStats.ok) {
+      const json = await resStats.json();
+      setStats(json);
     }
   }, []);
   const fetchTags = useCallback(async () => {
@@ -290,12 +310,69 @@ export default function ContactsPage() {
     );
   }
 
+  const sourceLabel = (s: string) => {
+    if (s === 'line') return t('sourceLine');
+    if (s === 'widget') return t('sourceWidget');
+    return t('sourceImport');
+  };
+  const stageLabel = (s: string) => {
+    const m: Record<string, string> = { new_customer: t('stageNew'), engaging: t('stageEngaging'), active: t('stageActive'), vip: t('stageVip'), churn_risk: t('stageChurn') };
+    return m[s] ?? s;
+  };
+  const kanbanCols = ['new_customer', 'engaging', 'active', 'vip', 'churn_risk'] as const;
+  const segmentGroups = tags.map((tag) => ({
+    tag,
+    contacts: filteredContacts.filter((c) => c.tags.some((t) => t.id === tag.id)),
+  })).filter((g) => g.contacts.length > 0);
+
   return (
     <div>
+      <div className="mb-8 rounded-xl bg-gradient-to-br from-indigo-50 to-white p-6 border border-indigo-100">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{t('heroTitle')}</h1>
+            <p className="mt-1 text-gray-600">{t('heroSubtitle')}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-indigo-600" title="LINE">LINE</span>
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-400" title="Widget">W</span>
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-400" title="Email">@</span>
+          </div>
+        </div>
+      </div>
+
+      {stats && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-sm text-gray-500">{t('statTotal')}</p>
+            <p className="text-2xl font-bold text-gray-900">{stats.totalContacts}</p>
+            {stats.weeklyNewPercent > 0 && (
+              <p className="text-xs text-green-600 mt-1">↑ {stats.weeklyNewPercent}% {stats.weeklyNewContacts} this week</p>
+            )}
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-sm text-gray-500">{t('statActive')}</p>
+            <p className="text-2xl font-bold text-gray-900">{stats.activeContacts}</p>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-sm text-gray-500">{t('statSegments')}</p>
+            <p className="text-2xl font-bold text-gray-900">{stats.segmentCount}</p>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-sm text-gray-500">{t('statClv')}</p>
+            <p className="text-2xl font-bold text-gray-900">{stats.avgClv != null ? stats.avgClv : '—'}</p>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
-          <p className="mt-1 text-gray-600">{t('totalContacts', { count: filteredContacts.length })}</p>
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-lg border border-gray-200 p-0.5 bg-gray-50">
+            {(['list', 'kanban', 'segment'] as const).map((m) => (
+              <button key={m} type="button" onClick={() => setViewMode(m)} className={`rounded-md px-3 py-1.5 text-sm font-medium ${viewMode === m ? 'bg-white shadow text-gray-900' : 'text-gray-600 hover:text-gray-900'}`}>{t(`view${m.charAt(0).toUpperCase() + m.slice(1)}`)}</button>
+            ))}
+          </div>
+          <p className="text-sm text-gray-500">{t('totalContacts', { count: filteredContacts.length })}</p>
         </div>
         <button
           type="button"
@@ -335,7 +412,60 @@ export default function ContactsPage() {
       )}
 
       <div className="mt-8">
-        {!contacts.length ? (
+        {viewMode === 'kanban' && (
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            {kanbanCols.map((col) => (
+              <div key={col} className="rounded-xl border border-gray-200 bg-gray-50/50 p-3 min-h-[200px]">
+                <p className="text-xs font-medium text-gray-600 mb-3">{stageLabel(col)}</p>
+                <div className="space-y-2">
+                  {filteredContacts.filter((c) => (c.lifecycle_stage ?? 'new_customer') === col).map((c) => (
+                    <Link key={c.id} href={`/dashboard/conversations/${c.id}`} className="block rounded-lg border border-gray-200 bg-white p-2 hover:shadow-sm transition-shadow">
+                      <div className="flex items-center gap-2">
+                        <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-sm font-medium text-indigo-700">{c.name?.charAt(0) || '?'}</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{c.name || t('unnamedCustomer')}</p>
+                          <div className="flex flex-wrap gap-1 mt-0.5">
+                            {c.tags.slice(0, 2).map((tg) => (
+                              <span key={tg.id} className={`inline-flex rounded px-1.5 py-0.5 text-xs ${tagClass(tg.color)}`}>{tg.name}</span>
+                            ))}
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">{c.lastInteraction ? new Date(c.lastInteraction).toLocaleDateString('zh-TW') : '—'}</p>
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {viewMode === 'segment' && (
+          <div className="space-y-4">
+            {segmentGroups.length === 0 ? (
+              <div className="rounded-xl border border-gray-200 bg-white p-8 text-center text-gray-500">
+                {tags.length === 0 ? t('emptyDesc') : 'Select tags to filter. Segments appear when contacts have tags.'}
+              </div>
+            ) : (
+              segmentGroups.map((g) => (
+                <div key={g.tag.id} className="rounded-xl border border-gray-200 bg-white p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${tagClass(g.tag.color)}`}>{g.tag.name}</span>
+                    <span className="text-sm text-gray-500">{g.contacts.length} contacts</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {g.contacts.slice(0, 20).map((c) => (
+                      <Link key={c.id} href={`/dashboard/conversations/${c.id}`} className="rounded-lg border border-gray-100 px-2 py-1 text-sm text-indigo-600 hover:bg-indigo-50">{c.name || t('unnamedCustomer')}</Link>
+                    ))}
+                    {g.contacts.length > 20 && <span className="text-sm text-gray-400">+{g.contacts.length - 20} more</span>}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {viewMode === 'list' && !contacts.length ? (
           <div className="rounded-xl border border-gray-200 bg-white px-6 py-16 shadow-sm">
             <EmptyState
               icon="👥"
@@ -343,20 +473,23 @@ export default function ContactsPage() {
               description={t('emptyDesc')}
             />
           </div>
-        ) : (
+        ) : viewMode === 'list' ? (
           <>
           <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 w-10" />
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{t('colName')}</th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{t('colLineUserId')}</th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{t('colEmail')}</th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{t('colPhone')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{t('colSource')}</th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{t('colTags')}</th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{t('colCsat')}</th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{t('colTopTopic')}</th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{t('colConversations')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{t('colStage')}</th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{t('colLastInteraction')}</th>
                   <th className="px-6 py-3 w-28" />
                 </tr>
@@ -364,6 +497,9 @@ export default function ContactsPage() {
               <tbody className="divide-y divide-gray-200 bg-white">
                 {paginatedContacts.map((c) => (
                   <tr key={c.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="whitespace-nowrap px-6 py-4">
+                      <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-sm font-medium text-indigo-700">{c.name?.charAt(0) || '?'}</div>
+                    </td>
                     <td className="whitespace-nowrap px-6 py-4">
                       <Link
                         href={`/dashboard/conversations/${c.id}`}
@@ -375,14 +511,15 @@ export default function ContactsPage() {
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600 font-mono">{c.line_user_id}</td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">{c.email || '—'}</td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">{c.phone || '—'}</td>
+                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600">{sourceLabel(c.source ?? 'line')}</td>
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap gap-1">
-                        {c.tags.slice(0, 3).map((t) => (
+                        {c.tags.slice(0, 3).map((tg) => (
                           <span
-                            key={t.id}
-                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${tagClass(t.color)}`}
+                            key={tg.id}
+                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${tagClass(tg.color)}`}
                           >
-                            {t.name}
+                            {tg.name}
                           </span>
                         ))}
                         {c.tags.length > 3 && (
@@ -395,6 +532,12 @@ export default function ContactsPage() {
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">{c.top_topic || '—'}</td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">{c.conversationCount}</td>
+                    <td className="whitespace-nowrap px-6 py-4">
+                      <span className="inline-flex items-center gap-1">
+                        <span className={`h-2 w-2 rounded-full ${(c.lifecycle_stage ?? 'new_customer') === 'churn_risk' ? 'bg-red-500' : (c.lifecycle_stage ?? 'new_customer') === 'vip' ? 'bg-amber-500' : 'bg-green-500'}`} />
+                        {stageLabel(c.lifecycle_stage ?? 'new_customer')}
+                      </span>
+                    </td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
                       {c.lastInteraction ? new Date(c.lastInteraction).toLocaleString('zh-TW') : '—'}
                     </td>
@@ -498,7 +641,7 @@ export default function ContactsPage() {
             </div>
           )}
           </>
-        )}
+        ) : null}
       </div>
 
       {/* Contact detail drawer */}

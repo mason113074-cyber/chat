@@ -27,8 +27,8 @@ function loadEnvLocal(): void {
 }
 
 loadEnvLocal();
-
-const baseURL = process.env.TEST_BASE_URL || 'http://localhost:3000';
+// E2E_BASE_URL 給 production 用（.env.local 通常不設，cross-env 傳入才生效）
+const baseURL = process.env.E2E_BASE_URL || process.env.TEST_BASE_URL || 'http://localhost:3000';
 
 export default defineConfig({
   testDir: './e2e',

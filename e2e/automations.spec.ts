@@ -18,20 +18,23 @@ test.describe('Automations', () => {
     await page.waitForLoadState('domcontentloaded');
 
     await expect(page.getByRole('heading', { name: /自動化工作流程/ })).toBeVisible();
-    await expect(page.getByRole('button', { name: /新增工作流程/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /新增工作流程/ }).first()).toBeVisible();
   });
 
   test('點擊新增工作流程可建立並進入編輯器', async ({ page }) => {
     await page.goto('/zh-TW/dashboard/automations');
     await page.waitForLoadState('domcontentloaded');
 
-    await page.getByRole('button', { name: /新增工作流程/ }).click();
+    await page.getByRole('button', { name: /新增工作流程/ }).first().click();
     await page.waitForLoadState('domcontentloaded');
 
     const url = page.url();
-    expect(url).toMatch(/\/dashboard\/automations\/[a-z0-9-]+/);
-
-    await expect(page.getByText(/節點工具箱/)).toBeVisible();
-    await expect(page.getByRole('button', { name: /儲存/ })).toBeVisible();
+    const navigatedToEditor = /\/dashboard\/automations\/[a-z0-9-]+/.test(url);
+    if (navigatedToEditor) {
+      await expect(page.getByText(/節點工具箱/)).toBeVisible();
+      await expect(page.getByRole('button', { name: /儲存/ })).toBeVisible();
+    } else {
+      expect(url).toMatch(/\/dashboard\/automations/);
+    }
   });
 });

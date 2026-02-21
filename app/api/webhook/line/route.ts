@@ -14,6 +14,7 @@ import { calculateConfidence } from '@/lib/confidence';
 import { isWithinBusinessHours } from '@/lib/business-hours';
 import { summarizeConversation } from '@/lib/conversation-summary';
 import { WorkflowEngine, type WorkflowData } from '@/lib/workflow-engine';
+import { storeSentimentAndAlert } from '@/lib/sentiment';
 
 const KNOWLEDGE_PREFIX =
   '\n\n## 以下是你可以參考的知識庫內容（只能根據以下內容回答，勿使用其他知識）：\n';
@@ -564,7 +565,8 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
       enabledQuickReplies.length > 0 ? enabledQuickReplies : undefined
     );
 
-    await insertConversationMessage(contact.id, userMessage, 'user');
+    const userConv = await insertConversationMessage(contact.id, userMessage, 'user');
+    if (userConv?.id) void storeSentimentAndAlert(userConv.id, contact.id, ownerUserId, userMessage, contact.name ?? null);
     const needsHumanFromUser = HUMAN_HANDOFF_KEYWORDS.some((keyword) =>
       userMessage.toLowerCase().includes(keyword.toLowerCase())
     );

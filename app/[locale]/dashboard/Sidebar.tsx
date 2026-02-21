@@ -11,6 +11,7 @@ import {
   BookOpen,
   BarChart3,
   Zap,
+  Megaphone,
   Settings,
   CreditCard,
   TestTube,
@@ -35,6 +36,7 @@ const MAIN_NAV = [
   { href: '/dashboard/knowledge-base', labelKey: 'knowledgeBase' as const, Icon: BookOpen },
   { href: '/dashboard/analytics', labelKey: 'analytics' as const, Icon: BarChart3 },
   { href: '/dashboard/automations', labelKey: 'automations' as const, Icon: Zap },
+  { href: '/dashboard/campaigns', labelKey: 'campaigns' as const, Icon: Megaphone },
   { href: '/dashboard/settings', labelKey: 'settings' as const, Icon: Settings },
 ] as const;
 

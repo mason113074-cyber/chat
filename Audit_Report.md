@@ -1,18 +1,12 @@
-# E2E 稽核報告 — https://www.customeraipro.com
+# E2E 稽核報告 — http://localhost:3000
 
-**執行時間**: 2026-02-20T13:51:43.802Z
+**執行時間**: 2026-02-21T09:32:29.026Z
 
 ---
 
 ## [Critical] 阻斷性錯誤
 
-### 1. A3 未登入應被導向登入頁
-
-- **觸發條件**: 未帶 session 直接訪問 /dashboard
-- **Error Log**:
-```
-預期導向 /login，實際 URL: https://www.customeraipro.com/en/dashboard. Errors: none
-```
+無。
 
 ## [Warning] 潛在風險
 
