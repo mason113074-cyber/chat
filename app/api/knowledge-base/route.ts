@@ -3,8 +3,6 @@ import { createClient } from '@/lib/supabase/server';
 import { getAuthFromRequest } from '@/lib/auth-helper';
 import { clearKnowledgeCache } from '@/lib/knowledge-search';
 
-const CATEGORIES = ['general', '常見問題', '產品資訊', '退換貨政策', '營業資訊', '其他'];
-
 export async function GET(request: NextRequest) {
   try {
     const auth = await getAuthFromRequest(request);
@@ -29,7 +27,7 @@ export async function GET(request: NextRequest) {
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false });
 
-    if (category && CATEGORIES.includes(category)) {
+    if (category) {
       q = q.eq('category', category);
     }
     if (search) {
@@ -67,7 +65,10 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const title = typeof body.title === 'string' ? body.title.trim().slice(0, 200) : '';
     const content = typeof body.content === 'string' ? body.content.trim() : '';
-    const category = body.category && CATEGORIES.includes(body.category) ? body.category : 'general';
+    const category =
+      typeof body.category === 'string' && body.category.trim()
+        ? body.category.trim().slice(0, 50)
+        : 'general';
     const isActive = body.is_active !== false;
 
     if (!title) return NextResponse.json({ error: '請填寫標題' }, { status: 400 });

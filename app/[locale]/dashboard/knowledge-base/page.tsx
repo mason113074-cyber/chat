@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { useToast } from '@/components/Toast';
 
-const CATEGORIES = [
+const DEFAULT_CATEGORIES = [
   { value: 'general', labelKey: 'catGeneral' as const },
   { value: '常見問題', labelKey: 'catFaq' as const },
   { value: '產品資訊', labelKey: 'catProduct' as const },
@@ -31,8 +31,20 @@ type Item = {
 };
 
 type Stats = { total: number; activeCount: number; lastUpdated: string | null; byCategory: Record<string, number> };
+type GapSuggestion = {
+  id: string;
+  questionExample: string;
+  frequency: number;
+  suggestedTitle: string;
+  suggestedAnswer: string;
+  suggestedCategory: string;
+};
 
 const PREVIEW_LEN = 100;
+
+function categoryLabelKey(category: string): (typeof DEFAULT_CATEGORIES)[number]['labelKey'] | null {
+  return DEFAULT_CATEGORIES.find((c) => c.value === category)?.labelKey ?? null;
+}
 
 function parseTxt(content: string): { title: string; content: string; category: string }[] {
   const lines = content.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
@@ -82,10 +94,20 @@ export default function KnowledgeBasePage() {
   const [formTitle, setFormTitle] = useState('');
   const [formContent, setFormContent] = useState('');
   const [formCategory, setFormCategory] = useState('general');
+  const [formCustomCategory, setFormCustomCategory] = useState('');
   const [saving, setSaving] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [importPreview, setImportPreview] = useState<{ title: string; content: string; category: string }[]>([]);
   const [importing, setImporting] = useState(false);
+  const [urlImportOpen, setUrlImportOpen] = useState(false);
+  const [urlInput, setUrlInput] = useState('');
+  const [urlDepth, setUrlDepth] = useState(1);
+  const [urlAutoCategories, setUrlAutoCategories] = useState(true);
+  const [urlPreview, setUrlPreview] = useState<{ title: string; content: string; category: string; sourceUrl?: string }[]>([]);
+  const [urlLoading, setUrlLoading] = useState(false);
+  const [gapLoading, setGapLoading] = useState(false);
+  const [gapSuggestions, setGapSuggestions] = useState<GapSuggestion[]>([]);
+  const [adoptingId, setAdoptingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Test AI panel - 預設展開方便測試
@@ -114,6 +136,23 @@ export default function KnowledgeBasePage() {
     }
   }, []);
 
+  const categoryOptions = useMemo(() => {
+    const set = new Set<string>(DEFAULT_CATEGORIES.map((c) => c.value));
+    for (const item of items) set.add(item.category || 'general');
+    for (const key of Object.keys(stats?.byCategory ?? {})) set.add(key || 'general');
+    if (formCategory && formCategory !== '__custom') set.add(formCategory);
+    if (formCustomCategory.trim()) set.add(formCustomCategory.trim());
+    return Array.from(set).filter(Boolean);
+  }, [items, stats, formCategory, formCustomCategory]);
+
+  const getCategoryLabel = useCallback(
+    (category: string) => {
+      const labelKey = categoryLabelKey(category);
+      return labelKey ? t(labelKey) : category;
+    },
+    [t]
+  );
+
   useEffect(() => {
     const t = setTimeout(() => setSearchDebounced(search), 300);
     return () => clearTimeout(t);
@@ -129,6 +168,7 @@ export default function KnowledgeBasePage() {
     setFormTitle('');
     setFormContent('');
     setFormCategory('general');
+    setFormCustomCategory('');
     setModalOpen(true);
   };
 
@@ -136,20 +176,31 @@ export default function KnowledgeBasePage() {
     setEditingId(item.id);
     setFormTitle(item.title);
     setFormContent(item.content);
-    setFormCategory(item.category || 'general');
+    const category = item.category || 'general';
+    if (DEFAULT_CATEGORIES.some((c) => c.value === category)) {
+      setFormCategory(category);
+      setFormCustomCategory('');
+    } else {
+      setFormCategory('__custom');
+      setFormCustomCategory(category);
+    }
     setModalOpen(true);
   };
 
   const handleSave = async () => {
     const title = formTitle.trim();
     if (!title) return;
+    const effectiveCategory =
+      formCategory === '__custom'
+        ? formCustomCategory.trim() || 'general'
+        : formCategory || 'general';
     setSaving(true);
     try {
       if (editingId) {
         const res = await fetch(`/api/knowledge-base/${editingId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title, content: formContent.trim(), category: formCategory }),
+          body: JSON.stringify({ title, content: formContent.trim(), category: effectiveCategory }),
         });
         const data = await res.json().catch(() => ({}));
         if (res.ok) {
@@ -164,7 +215,7 @@ export default function KnowledgeBasePage() {
         const res = await fetch('/api/knowledge-base', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title, content: formContent.trim(), category: formCategory }),
+          body: JSON.stringify({ title, content: formContent.trim(), category: effectiveCategory }),
         });
         const data = await res.json().catch(() => ({}));
         if (res.ok) {
@@ -248,6 +299,102 @@ export default function KnowledgeBasePage() {
     }
   };
 
+  const handleUrlPreview = async () => {
+    const target = urlInput.trim();
+    if (!target) return;
+    setUrlLoading(true);
+    try {
+      const res = await fetch('/api/knowledge-base/import-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: target,
+          depth: urlDepth,
+          autoCategories: urlAutoCategories,
+          previewOnly: true,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.show((data?.error as string) ?? t('requestFailed'), 'error');
+        return;
+      }
+      setUrlPreview((data.preview ?? []) as { title: string; content: string; category: string; sourceUrl?: string }[]);
+    } finally {
+      setUrlLoading(false);
+    }
+  };
+
+  const handleUrlImportConfirm = async () => {
+    const target = urlInput.trim();
+    if (!target) return;
+    setUrlLoading(true);
+    try {
+      const res = await fetch('/api/knowledge-base/import-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: target,
+          depth: urlDepth,
+          autoCategories: urlAutoCategories,
+          previewOnly: false,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.show((data?.error as string) ?? t('requestFailed'), 'error');
+        return;
+      }
+      setUrlImportOpen(false);
+      setUrlPreview([]);
+      setUrlInput('');
+      await Promise.all([fetchList(), fetchStats(), loadGapAnalysis()]);
+      toast.show(t('toastImported', { count: data.imported ?? 0 }), 'success');
+    } finally {
+      setUrlLoading(false);
+    }
+  };
+
+  const loadGapAnalysis = useCallback(async () => {
+    setGapLoading(true);
+    try {
+      const res = await fetch('/api/knowledge-base/gap-analysis?days=30');
+      if (!res.ok) return;
+      const data = await res.json();
+      setGapSuggestions((data.suggestions ?? []) as GapSuggestion[]);
+    } finally {
+      setGapLoading(false);
+    }
+  }, []);
+
+  const adoptSuggestion = async (s: GapSuggestion) => {
+    setAdoptingId(s.id);
+    try {
+      const res = await fetch('/api/knowledge-base/gap-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: s.suggestedTitle,
+          content: `${s.suggestedAnswer}\n\n客戶問題範例：${s.questionExample}`,
+          category: s.suggestedCategory || 'general',
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.show((data?.error as string) ?? t('requestFailed'), 'error');
+        return;
+      }
+      await Promise.all([fetchList(), fetchStats(), loadGapAnalysis()]);
+      toast.show(t('toastAdded'), 'success');
+    } finally {
+      setAdoptingId(null);
+    }
+  };
+
+  useEffect(() => {
+    loadGapAnalysis();
+  }, [loadGapAnalysis]);
+
   const handleTestSubmit = async () => {
     const q = testQuestion.trim();
     if (!q) return;
@@ -317,7 +464,7 @@ export default function KnowledgeBasePage() {
             <p className="text-sm text-gray-500">{t('statByCategory')}</p>
             <p className="text-sm text-gray-700">
               {Object.entries(stats.byCategory)
-                .map(([k, v]) => `${t(CATEGORIES.find((c) => c.value === k)?.labelKey ?? 'catGeneral')}: ${v}`)
+                .map(([k, v]) => `${getCategoryLabel(k)}: ${v}`)
                 .join('、') || '—'}
             </p>
           </div>
@@ -340,6 +487,13 @@ export default function KnowledgeBasePage() {
           className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
         >
           {t('importFaq')}
+        </button>
+        <button
+          type="button"
+          onClick={() => setUrlImportOpen(true)}
+          className="rounded-lg border border-indigo-300 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+        >
+          {t('importFromUrl')}
         </button>
         <input
           id="kb-import-file"
@@ -380,8 +534,8 @@ export default function KnowledgeBasePage() {
           aria-label={t('allCategories')}
         >
           <option value="">{t('allCategories')}</option>
-          {CATEGORIES.map((c) => (
-            <option key={c.value} value={c.value}>{t(c.labelKey)}</option>
+          {categoryOptions.map((category) => (
+            <option key={category} value={category}>{getCategoryLabel(category)}</option>
           ))}
         </select>
       </div>
@@ -416,7 +570,7 @@ export default function KnowledgeBasePage() {
               <div className="flex items-start justify-between gap-2">
                 <h3 className="font-semibold text-gray-900 line-clamp-1">{item.title}</h3>
                 <span className={`shrink-0 rounded px-2 py-0.5 text-xs ${CATEGORY_COLOR[item.category] ?? CATEGORY_COLOR.general}`}>
-                  {t(CATEGORIES.find((c) => c.value === item.category)?.labelKey ?? 'catGeneral')}
+                  {getCategoryLabel(item.category)}
                 </span>
               </div>
               <p className="mt-2 text-sm text-gray-600 line-clamp-2">
@@ -522,7 +676,7 @@ export default function KnowledgeBasePage() {
                             >
                               <span className="font-medium text-gray-900">{s.title}</span>
                               <span className={`ml-2 rounded px-1.5 py-0.5 text-xs ${CATEGORY_COLOR[s.category] ?? CATEGORY_COLOR.general}`}>
-                                {t(CATEGORIES.find((c) => c.value === s.category)?.labelKey ?? 'catGeneral')}
+                                {getCategoryLabel(s.category)}
                               </span>
                             </div>
                           ))}
@@ -536,6 +690,138 @@ export default function KnowledgeBasePage() {
           </div>
         </div>
       </div>
+
+      {/* Gap analysis */}
+      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">{t('gapAnalysisTitle')}</h2>
+            <p className="text-sm text-gray-500">{t('gapAnalysisDesc')}</p>
+          </div>
+          <button
+            type="button"
+            onClick={loadGapAnalysis}
+            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            {t('reload')}
+          </button>
+        </div>
+        <div className="mt-4">
+          {gapLoading ? (
+            <p className="text-sm text-gray-500">{t('loading')}</p>
+          ) : gapSuggestions.length === 0 ? (
+            <p className="text-sm text-gray-500">{t('noData')}</p>
+          ) : (
+            <div className="space-y-3">
+              {gapSuggestions.map((s) => (
+                <div key={s.id} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium text-gray-900 truncate">{s.suggestedTitle}</p>
+                      <p className="mt-1 text-sm text-gray-600 line-clamp-2">{s.questionExample}</p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {t('frequency')}: {s.frequency} · {t('fieldCategory')}: {getCategoryLabel(s.suggestedCategory)}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => adoptSuggestion(s)}
+                      disabled={adoptingId === s.id}
+                      className="shrink-0 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                      {adoptingId === s.id ? t('saving') : t('adoptSuggestion')}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* URL import modal */}
+      {urlImportOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6 shadow-lg">
+            <h2 className="text-lg font-semibold text-gray-900">{t('importFromUrl')}</h2>
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">{t('urlLabel')}</label>
+                <input
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  placeholder="https://..."
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">{t('crawlDepth')}</label>
+                  <select
+                    value={urlDepth}
+                    onChange={(e) => setUrlDepth(Number(e.target.value))}
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                  >
+                    <option value={1}>{t('depthOnePage')}</option>
+                    <option value={3}>{t('depthSubPages')}</option>
+                  </select>
+                </div>
+                <label className="flex items-center gap-2 text-sm text-gray-700 mt-6">
+                  <input
+                    type="checkbox"
+                    checked={urlAutoCategories}
+                    onChange={(e) => setUrlAutoCategories(e.target.checked)}
+                  />
+                  {t('autoCategory')}
+                </label>
+              </div>
+              {urlPreview.length > 0 && (
+                <div className="rounded-lg border border-gray-200 p-3">
+                  <p className="text-sm font-medium text-gray-700 mb-2">{t('importPreviewDesc', { count: urlPreview.length })}</p>
+                  <div className="max-h-52 overflow-y-auto space-y-2">
+                    {urlPreview.map((row, idx) => (
+                      <div key={`${row.title}-${idx}`} className="rounded border border-gray-100 bg-gray-50 px-2 py-1.5 text-sm">
+                        <p className="font-medium text-gray-900">{row.title}</p>
+                        <p className="text-xs text-gray-600">
+                          {getCategoryLabel(row.category)}{row.sourceUrl ? ` · ${row.sourceUrl}` : ''}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setUrlImportOpen(false);
+                  setUrlPreview([]);
+                }}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+              >
+                {t('cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={handleUrlPreview}
+                disabled={urlLoading || !urlInput.trim()}
+                className="rounded-lg border border-indigo-300 bg-indigo-50 px-4 py-2 text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
+              >
+                {urlLoading ? t('loading') : t('preview')}
+              </button>
+              <button
+                type="button"
+                onClick={handleUrlImportConfirm}
+                disabled={urlLoading || !urlInput.trim()}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {urlLoading ? t('importing') : t('confirmImport')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add/Edit Modal */}
       {modalOpen && (
@@ -560,10 +846,19 @@ export default function KnowledgeBasePage() {
                   className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
                   aria-labelledby="form-category-label"
                 >
-                  {CATEGORIES.map((c) => (
-                    <option key={c.value} value={c.value}>{t(c.labelKey)}</option>
+                  {categoryOptions.map((category) => (
+                    <option key={category} value={category}>{getCategoryLabel(category)}</option>
                   ))}
+                  <option value="__custom">{t('customCategory')}</option>
                 </select>
+                {formCategory === '__custom' && (
+                  <input
+                    value={formCustomCategory}
+                    onChange={(e) => setFormCustomCategory(e.target.value)}
+                    className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2"
+                    placeholder={t('customCategoryPlaceholder')}
+                  />
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">{t('fieldContent')}</label>

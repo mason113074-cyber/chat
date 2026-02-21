@@ -49,6 +49,9 @@ const AI_MODELS = [
 ] as const;
 const EXAMPLE_QUESTIONS_KEYS = ['exampleQ1', 'exampleQ2', 'exampleQ3'] as const;
 
+type TabId = 'general' | 'personality' | 'behavior' | 'experience' | 'optimize';
+const TAB_IDS: TabId[] = ['general', 'personality', 'behavior', 'experience', 'optimize'];
+
 export default function SettingsPage() {
   const t = useTranslations('settings');
   const locale = useLocale();
@@ -151,8 +154,6 @@ export default function SettingsPage() {
   const [abTestForm, setAbTestForm] = useState<{ name: string; variantA: string; variantB: string; trafficSplit: number } | null>(null);
 
   // Tab 分頁：與 URL hash 同步
-  type TabId = 'general' | 'personality' | 'behavior' | 'experience' | 'optimize';
-  const TAB_IDS: TabId[] = ['general', 'personality', 'behavior', 'experience', 'optimize'];
   const [activeTab, setActiveTab] = useState<TabId>(() => {
     if (typeof window === 'undefined') return 'general';
     const hash = window.location.hash.slice(1);

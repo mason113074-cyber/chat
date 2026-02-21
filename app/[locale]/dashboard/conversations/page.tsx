@@ -25,10 +25,14 @@ type Contact = {
   name: string | null;
   line_user_id: string;
   tags: string[];
+  notes?: string | null;
   status?: 'pending' | 'resolved';
   conversationStatus: ConversationStatus;
   lastMessage: string;
   lastMessageTime: string;
+  conversationCount: number;
+  firstInteraction: string | null;
+  lastInteraction: string | null;
 };
 
 export default function ConversationsPage() {
@@ -257,6 +261,62 @@ export default function ConversationsPage() {
     }
   }
 
+  async function takeoverConversation(contactId: string) {
+    try {
+      const res = await fetch(`/api/conversations/${contactId}/takeover`, { method: 'PUT' });
+      if (!res.ok) return;
+      await changeStatus(contactId, 'needs_human');
+      if (selectedContactId === contactId) {
+        await loadConversations(contactId);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  async function handbackConversation(contactId: string) {
+    try {
+      const res = await fetch(`/api/conversations/${contactId}/handback`, { method: 'PUT' });
+      if (!res.ok) return;
+      await changeStatus(contactId, 'ai_handled');
+      if (selectedContactId === contactId) {
+        await loadConversations(contactId);
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  async function sendHumanReply(message: string) {
+    if (!selectedContactId) return;
+    const res = await fetch(`/api/conversations/${selectedContactId}/reply`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message }),
+    });
+    if (!res.ok) return;
+    const json = await res.json().catch(() => ({}));
+    const inserted = json.item as Conversation | undefined;
+    if (inserted) {
+      setConversations((prev) => [...prev, inserted]);
+    } else {
+      await loadConversations(selectedContactId);
+    }
+    setContacts((prev) =>
+      prev.map((c) =>
+        c.id === selectedContactId
+          ? {
+              ...c,
+              conversationStatus: 'needs_human',
+              lastMessage: message,
+              lastMessageTime: new Date().toISOString(),
+              lastInteraction: new Date().toISOString(),
+            }
+          : c
+      )
+    );
+  }
+
   // 更新聯絡人列表並重新排序的輔助函數
   const updateContactsList = useCallback((
     contacts: Contact[],
@@ -272,6 +332,9 @@ export default function ConversationsPage() {
           ...contact,
           lastMessage: message,
           lastMessageTime: created_at,
+          lastInteraction: created_at,
+          firstInteraction: contact.firstInteraction ?? created_at,
+          conversationCount: (contact.conversationCount ?? 0) + 1,
         };
       }
       return contact;
@@ -370,10 +433,14 @@ export default function ConversationsPage() {
                 name: newContact.name,
                 line_user_id: newContact.line_user_id,
                 tags: [],
+                notes: null,
                 status: 'pending',
                 conversationStatus: 'ai_handled',
                 lastMessage: '尚無對話',
                 lastMessageTime: '',
+                conversationCount: 0,
+                firstInteraction: null,
+                lastInteraction: null,
               },
               ...prev,
             ]);
@@ -449,7 +516,7 @@ export default function ConversationsPage() {
     // Get all contacts with tags, status, and their latest conversation
     const { data: contactsData } = await supabase
       .from('contacts')
-      .select('id, name, line_user_id, tags, status')
+      .select('id, name, line_user_id, tags, notes, status')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
@@ -477,23 +544,40 @@ export default function ConversationsPage() {
 
     const contactsWithMessages = await Promise.all(
       contactsData.map(async (contact) => {
-        const { data: lastMsg } = await supabase
-          .from('conversations')
-          .select('message, created_at')
-          .eq('contact_id', contact.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
+        const [{ data: lastMsg }, { data: firstMsg }, { count: convCount }] = await Promise.all([
+          supabase
+            .from('conversations')
+            .select('message, created_at')
+            .eq('contact_id', contact.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from('conversations')
+            .select('created_at')
+            .eq('contact_id', contact.id)
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle(),
+          supabase
+            .from('conversations')
+            .select('id', { count: 'exact', head: true })
+            .eq('contact_id', contact.id),
+        ]);
 
         return {
           id: contact.id,
           name: contact.name,
           line_user_id: contact.line_user_id,
           tags: (contact.tags as string[] | null) ?? [],
+          notes: (contact.notes as string | null) ?? null,
           status: (contact.status === 'resolved' ? 'resolved' : 'pending') as 'pending' | 'resolved',
           conversationStatus: latestStatusByContact.get(contact.id) ?? 'ai_handled',
           lastMessage: lastMsg?.message || '尚無對話',
           lastMessageTime: lastMsg?.created_at || '',
+          conversationCount: convCount ?? 0,
+          firstInteraction: firstMsg?.created_at ?? null,
+          lastInteraction: lastMsg?.created_at ?? null,
         };
       })
     );
@@ -537,7 +621,7 @@ export default function ConversationsPage() {
     
     const { data } = await supabase
       .from('conversations')
-      .select('id, message, role, created_at')
+      .select('id, message, role, created_at, status, resolved_by')
       .eq('contact_id', contactId)
       .order('created_at', { ascending: true });
 
@@ -788,8 +872,17 @@ export default function ConversationsPage() {
           <div className="flex-1 min-w-0">
             <div className="rounded-xl border border-gray-200 bg-white overflow-hidden h-full flex flex-col">
               <ConversationPanel
-                selectedContactName={selectedContact?.name ?? null}
+                selectedContact={selectedContact ?? null}
                 conversations={conversations}
+                onTakeover={async () => {
+                  if (!selectedContactId) return;
+                  await takeoverConversation(selectedContactId);
+                }}
+                onHandback={async () => {
+                  if (!selectedContactId) return;
+                  await handbackConversation(selectedContactId);
+                }}
+                onSendHumanReply={sendHumanReply}
               />
             </div>
           </div>

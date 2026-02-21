@@ -3,8 +3,6 @@ import { createClient } from '@/lib/supabase/server';
 import { getAuthFromRequest } from '@/lib/auth-helper';
 import { clearKnowledgeCache } from '@/lib/knowledge-search';
 
-const CATEGORIES = ['general', '常見問題', '產品資訊', '退換貨政策', '營業資訊', '其他'];
-
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -26,7 +24,9 @@ export async function PUT(
     };
     if (typeof body.title === 'string') updates.title = body.title.trim().slice(0, 200);
     if (typeof body.content === 'string') updates.content = body.content.trim();
-    if (body.category && CATEGORIES.includes(body.category)) updates.category = body.category;
+    if (typeof body.category === 'string' && body.category.trim()) {
+      updates.category = body.category.trim().slice(0, 50);
+    }
     if (typeof body.is_active === 'boolean') updates.is_active = body.is_active;
 
     if (updates.title === '') return NextResponse.json({ error: '標題不可為空' }, { status: 400 });

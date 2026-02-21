@@ -12,6 +12,11 @@ type Contact = {
   id: string;
   name: string | null;
   line_user_id: string;
+  email?: string | null;
+  phone?: string | null;
+  notes?: string | null;
+  csat_score?: number | null;
+  top_topic?: string | null;
   created_at: string;
   conversationCount: number;
   lastInteraction: string | null;
@@ -49,6 +54,16 @@ export default function ContactsPage() {
   const [editingTagId, setEditingTagId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [editingColor, setEditingColor] = useState('gray');
+  const [detailContact, setDetailContact] = useState<Contact | null>(null);
+  const [detailSaving, setDetailSaving] = useState(false);
+  const [detailForm, setDetailForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    notes: '',
+    csat_score: '',
+    top_topic: '',
+  });
   const popoverRef = useRef<HTMLDivElement>(null);
 
   const fetchContacts = useCallback(async () => {
@@ -194,6 +209,47 @@ export default function ContactsPage() {
     }
   }
 
+  function openContactDetail(contact: Contact) {
+    setDetailContact(contact);
+    setDetailForm({
+      name: contact.name ?? '',
+      email: contact.email ?? '',
+      phone: contact.phone ?? '',
+      notes: contact.notes ?? '',
+      csat_score: contact.csat_score != null ? String(contact.csat_score) : '',
+      top_topic: contact.top_topic ?? '',
+    });
+  }
+
+  async function saveContactDetail() {
+    if (!detailContact) return;
+    setDetailSaving(true);
+    try {
+      const csatValue =
+        detailForm.csat_score.trim() === ''
+          ? null
+          : Math.max(0, Math.min(5, Number(detailForm.csat_score)));
+      const res = await fetch(`/api/contacts/${detailContact.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: detailForm.name,
+          email: detailForm.email,
+          phone: detailForm.phone,
+          notes: detailForm.notes,
+          csat_score: Number.isFinite(csatValue) ? csatValue : null,
+          top_topic: detailForm.top_topic,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.contact) return;
+      setContacts((prev) => prev.map((c) => (c.id === detailContact.id ? { ...c, ...data.contact } : c)));
+      setDetailContact((prev) => (prev ? { ...prev, ...data.contact } : prev));
+    } finally {
+      setDetailSaving(false);
+    }
+  }
+
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
@@ -295,10 +351,14 @@ export default function ContactsPage() {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{t('colName')}</th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{t('colLineUserId')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{t('colEmail')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{t('colPhone')}</th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{t('colTags')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{t('colCsat')}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{t('colTopTopic')}</th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{t('colConversations')}</th>
                   <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">{t('colLastInteraction')}</th>
-                  <th className="px-6 py-3 w-12" />
+                  <th className="px-6 py-3 w-28" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
@@ -313,6 +373,8 @@ export default function ContactsPage() {
                       </Link>
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-600 font-mono">{c.line_user_id}</td>
+                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">{c.email || '—'}</td>
+                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">{c.phone || '—'}</td>
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap gap-1">
                         {c.tags.slice(0, 3).map((t) => (
@@ -328,67 +390,80 @@ export default function ContactsPage() {
                         )}
                       </div>
                     </td>
+                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">
+                      {c.csat_score != null ? Number(c.csat_score).toFixed(1) : '—'}
+                    </td>
+                    <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-700">{c.top_topic || '—'}</td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-900">{c.conversationCount}</td>
                     <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
                       {c.lastInteraction ? new Date(c.lastInteraction).toLocaleString('zh-TW') : '—'}
                     </td>
                     <td className="px-6 py-4 relative">
-                      <div className="relative inline-block" ref={openPopoverId === c.id ? popoverRef : undefined}>
-                      <button
-                        type="button"
-                        onClick={() => setOpenPopoverId((id) => (id === c.id ? null : c.id))}
-                        className="rounded p-1.5 text-gray-500 hover:bg-gray-200"
-                        aria-label={t('tagLabel')}
-                      >
-                        🏷️
-                      </button>
-                      {openPopoverId === c.id && (
-                        <div className="absolute right-0 top-full z-20 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-2 shadow-lg">
-                          <div className="max-h-48 overflow-y-auto px-2">
-                            {tags.map((t) => {
-                              const assigned = c.tags.some((x) => x.id === t.id);
-                              return (
-                                <button
-                                  key={t.id}
-                                  type="button"
-                                  onClick={() => (assigned ? removeTagFromContact(c.id, t.id) : addTagToContact(c.id, t.id))}
-                                  className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm ${tagClass(t.color)}`}
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => openContactDetail(c)}
+                          className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                        >
+                          {t('viewDetail')}
+                        </button>
+                        <div className="relative inline-block" ref={openPopoverId === c.id ? popoverRef : undefined}>
+                          <button
+                            type="button"
+                            onClick={() => setOpenPopoverId((id) => (id === c.id ? null : c.id))}
+                            className="rounded p-1.5 text-gray-500 hover:bg-gray-200"
+                            aria-label={t('tagLabel')}
+                          >
+                            🏷️
+                          </button>
+                          {openPopoverId === c.id && (
+                            <div className="absolute right-0 top-full z-20 mt-1 w-56 rounded-lg border border-gray-200 bg-white py-2 shadow-lg">
+                              <div className="max-h-48 overflow-y-auto px-2">
+                                {tags.map((t) => {
+                                  const assigned = c.tags.some((x) => x.id === t.id);
+                                  return (
+                                    <button
+                                      key={t.id}
+                                      type="button"
+                                      onClick={() => (assigned ? removeTagFromContact(c.id, t.id) : addTagToContact(c.id, t.id))}
+                                      className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm ${tagClass(t.color)}`}
+                                    >
+                                      {assigned ? '✅' : '○'} {t.name}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              <div className="border-t border-gray-100 mt-2 pt-2 px-2 space-y-2">
+                                <p className="text-xs font-medium text-gray-500">{t('addTag')}</p>
+                                <input
+                                  type="text"
+                                  value={newTagName}
+                                  onChange={(e) => setNewTagName(e.target.value)}
+                                  placeholder={t('tagNamePlaceholder')}
+                                  className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                                />
+                                <select
+                                  value={newTagColor}
+                                  onChange={(e) => setNewTagColor(e.target.value)}
+                                  className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
                                 >
-                                  {assigned ? '✅' : '○'} {t.name}
+                                  {TAG_COLORS.map((col) => (
+                                    <option key={col} value={col}>
+                                      {col}
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  type="button"
+                                  onClick={() => createTag()}
+                                  className="w-full rounded bg-indigo-600 px-2 py-1 text-sm text-white hover:bg-indigo-700"
+                                >
+                                  {t('addTagButton')}
                                 </button>
-                              );
-                            })}
-                          </div>
-                          <div className="border-t border-gray-100 mt-2 pt-2 px-2 space-y-2">
-                            <p className="text-xs font-medium text-gray-500">{t('addTag')}</p>
-                            <input
-                              type="text"
-                              value={newTagName}
-                              onChange={(e) => setNewTagName(e.target.value)}
-                              placeholder={t('tagNamePlaceholder')}
-                              className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
-                            />
-                            <select
-                              value={newTagColor}
-                              onChange={(e) => setNewTagColor(e.target.value)}
-                              className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
-                            >
-                              {TAG_COLORS.map((col) => (
-                                <option key={col} value={col}>
-                                  {col}
-                                </option>
-                              ))}
-                            </select>
-                            <button
-                              type="button"
-                              onClick={() => createTag()}
-                              className="w-full rounded bg-indigo-600 px-2 py-1 text-sm text-white hover:bg-indigo-700"
-                            >
-                              {t('addTagButton')}
-                            </button>
-                          </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      )}
                       </div>
                     </td>
                   </tr>
@@ -422,6 +497,99 @@ export default function ContactsPage() {
           </>
         )}
       </div>
+
+      {/* Contact detail drawer */}
+      {detailContact && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/30" onClick={() => setDetailContact(null)}>
+          <div
+            className="h-full w-full max-w-md overflow-y-auto bg-white p-5 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">{t('contactDetail')}</h2>
+              <button type="button" onClick={() => setDetailContact(null)} className="text-gray-500 hover:text-gray-700">✕</button>
+            </div>
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="block text-sm text-gray-600">{t('colName')}</label>
+                <input
+                  value={detailForm.name}
+                  onChange={(e) => setDetailForm((prev) => ({ ...prev, name: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600">{t('colLineUserId')}</label>
+                <p className="mt-1 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 break-all">
+                  {detailContact.line_user_id}
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600">{t('colEmail')}</label>
+                <input
+                  value={detailForm.email}
+                  onChange={(e) => setDetailForm((prev) => ({ ...prev, email: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600">{t('colPhone')}</label>
+                <input
+                  value={detailForm.phone}
+                  onChange={(e) => setDetailForm((prev) => ({ ...prev, phone: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600">{t('colCsat')}</label>
+                <input
+                  value={detailForm.csat_score}
+                  onChange={(e) => setDetailForm((prev) => ({ ...prev, csat_score: e.target.value }))}
+                  placeholder="0~5"
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600">{t('colTopTopic')}</label>
+                <input
+                  value={detailForm.top_topic}
+                  onChange={(e) => setDetailForm((prev) => ({ ...prev, top_topic: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600">{t('customerNotes')}</label>
+                <textarea
+                  rows={5}
+                  value={detailForm.notes}
+                  onChange={(e) => setDetailForm((prev) => ({ ...prev, notes: e.target.value }))}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                />
+              </div>
+              <div className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                {t('firstInteraction')}: {detailContact.created_at ? new Date(detailContact.created_at).toLocaleString('zh-TW') : '—'}
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDetailContact(null)}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                {t('cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={saveContactDetail}
+                disabled={detailSaving}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm text-white hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {detailSaving ? t('loading') : t('save')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Manage tags modal */}
       {manageOpen && (

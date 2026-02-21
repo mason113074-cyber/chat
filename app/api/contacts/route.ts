@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
     const { data: contacts } = await supabase
       .from('contacts')
-      .select('id, line_user_id, name, created_at, conversations(id, created_at)')
+      .select('id, line_user_id, name, email, phone, notes, csat_score, top_topic, created_at, conversations(id, created_at, message)')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
       assignmentsByContact.set(a.contact_id, list);
     }
 
-    type Conv = { id: string; created_at: string };
+    type Conv = { id: string; created_at: string; message?: string | null };
     const out = contacts.map((c) => {
       const convs = (c.conversations as Conv[]) ?? [];
       const conversationCount = convs.length;
@@ -51,10 +51,30 @@ export async function GET(request: NextRequest) {
             new Date(conv.created_at) > new Date(latest) ? conv.created_at : latest,
             convs[0].created_at)
         : null;
+
+      const keywordFreq = new Map<string, number>();
+      for (const conv of convs) {
+        const text = (conv.message ?? '').toLowerCase();
+        const tokens = text
+          .replace(/[^\u4e00-\u9fa5a-z0-9\s]/g, ' ')
+          .split(/\s+/)
+          .filter((w) => w.length >= 2)
+          .slice(0, 20);
+        for (const token of tokens) {
+          keywordFreq.set(token, (keywordFreq.get(token) ?? 0) + 1);
+        }
+      }
+      const computedTopTopic = Array.from(keywordFreq.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
       return {
         id: c.id,
         name: c.name,
         line_user_id: c.line_user_id,
+        email: c.email ?? null,
+        phone: c.phone ?? null,
+        notes: c.notes ?? null,
+        csat_score: c.csat_score ?? null,
+        top_topic: c.top_topic ?? computedTopTopic,
         created_at: c.created_at,
         conversationCount,
         lastInteraction,

@@ -27,6 +27,16 @@ type HourlyPoint = { hour: number; count: number };
 type TopQuestion = { keyword: string; count: number; percentage: number };
 type TopContact = { contactId: string; name: string | null; lineUserId: string; count: number; lastAt: string | null };
 type Quality = { avgReplyLength: number | null; aiModel: string | null };
+type AiQuality = {
+  totalConversations: number;
+  aiHandledCount: number;
+  humanHandoffCount: number;
+  aiHandledRate: number;
+  avgConfidenceScore: number;
+  confidenceDistribution: { range: string; count: number }[];
+  feedbackStats: { positive: number; negative: number; total: number; positiveRate: number };
+  topLowConfidenceQuestions: { question: string; confidence: number; date: string }[];
+};
 
 type Resolution = {
   total_conversations: number;
@@ -159,6 +169,7 @@ export default function AnalyticsPage() {
   const [topQuestions, setTopQuestions] = useState<TopQuestion[]>([]);
   const [topContacts, setTopContacts] = useState<TopContact[]>([]);
   const [quality, setQuality] = useState<Quality | null>(null);
+  const [aiQuality, setAiQuality] = useState<AiQuality | null>(null);
   const [resolution, setResolution] = useState<Resolution | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -176,7 +187,8 @@ export default function AnalyticsPage() {
       });
     }, 10000);
     try {
-      const [overviewRes, trendsRes, hourlyRes, questionsRes, contactsRes, qualityRes, resolutionRes] = await Promise.all([
+      const period = days >= 90 ? '90d' : days >= 30 ? '30d' : '7d';
+      const [overviewRes, trendsRes, hourlyRes, questionsRes, contactsRes, qualityRes, resolutionRes, aiQualityRes] = await Promise.all([
         fetch('/api/analytics/overview'),
         fetch(`/api/analytics/trends?days=${days}`),
         fetch(`/api/analytics/hourly?days=${days}`),
@@ -184,6 +196,7 @@ export default function AnalyticsPage() {
         fetch(`/api/analytics/top-contacts?days=${days}&limit=10`),
         fetch(`/api/analytics/quality?days=${days}`),
         fetch(`/api/analytics/resolution?days=${days}`),
+        fetch(`/api/analytics/ai-quality?period=${period}`),
       ]);
       if (overviewRes.ok) setOverview(await overviewRes.json());
       if (trendsRes.ok) {
@@ -204,6 +217,7 @@ export default function AnalyticsPage() {
       }
       if (qualityRes.ok) setQuality(await qualityRes.json());
       if (resolutionRes.ok) setResolution(await resolutionRes.json());
+      if (aiQualityRes.ok) setAiQuality(await aiQualityRes.json());
     } catch (err) {
       setError(err instanceof Error ? err.message : t('loadFailed'));
     } finally {
@@ -236,11 +250,38 @@ export default function AnalyticsPage() {
     );
   };
 
+  const exportCsv = () => {
+    const rows: string[] = [];
+    rows.push('section,key,value');
+    rows.push(`overview,totalConversations,${overview?.thisMonth.totalConversations ?? 0}`);
+    rows.push(`overview,aiReplies,${overview?.thisMonth.aiReplies ?? 0}`);
+    rows.push(`overview,newContacts,${overview?.thisMonth.newContacts ?? 0}`);
+    rows.push(`resolution,rate,${resolution?.resolution_rate ?? 0}`);
+    rows.push(`csat,positiveRate,${aiQuality?.feedbackStats.positiveRate ?? 0}`);
+    for (const item of topQuestions) {
+      rows.push(`topQuestion,${item.keyword},${item.count}`);
+    }
+    for (const item of topContacts) {
+      rows.push(`topContact,${item.name ?? item.lineUserId},${item.count}`);
+    }
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `analytics-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportPdf = () => {
+    window.print();
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {DAYS_OPTIONS.map((d) => (
             <button
               key={d}
@@ -251,6 +292,20 @@ export default function AnalyticsPage() {
               {t(`last${d}Days` as 'last7Days' | 'last14Days' | 'last30Days' | 'last90Days')}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={exportCsv}
+            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            {t('exportCsv')}
+          </button>
+          <button
+            type="button"
+            onClick={exportPdf}
+            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            {t('exportPdf')}
+          </button>
         </div>
       </div>
 
@@ -530,6 +585,76 @@ export default function AnalyticsPage() {
                 <p className="text-xl font-bold text-gray-900">{quality?.aiModel || '—'}</p>
               </div>
             </div>
+          </div>
+
+          {/* CSAT + confidence */}
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+              <h2 className="mb-3 text-lg font-semibold text-gray-900">{t('csatAndFeedback')}</h2>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="rounded-lg bg-green-50 p-3">
+                  <p className="text-sm text-gray-600">{t('satisfactionRate')}</p>
+                  <p className="text-2xl font-bold text-green-700">
+                    {Math.round(aiQuality?.feedbackStats.positiveRate ?? 0)}%
+                  </p>
+                </div>
+                <div className="rounded-lg bg-blue-50 p-3">
+                  <p className="text-sm text-gray-600">{t('feedbackTotal')}</p>
+                  <p className="text-2xl font-bold text-blue-700">
+                    {aiQuality?.feedbackStats.total ?? 0}
+                  </p>
+                </div>
+              </div>
+              <p className="mt-3 text-sm text-gray-600">
+                👍 {aiQuality?.feedbackStats.positive ?? 0} · 👎 {aiQuality?.feedbackStats.negative ?? 0}
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+              <h2 className="mb-3 text-lg font-semibold text-gray-900">{t('confidenceDistribution')}</h2>
+              <div className="space-y-2">
+                {(aiQuality?.confidenceDistribution ?? []).length === 0 ? (
+                  <p className="text-sm text-gray-500">{t('noData')}</p>
+                ) : (
+                  (aiQuality?.confidenceDistribution ?? []).map((bucket) => {
+                    const max = Math.max(
+                      1,
+                      ...(aiQuality?.confidenceDistribution ?? []).map((x) => x.count)
+                    );
+                    const width = Math.round((bucket.count / max) * 100);
+                    return (
+                      <div key={bucket.range}>
+                        <div className="mb-1 flex items-center justify-between text-xs text-gray-600">
+                          <span>{bucket.range}</span>
+                          <span>{bucket.count}</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-gray-100">
+                          <div className="h-2 rounded-full bg-indigo-500" style={{ width: `${width}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <h2 className="mb-3 text-lg font-semibold text-gray-900">{t('lowConfidenceQuestions')}</h2>
+            {(aiQuality?.topLowConfidenceQuestions ?? []).length === 0 ? (
+              <p className="text-sm text-gray-500">{t('noData')}</p>
+            ) : (
+              <div className="space-y-2">
+                {(aiQuality?.topLowConfidenceQuestions ?? []).slice(0, 8).map((q, idx) => (
+                  <div key={`${idx}-${q.date}`} className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                    <p className="text-sm text-gray-800">{q.question}</p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      {t('confidence')}: {Math.round((q.confidence ?? 0) * 100)}% · {new Date(q.date).toLocaleString('zh-TW')}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </>
       )}

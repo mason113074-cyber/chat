@@ -2,12 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { clearKnowledgeCache } from '@/lib/knowledge-search';
 
-const CATEGORIES = ['general', '常見問題', '產品資訊', '退換貨政策', '營業資訊', '其他'];
-
 type ImportRow = { title: string; content: string; category?: string };
 
 function normalizeCategory(c: unknown): string {
-  if (typeof c === 'string' && CATEGORIES.includes(c)) return c;
+  if (typeof c === 'string' && c.trim()) return c.trim().slice(0, 50);
   return 'general';
 }
 

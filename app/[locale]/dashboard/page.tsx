@@ -4,6 +4,34 @@ import { Link } from '@/i18n/navigation';
 
 type Props = { params: Promise<{ locale: string }> };
 
+type DailyTrend = {
+  date: string;
+  aiResolved: number;
+  humanRequired: number;
+  totalConversations: number;
+};
+
+function toDateKey(d: Date) {
+  return d.toISOString().slice(0, 10);
+}
+
+function buildLinePath(values: number[], width: number, height: number, padding = 24) {
+  const innerW = width - padding * 2;
+  const innerH = height - padding * 2;
+  const max = Math.max(1, ...values);
+  const x = (idx: number) => padding + (idx / Math.max(1, values.length - 1)) * innerW;
+  const y = (v: number) => padding + innerH - (v / max) * innerH;
+  const path = values.map((v, i) => `${i === 0 ? 'M' : 'L'} ${x(i)} ${y(v)}`).join(' ');
+  return { path, x, y, max };
+}
+
+function emotionFromMessage(message: string): '😊' | '😐' | '😠' {
+  const text = message.toLowerCase();
+  if (/(謝謝|感謝|太棒|很好|滿意|讚|great|thanks|helpful|good)/i.test(text)) return '😊';
+  if (/(爛|生氣|不滿|投訴|退款|退費|糟糕|angry|bad|complaint|refund)/i.test(text)) return '😠';
+  return '😐';
+}
+
 export default async function DashboardPage({ params }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
@@ -19,13 +47,17 @@ export default async function DashboardPage({ params }: Props) {
   today.setHours(0, 0, 0, 0);
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
+  const trendStart = new Date();
+  trendStart.setDate(trendStart.getDate() - 6);
+  trendStart.setHours(0, 0, 0, 0);
 
-  // Run all dashboard queries in parallel for faster load
+  // Base dashboard queries
   const [
     { count: contactsCount },
     { data: contactsWithConversations },
     { count: newContactsCount },
     { data: recentConversations },
+    { data: allContactRows },
   ] = await Promise.all([
     supabase
       .from('contacts')
@@ -42,11 +74,51 @@ export default async function DashboardPage({ params }: Props) {
       .gte('created_at', weekAgo.toISOString()),
     supabase
       .from('conversations')
-      .select('id, message, created_at, contacts!inner(name, line_user_id, id)')
+      .select('id, message, role, resolved_by, status, created_at, contacts!inner(name, line_user_id, id)')
       .eq('contacts.user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(5),
+    supabase
+      .from('contacts')
+      .select('id')
+      .eq('user_id', user.id),
   ]);
+
+  const contactIds = (allContactRows ?? []).map((c) => c.id);
+
+  const {
+    data: trendAssistantRows,
+  } = contactIds.length > 0
+    ? await supabase
+        .from('conversations')
+        .select('contact_id, created_at, status, is_resolved, resolved_by')
+        .in('contact_id', contactIds)
+        .eq('role', 'assistant')
+        .gte('created_at', trendStart.toISOString())
+        .order('created_at', { ascending: true })
+    : { data: [] as Array<{ contact_id: string; created_at: string; status: string | null; is_resolved: boolean | null; resolved_by: string | null }> };
+
+  const {
+    data: todayRows,
+  } = contactIds.length > 0
+    ? await supabase
+        .from('conversations')
+        .select('contact_id, role, created_at, status, is_resolved')
+        .in('contact_id', contactIds)
+        .gte('created_at', today.toISOString())
+        .order('created_at', { ascending: true })
+    : { data: [] as Array<{ contact_id: string; role: string; created_at: string; status: string | null; is_resolved: boolean | null }> };
+
+  const {
+    data: latestAssistantRows,
+  } = contactIds.length > 0
+    ? await supabase
+        .from('conversations')
+        .select('contact_id, status, created_at')
+        .in('contact_id', contactIds)
+        .eq('role', 'assistant')
+        .order('created_at', { ascending: false })
+    : { data: [] as Array<{ contact_id: string; status: string | null; created_at: string }> };
 
   const conversationsCount = (contactsWithConversations || []).reduce(
     (total, contact) => total + ((contact.conversations as Conversation[]) || []).length,
@@ -58,10 +130,84 @@ export default async function DashboardPage({ params }: Props) {
     return total + todayConvs.length;
   }, 0);
 
+  const trendMap = new Map<string, DailyTrend>();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(trendStart);
+    d.setDate(d.getDate() + i);
+    const key = toDateKey(d);
+    trendMap.set(key, { date: key, aiResolved: 0, humanRequired: 0, totalConversations: 0 });
+  }
+
+  let aiResolvedTotal = 0;
+  let humanRequiredTotal = 0;
+  for (const row of trendAssistantRows ?? []) {
+    const key = toDateKey(new Date(row.created_at));
+    const point = trendMap.get(key);
+    if (!point) continue;
+    point.totalConversations += 1;
+    const needsHuman =
+      row.status === 'needs_human' ||
+      row.is_resolved === false ||
+      row.resolved_by === 'human';
+    if (needsHuman) {
+      point.humanRequired += 1;
+      humanRequiredTotal += 1;
+    } else {
+      point.aiResolved += 1;
+      aiResolvedTotal += 1;
+    }
+  }
+  const dailyTrend = Array.from(trendMap.values());
+  const resolutionRate =
+    aiResolvedTotal + humanRequiredTotal > 0
+      ? Math.round((aiResolvedTotal / (aiResolvedTotal + humanRequiredTotal)) * 100)
+      : 0;
+
+  // Today realtime metrics
+  const latestStatusByContact = new Map<string, string>();
+  for (const row of latestAssistantRows ?? []) {
+    if (!latestStatusByContact.has(row.contact_id)) {
+      latestStatusByContact.set(row.contact_id, row.status ?? 'ai_handled');
+    }
+  }
+  let queuedConversations = 0;
+  let processingConversations = 0;
+  for (const id of contactIds) {
+    const status = latestStatusByContact.get(id) ?? 'ai_handled';
+    if (status === 'needs_human') queuedConversations += 1;
+    if (status === 'ai_handled') processingConversations += 1;
+  }
+
+  const unresolvedToday = (todayRows ?? []).filter(
+    (r) => r.role === 'assistant' && (r.status === 'needs_human' || r.is_resolved === false)
+  ).length;
+  const todayPairs: number[] = [];
+  const groupedToday = new Map<string, Array<{ role: string; created_at: string }>>();
+  for (const row of todayRows ?? []) {
+    const list = groupedToday.get(row.contact_id) ?? [];
+    list.push({ role: row.role, created_at: row.created_at });
+    groupedToday.set(row.contact_id, list);
+  }
+  for (const list of groupedToday.values()) {
+    for (let i = 0; i < list.length - 1; i++) {
+      const curr = list[i];
+      const next = list[i + 1];
+      if (curr.role === 'user' && next.role === 'assistant') {
+        const diff = new Date(next.created_at).getTime() - new Date(curr.created_at).getTime();
+        if (diff >= 0) todayPairs.push(diff / 1000);
+      }
+    }
+  }
+  const avgReplySecondsToday =
+    todayPairs.length > 0 ? Math.round(todayPairs.reduce((a, b) => a + b, 0) / todayPairs.length) : 0;
+
   type ConversationRow = {
     id: string;
     message: string;
     created_at: string;
+    role?: string;
+    status?: string | null;
+    resolved_by?: string | null;
     contacts: { name: string | null; line_user_id: string; id: string } | null;
   };
 
@@ -151,6 +297,107 @@ export default async function DashboardPage({ params }: Props) {
         </div>
       </div>
 
+      {/* 7-day trend + AI resolution */}
+      <div className="mt-8 grid gap-6 lg:grid-cols-3">
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm lg:col-span-2">
+          <h2 className="text-lg font-semibold text-gray-900">{t('trend7d')}</h2>
+          <p className="mt-1 text-sm text-gray-500">{t('trend7dDesc')}</p>
+          <div className="mt-4">
+            {(() => {
+              const width = 700;
+              const height = 240;
+              const aiValues = dailyTrend.map((d) => d.aiResolved);
+              const humanValues = dailyTrend.map((d) => d.humanRequired);
+              const max = Math.max(1, ...aiValues, ...humanValues);
+              const aiPath = buildLinePath(aiValues, width, height, 28);
+              const humanPath = buildLinePath(humanValues, width, height, 28);
+              const yGuide = [0, Math.ceil(max / 2), max];
+              return (
+                <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-[240px]">
+                  {yGuide.map((v) => {
+                    const y = aiPath.y(v);
+                    return (
+                      <g key={v}>
+                        <line x1={28} x2={width - 28} y1={y} y2={y} stroke="#e5e7eb" strokeDasharray="3 3" />
+                        <text x={6} y={y + 4} fontSize="10" fill="#6b7280">{v}</text>
+                      </g>
+                    );
+                  })}
+                  <path d={aiPath.path} fill="none" stroke="#4f46e5" strokeWidth="2.5" />
+                  <path d={humanPath.path} fill="none" stroke="#f97316" strokeWidth="2.5" />
+                  {dailyTrend.map((d, i) => (
+                    <g key={d.date}>
+                      <circle cx={aiPath.x(i)} cy={aiPath.y(d.aiResolved)} r="3.5" fill="#4f46e5" />
+                      <circle cx={humanPath.x(i)} cy={humanPath.y(d.humanRequired)} r="3.5" fill="#f97316" />
+                      <text x={aiPath.x(i)} y={height - 8} textAnchor="middle" fontSize="10" fill="#6b7280">
+                        {d.date.slice(5)}
+                      </text>
+                    </g>
+                  ))}
+                </svg>
+              );
+            })()}
+          </div>
+          <div className="mt-3 flex items-center gap-6 text-sm">
+            <span className="inline-flex items-center gap-2 text-indigo-700">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-indigo-600" />
+              {t('aiResolved')}
+            </span>
+            <span className="inline-flex items-center gap-2 text-orange-700">
+              <span className="inline-block h-2.5 w-2.5 rounded-full bg-orange-500" />
+              {t('humanRequired')}
+            </span>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900">{t('aiResolutionRate')}</h2>
+          <p className="mt-1 text-sm text-gray-500">{t('aiResolutionRateDesc')}</p>
+          <div className="mt-5 flex items-center gap-4">
+            <svg width="96" height="96" viewBox="0 0 96 96" className="shrink-0">
+              <circle cx="48" cy="48" r="38" fill="none" stroke="#e5e7eb" strokeWidth="10" />
+              <circle
+                cx="48"
+                cy="48"
+                r="38"
+                fill="none"
+                stroke="#22c55e"
+                strokeWidth="10"
+                strokeDasharray={`${(resolutionRate / 100) * 238.76} 238.76`}
+                transform="rotate(-90 48 48)"
+              />
+            </svg>
+            <div>
+              <p className="text-3xl font-bold text-gray-900">{resolutionRate}%</p>
+              <p className="text-sm text-gray-500">{t('resolutionRatio', { ai: aiResolvedTotal, human: humanRequiredTotal })}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Today realtime status */}
+      <div className="mt-8">
+        <h2 className="text-lg font-semibold text-gray-900">{t('realtimeToday')}</h2>
+        <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-sm text-gray-600">{t('queuedConversations')}</p>
+            <p className="mt-2 text-2xl font-bold text-amber-600">{queuedConversations}</p>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-sm text-gray-600">{t('processingConversations')}</p>
+            <p className="mt-2 text-2xl font-bold text-indigo-600">{processingConversations}</p>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-sm text-gray-600">{t('avgReplySecondsToday')}</p>
+            <p className="mt-2 text-2xl font-bold text-emerald-600">{avgReplySecondsToday}s</p>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <p className="text-sm text-gray-600">{t('unresolvedToday')}</p>
+            <p className="mt-2 text-2xl font-bold text-rose-600">{unresolvedToday}</p>
+          </div>
+        </div>
+      </div>
+
       {/* Recent Conversations */}
       <div className="mt-8">
         <div className="flex items-center justify-between mb-4">
@@ -189,17 +436,39 @@ export default async function DashboardPage({ params }: Props) {
               <Link
                 key={conv.id}
                 href={conv.contacts?.id ? `/dashboard/conversations/${conv.contacts.id}` : '/dashboard/conversations'}
-                className="block rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-indigo-200 hover:shadow-md transition-all"
+                className="group block rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:border-indigo-200 hover:shadow-md transition-all"
+                title={conv.message}
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900">
-                      {conv.contacts?.name || t('unnamedCustomer')}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <span>{emotionFromMessage(conv.message)}</span>
+                      <p className="font-medium text-gray-900">
+                        {conv.contacts?.name || t('unnamedCustomer')}
+                      </p>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                          conv.role === 'assistant'
+                            ? conv.resolved_by === 'human'
+                              ? 'bg-blue-100 text-blue-700'
+                              : 'bg-emerald-100 text-emerald-700'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}
+                      >
+                        {conv.role === 'assistant'
+                          ? conv.resolved_by === 'human'
+                            ? t('sourceHuman')
+                            : t('sourceAi')
+                          : t('sourceUser')}
+                      </span>
+                    </div>
                     <p className="mt-1 text-sm text-gray-600 line-clamp-2">
                       {conv.message.length > 50
                         ? conv.message.substring(0, 50) + '...'
                         : conv.message}
+                    </p>
+                    <p className="mt-1 hidden text-xs text-gray-400 group-hover:block">
+                      {t('hoverPreview')}: {conv.message.length > 120 ? `${conv.message.slice(0, 120)}...` : conv.message}
                     </p>
                   </div>
                   <p className="text-xs text-gray-500 whitespace-nowrap">
