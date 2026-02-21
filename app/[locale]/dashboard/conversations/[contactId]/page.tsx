@@ -117,7 +117,7 @@ export default function ConversationDetailPage() {
     } finally {
       setSuggestionLoading(false);
     }
-  }, [contactId, loadSuggestions]);
+  }, [contactId]);
 
   useEffect(() => {
     if (!contactId) {
@@ -174,7 +174,7 @@ export default function ConversationDetailPage() {
     };
 
     loadData();
-  }, [contactId]);
+  }, [contactId, loadSuggestions]);
 
   // 自動捲動到最新訊息
   useEffect(() => {
