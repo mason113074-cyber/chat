@@ -148,7 +148,7 @@ export function GlobalSearch({
       });
     }
     return items;
-  }, [filteredPages, results]);
+  }, [filteredPages, results, tConversations]);
 
   const totalCount = flatItems.length;
 
@@ -171,9 +171,12 @@ export function GlobalSearch({
       debounceRef.current = null;
       setLoading(true);
       fetch(`/api/search?q=${encodeURIComponent(query.trim())}`)
-        .then((res) => res.json())
+        .then(async (res) => {
+          const data = await res.json().catch(() => ({}));
+          return res.ok ? data : { error: true };
+        })
         .then((data) => {
-          if (data.error) {
+          if (data?.error) {
             setResults({ conversations: [], contacts: [], knowledge: [] });
           } else {
             setResults({

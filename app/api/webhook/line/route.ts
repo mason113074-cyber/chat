@@ -389,8 +389,7 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
           variant,
         });
       }
-      const snippet = variant === 'A' ? runningTest.variant_a_prompt : runningTest.variant_b_prompt;
-      effectiveSystemPrompt = (effectiveSystemPrompt ? effectiveSystemPrompt + '\n\n' : '') + snippet;
+      effectiveSystemPrompt = variant === 'A' ? runningTest.variant_a_prompt : runningTest.variant_b_prompt;
       abTestId = runningTest.id;
       abVariant = variant;
     }

@@ -18,13 +18,9 @@ export default function AIQualityPage() {
   useEffect(() => {
     let cancelled = false;
     fetch(`/api/analytics/ai-quality?period=${period}`, { credentials: 'include' })
-      .then(async (r) => {
-        const d = await r.json();
-        if (!r.ok) return null;
-        return d;
-      })
+      .then((r) => r.json())
       .then((d) => {
-        if (!cancelled && d) setData(d);
+        if (!cancelled) setData(d);
       });
     return () => { cancelled = true; };
   }, [period]);

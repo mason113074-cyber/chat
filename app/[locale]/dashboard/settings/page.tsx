@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
+import Image from 'next/image';
 import { Link } from '@/i18n/navigation';
 import { useToast } from '@/components/Toast';
 import { QuickReplies } from '@/app/components/QuickReplies';
@@ -569,7 +570,7 @@ export default function SettingsPage() {
             {lineLoginBound ? (
               <>
                 {lineLoginPhotoUrl && (
-                  <img src={lineLoginPhotoUrl} alt="" className="h-10 w-10 rounded-full object-cover" />
+                  <Image src={lineLoginPhotoUrl} alt="" width={40} height={40} className="h-10 w-10 rounded-full object-cover" />
                 )}
                 <span className="text-sm font-medium text-gray-700">
                   {t('lineLoginBoundAs')} {lineLoginDisplayName || t('lineLoginBound')}
