@@ -27,6 +27,7 @@
   },
   "nav": {
     "overview": "總覽",
+    "automations": "自動化",
     "conversations": "對話紀錄",
     "contacts": "客戶聯絡人",
     "billing": "方案與計費",
@@ -40,6 +41,23 @@
     "help": "幫助",
     "faq": "常見問題",
     "openMenu": "開啟選單"
+  },
+  "automations": {
+    "title": "自動化工作流程",
+    "subtitle": "用視覺化流程設計自動化客服流程",
+    "newWorkflow": "新增工作流程",
+    "newWorkflowName": "未命名工作流程",
+    "loading": "載入中...",
+    "emptyTitle": "尚無工作流程",
+    "emptyDesc": "建立第一個工作流程，自動化回覆與動作。",
+    "noDescription": "無描述",
+    "lastUpdated": "更新於",
+    "edit": "編輯",
+    "delete": "刪除",
+    "deleteConfirm": "確定要刪除「{name}」？此操作無法復原。",
+    "save": "儲存",
+    "test": "測試",
+    "back": "返回"
   },
   "systemTest": {
     "title": "系統測試控制台",

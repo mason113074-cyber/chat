@@ -27,6 +27,7 @@
   },
   "nav": {
     "overview": "Overview",
+    "automations": "Automations",
     "conversations": "Conversations",
     "contacts": "Contacts",
     "billing": "Billing",
@@ -40,6 +41,23 @@
     "help": "Help",
     "faq": "FAQ",
     "openMenu": "Open menu"
+  },
+  "automations": {
+    "title": "Automation Workflows",
+    "subtitle": "Design visual workflows to automate customer service",
+    "newWorkflow": "New Workflow",
+    "newWorkflowName": "Untitled Workflow",
+    "loading": "Loading...",
+    "emptyTitle": "No workflows yet",
+    "emptyDesc": "Create your first workflow to automate responses and actions.",
+    "noDescription": "No description",
+    "lastUpdated": "Updated",
+    "edit": "Edit",
+    "delete": "Delete",
+    "deleteConfirm": "Delete workflow \"{name}\"? This cannot be undone.",
+    "save": "Save",
+    "test": "Test",
+    "back": "Back"
   },
   "systemTest": {
     "title": "System Test Dashboard",

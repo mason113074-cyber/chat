@@ -29,12 +29,15 @@
     "@supabase/supabase-js": "^2.45.0",
     "@tailwindcss/typography": "^0.5.19",
     "@upstash/redis": "^1.36.2",
+    "@xyflow/react": "^12.10.1",
+    "dagre": "^0.8.5",
     "lucide-react": "^0.575.0",
     "next": "^16.1.6",
     "next-intl": "^4.8.3",
     "openai": "^4.67.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@axe-core/react": "^4.10.0",

@@ -42,6 +42,8 @@
   contact_tag_assignments → via contact_id → contacts.user_id = auth.uid()
   openai_usage   → auth.uid() = user_id (SELECT only)
   ai_feedback    → auth.uid() = user_id（AI 滿意度回饋，待 migration）
+  workflows      → auth.uid() = user_id（自動化工作流程，ReactFlow nodes/edges）
+  workflow_logs  → via workflow_id → workflows.user_id = auth.uid()
 ```
 
 [AI 回覆加強 — 高優先級]

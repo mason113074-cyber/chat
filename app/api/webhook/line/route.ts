@@ -13,6 +13,7 @@ import { detectSensitiveKeywords } from '@/lib/security/sensitive-keywords';
 import { calculateConfidence } from '@/lib/confidence';
 import { isWithinBusinessHours } from '@/lib/business-hours';
 import { summarizeConversation } from '@/lib/conversation-summary';
+import { WorkflowEngine, type WorkflowData } from '@/lib/workflow-engine';
 
 const KNOWLEDGE_PREFIX =
   '\n\n## 以下是你可以參考的知識庫內容（只能根據以下內容回答，勿使用其他知識）：\n';
@@ -314,6 +315,77 @@ async function handleEvent(event: LineWebhookEvent, requestId: string): Promise<
       reply_delay_seconds: replyDelaySeconds = 0,
       quick_replies: quickReplies = [],
     } = settings;
+
+    // 自動化工作流程：若有 workflow 觸發則執行並 return
+    const { data: workflows } = await admin
+      .from('workflows')
+      .select('id, name, nodes, edges')
+      .eq('user_id', ownerUserId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: true });
+
+    if (workflows && workflows.length > 0) {
+      const { count } = await admin
+        .from('conversations')
+        .select('*', { count: 'exact', head: true })
+        .eq('contact_id', contact.id);
+      const isNewCustomer = (count ?? 0) === 0;
+      const bhEnabled = settings?.business_hours_enabled ?? false;
+      const bhConfig = settings?.business_hours ?? null;
+      const isOffHours = !!bhEnabled && !isWithinBusinessHours(bhConfig);
+
+      for (const w of workflows) {
+        const nodes = (w.nodes ?? []) as WorkflowData['nodes'];
+        const edges = (w.edges ?? []) as WorkflowData['edges'];
+        const triggerNodes = nodes.filter(
+          (n) => n.type === 'trigger' && !edges.some((e) => e.target === n.id)
+        );
+        if (triggerNodes.length === 0) continue;
+
+        const trigger = triggerNodes[0];
+        const subType = trigger.data?.subType ?? 'new_message';
+        let shouldTrigger = false;
+        if (subType === 'new_message') shouldTrigger = true;
+        else if (subType === 'keywords') {
+          const keywords = (trigger.data?.keywords ?? []) as string[];
+          if (keywords.length === 0) shouldTrigger = true;
+          else shouldTrigger = keywords.some((k) =>
+            userMessage.toLowerCase().includes(String(k).toLowerCase())
+          );
+        } else if (subType === 'new_customer') shouldTrigger = isNewCustomer;
+        else if (subType === 'off_hours') shouldTrigger = isOffHours;
+
+        if (!shouldTrigger) continue;
+
+        const result = await WorkflowEngine.execute(
+          { id: w.id, name: w.name, nodes, edges },
+          {
+            message: userMessage,
+            contactId: contact.id,
+            lineUserId,
+            ownerUserId,
+            replyToken,
+            isNewCustomer,
+            isOffHours,
+            businessHoursConfig: bhConfig,
+            systemPrompt: systemPrompt ?? undefined,
+            aiModel: aiModel ?? undefined,
+            variables: {},
+          }
+        );
+
+        await admin.from('workflow_logs').insert({
+          workflow_id: w.id,
+          status: result.success ? 'success' : 'failed',
+          executed_nodes: result.executedNodes,
+          error: result.error ?? null,
+        });
+
+        await markAsProcessed(eventId);
+        void invalidateAnalyticsCache(ownerUserId);
+        return;
+      }
+    }
 
     // Sprint 2: 自訂敏感詞檢查（在內建敏感詞之後）
     const customMatch = customSensitiveWords?.some((word: string) =>
