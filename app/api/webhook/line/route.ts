@@ -313,7 +313,7 @@ export async function handleEvent(
         await insertConversationMessage(contact.id, userMessage, 'user');
         await insertConversationMessage(contact.id, SENSITIVE_CONTENT_REPLY, 'assistant', {
           status: 'needs_human',
-          resolved_by: 'policy',
+          resolved_by: 'guardrail',
           is_resolved: false,
         });
       } catch (auditErr) {
