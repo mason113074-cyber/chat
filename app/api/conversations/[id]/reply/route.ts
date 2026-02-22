@@ -41,16 +41,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       const { error: suggestionError } = await supabase
         .from('ai_suggestions')
         .update({
-          draft_text: message,
+          suggested_reply: message,
           status: 'sent',
-          approved_by: user.id,
-          approved_at: nowIso,
           sent_at: nowIso,
+          sent_by: user.id,
         })
         .eq('id', suggestionId)
         .eq('user_id', user.id)
         .eq('contact_id', contactId)
-        .in('status', ['pending', 'approved']);
+        .eq('status', 'draft');
 
       if (suggestionError) {
         if (suggestionError.code !== '42P01') {

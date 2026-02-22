@@ -307,6 +307,23 @@ export async function handleEvent(
       riskLevel: sensitiveCheck.riskLevel,
       keywords: sensitiveCheck.keywords.slice(0, 5),
     });
+    if (ownerUserId && lineUserId) {
+      try {
+        const contact = await getOrCreateContactByLineUserId(lineUserId, ownerUserId);
+        await insertConversationMessage(contact.id, userMessage, 'user');
+        await insertConversationMessage(contact.id, SENSITIVE_CONTENT_REPLY, 'assistant', {
+          status: 'needs_human',
+          resolved_by: 'guardrail',
+          is_resolved: false,
+        });
+      } catch (auditErr) {
+        console.error('[LINE webhook] Sensitive-branch audit write failed', {
+          requestId,
+          eventId,
+          error: auditErr instanceof Error ? auditErr.message : String(auditErr),
+        });
+      }
+    }
     try {
       await replyMessage(replyToken, SENSITIVE_CONTENT_REPLY, undefined, creds);
     } catch (replyError) {
@@ -684,20 +701,28 @@ export async function handleEvent(
       const { error: suggestionError } = await admin.from('ai_suggestions').insert({
         user_id: ownerUserId,
         contact_id: contact.id,
-        source_message_id: userConv?.id ?? null,
-        draft_text: decision.draftText,
-        action: decision.action,
+        bot_id: botId ?? null,
+        event_id: eventId,
+        user_message: userMessage,
+        suggested_reply: decision.draftText,
+        sources_count: decision.sources?.count ?? 0,
+        confidence_score: decision.confidence ?? null,
+        risk_category: decision.category,
         category: decision.category,
-        confidence: decision.confidence,
-        reason: decision.reason,
         sources: {
           count: decision.sources.count,
           titles: decision.sources.titles,
           items: decisionSources,
         },
-        status: 'pending',
+        status: 'draft',
       });
       if (suggestionError) {
+        console.error('[LINE webhook] ai_suggestions insert failed', {
+          requestId,
+          eventId,
+          contact_id: contact.id,
+          code: suggestionError.code,
+        });
         throw suggestionError;
       }
 

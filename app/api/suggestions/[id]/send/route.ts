@@ -32,11 +32,28 @@ export async function POST(_request: Request, { params }: RouteParams) {
     if (suggestion.user_id !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
-    if (suggestion.status !== 'draft') {
-      return NextResponse.json({ error: 'Suggestion already sent or expired' }, { status: 400 });
-    }
     if (new Date(suggestion.expires_at) <= new Date()) {
       return NextResponse.json({ error: 'Suggestion expired' }, { status: 400 });
+    }
+
+    const admin = getSupabaseAdmin();
+    const { data: updatedRow, error: updateErr } = await admin
+      .from('ai_suggestions')
+      .update({
+        status: 'sent',
+        sent_at: new Date().toISOString(),
+        sent_by: user.id,
+      })
+      .eq('id', suggestionId)
+      .eq('status', 'draft')
+      .select('id')
+      .maybeSingle();
+
+    if (updateErr || !updatedRow) {
+      return NextResponse.json(
+        { error: 'Suggestion already sent or not found' },
+        { status: 400 }
+      );
     }
 
     const { data: contact } = await supabase
@@ -47,7 +64,6 @@ export async function POST(_request: Request, { params }: RouteParams) {
       .maybeSingle();
     if (!contact) return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
 
-    const admin = getSupabaseAdmin();
     const { data: bot } = await admin
       .from('line_bots')
       .select('encrypted_channel_access_token')
@@ -75,20 +91,6 @@ export async function POST(_request: Request, { params }: RouteParams) {
       resolved_by: 'human',
       is_resolved: false,
     });
-
-    const { error: updateErr } = await admin
-      .from('ai_suggestions')
-      .update({
-        status: 'sent',
-        sent_at: new Date().toISOString(),
-        sent_by: user.id,
-      })
-      .eq('id', suggestionId);
-
-    if (updateErr) {
-      console.error('POST /api/suggestions/[id]/send update error:', updateErr);
-      return NextResponse.json({ error: 'Failed to update suggestion' }, { status: 500 });
-    }
 
     return NextResponse.json({ success: true });
   } catch (e) {
