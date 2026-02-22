@@ -7,12 +7,37 @@ const DEFAULT_MAX_CHARS = 2000;
 const KNOWLEDGE_SEARCH_CACHE_TTL = 300; // 5 分鐘
 const CACHE_PREFIX = 'knowledge_search:';
 
-function tokenizeQuery(query: string): string[] {
-  return query
+const CJK_REGEX = /[\u4E00-\u9FFF]/;
+const MAX_TOKENS = 40;
+
+function addCjkNgrams(token: string, n: number, out: Set<string>): void {
+  for (let i = 0; i <= token.length - n; i++) {
+    out.add(token.slice(i, i + n));
+  }
+}
+
+/**
+ * Tokenize query for knowledge search. Splits on whitespace/punctuation.
+ * For tokens containing CJK, also emits 2- and 3-char n-grams so Chinese phrases can match.
+ * Exported for tests.
+ */
+export function tokenizeQuery(query: string): string[] {
+  const raw = query
     .trim()
     .replace(/\s+/g, ' ')
     .split(/[\s，。！？、；：""''（）,.;:!?]+/)
     .filter((t) => t.length >= 2);
+
+  const set = new Set<string>();
+  for (const token of raw) {
+    if (CJK_REGEX.test(token)) {
+      if (token.length >= 2) addCjkNgrams(token, 2, set);
+      if (token.length >= 3) addCjkNgrams(token, 3, set);
+    } else {
+      set.add(token);
+    }
+  }
+  return Array.from(set).slice(0, MAX_TOKENS);
 }
 
 export type KnowledgeSource = { id: string; title: string; category: string };
