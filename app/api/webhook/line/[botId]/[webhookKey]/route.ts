@@ -2,11 +2,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { validateSignature } from '@/lib/line';
 import { decrypt, hashWebhookKey } from '@/lib/encrypt';
-import { handleEvent } from '../../route';
-import type { LineWebhookBody } from '@/lib/line';
+import { enqueueWebhookEventProcess } from '@/lib/qstash';
+import type { LineWebhookBody, LineWebhookEvent } from '@/lib/line';
 
 type RouteParams = { params: Promise<{ botId: string; webhookKey: string }> };
 
+function getEventId(event: LineWebhookEvent): string {
+  return (
+    event.webhookEventId ??
+    event.message?.id ??
+    (event.replyToken ? `token:${event.replyToken}` : `ts:${event.timestamp}:${event.source?.userId ?? 'unknown'}`)
+  );
+}
+
+/** B1: Only locate bot → verify → write one row per event → 200. No AI/workflow/reply. */
 export async function POST(request: NextRequest, { params }: RouteParams) {
   const start = Date.now();
   const requestId = `line-bot-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -20,7 +29,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const admin = getSupabaseAdmin();
     const { data: bot, error: botError } = await admin
       .from('line_bots')
-      .select('id, user_id, webhook_key_hash, encrypted_channel_secret, encrypted_channel_access_token')
+      .select('id, user_id, webhook_key_hash, encrypted_channel_secret, encrypted_channel_access_token, encryption_version')
       .eq('id', botId)
       .eq('is_active', true)
       .maybeSingle();
@@ -37,13 +46,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     let channelSecret: string;
-    let channelAccessToken: string;
     try {
-      channelSecret = decrypt(bot.encrypted_channel_secret);
-      channelAccessToken = decrypt(bot.encrypted_channel_access_token);
+      const { decrypt: decryptEnvelope } = await import('@/lib/crypto/envelope');
+      const version = Number(bot.encryption_version) || 1;
+      channelSecret = decryptEnvelope(bot.encrypted_channel_secret, version);
     } catch (e) {
-      console.error('[LINE webhook] Decrypt failed', { requestId, botId, error: e });
-      return NextResponse.json({ error: 'Configuration error' }, { status: 500 });
+      try {
+        const { decrypt: legacyDecrypt } = await import('@/lib/encrypt');
+        channelSecret = legacyDecrypt(bot.encrypted_channel_secret);
+      } catch (e2) {
+        console.error('[LINE webhook] Decrypt failed', { requestId, botId, error: e2 });
+        return NextResponse.json({ error: 'Configuration error' }, { status: 500 });
+      }
     }
 
     const body = await request.text();
@@ -53,55 +67,44 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
 
-    const { data: webhookRow, error: insertErr } = await admin
-      .from('webhook_events')
-      .insert({
-        bot_id: bot.id,
-        raw_body: body,
-        status: 'pending',
-      })
-      .select('id')
-      .single();
-
-    if (insertErr) {
-      console.error('[LINE webhook] Failed to persist event', { requestId, botId, error: insertErr });
-      return NextResponse.json({ error: 'Failed to persist' }, { status: 500 });
-    }
-
     const webhookBody: LineWebhookBody = JSON.parse(body);
     const events = webhookBody.events ?? [];
 
     if (events.length === 0) {
-      await admin.from('webhook_events').update({ status: 'processed', processed_at: new Date().toISOString() }).eq('id', webhookRow.id);
       return NextResponse.json({ success: true });
     }
 
-    const credentials = { channelSecret, channelAccessToken };
-    const overrides = {
-      ownerUserId: bot.user_id,
-      credentials,
-      botId: bot.id,
-    };
-
+    const insertedIds: string[] = [];
     for (const event of events) {
-      try {
-        await handleEvent(event, requestId, overrides);
-      } catch (err) {
-        console.error('[LINE webhook] Event error', { requestId, botId, error: err });
-        await admin
-          .from('webhook_events')
-          .update({ status: 'failed', error_message: err instanceof Error ? err.message : String(err), processed_at: new Date().toISOString() })
-          .eq('id', webhookRow.id);
-        return NextResponse.json({ success: true });
+      const eventId = getEventId(event);
+      const eventType = event.type ?? 'message';
+      const { data: row, error: insertErr } = await admin
+        .from('webhook_events')
+        .insert({
+          bot_id: bot.id,
+          event_id: eventId,
+          event_type: eventType,
+          raw_event: event as unknown as Record<string, unknown>,
+          status: 'pending',
+        })
+        .select('id')
+        .maybeSingle();
+
+      if (insertErr) {
+        if (insertErr.code === '23505') {
+          continue;
+        }
+        console.error('[LINE webhook] Failed to persist event', { requestId, botId, eventId, error: insertErr });
+        continue;
       }
+      if (row?.id) insertedIds.push(row.id);
     }
 
-    await admin
-      .from('webhook_events')
-      .update({ status: 'processed', processed_at: new Date().toISOString() })
-      .eq('id', webhookRow.id);
+    for (const id of insertedIds) {
+      void enqueueWebhookEventProcess(id);
+    }
 
-    console.info('[LINE webhook] Success', { requestId, botId, durationMs: Date.now() - start });
+    console.info('[LINE webhook] B1 events landed', { requestId, botId, count: insertedIds.length, durationMs: Date.now() - start });
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('[LINE webhook] Error', {
@@ -114,5 +117,5 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 }
 
 export async function GET() {
-  return NextResponse.json({ status: 'LINE webhook (multi-bot) is ready' });
+  return NextResponse.json({ status: 'LINE webhook (multi-bot) B1 ready' });
 }
