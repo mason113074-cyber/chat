@@ -48,7 +48,6 @@ export async function POST(_request: Request, { params }: RouteParams) {
       .maybeSingle();
     if (!contact) return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
 
-    const admin = getSupabaseAdmin();
     const { data: bot } = await admin
       .from('line_bots')
       .select('encrypted_channel_access_token, encryption_version')
