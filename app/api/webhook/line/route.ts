@@ -684,20 +684,28 @@ export async function handleEvent(
       const { error: suggestionError } = await admin.from('ai_suggestions').insert({
         user_id: ownerUserId,
         contact_id: contact.id,
-        source_message_id: userConv?.id ?? null,
-        draft_text: decision.draftText,
-        action: decision.action,
+        bot_id: botId ?? null,
+        event_id: eventId,
+        user_message: userMessage,
+        suggested_reply: decision.draftText,
+        sources_count: decision.sources?.count ?? 0,
+        confidence_score: decision.confidence ?? null,
+        risk_category: decision.category,
         category: decision.category,
-        confidence: decision.confidence,
-        reason: decision.reason,
         sources: {
           count: decision.sources.count,
           titles: decision.sources.titles,
           items: decisionSources,
         },
-        status: 'pending',
+        status: 'draft',
       });
       if (suggestionError) {
+        console.error('[LINE webhook] ai_suggestions insert failed', {
+          requestId,
+          eventId,
+          contact_id: contact.id,
+          code: suggestionError.code,
+        });
         throw suggestionError;
       }
 
