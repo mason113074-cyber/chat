@@ -25,19 +25,20 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const statusParam = request.nextUrl.searchParams.get('status') ?? 'pending';
     const allowedStatus = new Set(['pending', 'approved', 'sent', 'all']);
     const normalizedStatus = allowedStatus.has(statusParam) ? statusParam : 'pending';
+    const statusFilter = normalizedStatus === 'pending' ? 'draft' : normalizedStatus;
 
     let query = supabase
       .from('ai_suggestions')
       .select(
-        'id, source_message_id, draft_text, action, category, confidence, reason, sources, status, approved_by, approved_at, sent_at, created_at'
+        'id, event_id, user_message, suggested_reply, sources_count, confidence_score, risk_category, category, sources, status, sent_at, created_at, expires_at'
       )
       .eq('user_id', user.id)
       .eq('contact_id', contactId)
       .order('created_at', { ascending: false })
       .limit(30);
 
-    if (normalizedStatus !== 'all') {
-      query = query.eq('status', normalizedStatus);
+    if (statusFilter !== 'all') {
+      query = query.eq('status', statusFilter);
     }
 
     const { data, error } = await query;
@@ -47,7 +48,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Failed to fetch suggestions' }, { status: 500 });
     }
 
-    return NextResponse.json({ suggestions: data ?? [] });
+    const suggestions = (data ?? []).map((row) => ({
+      ...row,
+      draft_text: row.suggested_reply,
+      status: row.status === 'draft' ? 'pending' : row.status,
+    }));
+    return NextResponse.json({ suggestions });
   } catch (error) {
     console.error('GET /api/conversations/[id]/suggestions error:', error);
     return NextResponse.json({ error: 'Failed to fetch suggestions' }, { status: 500 });
