@@ -1,8 +1,6 @@
 {
   "crons": [
-    {
-      "path": "/api/health-check",
-      "schedule": "*/15 * * * *"
-    }
+    { "path": "/api/health-check", "schedule": "*/15 * * * *" },
+    { "path": "/api/internal/webhook-events/drain", "schedule": "* * * * *" }
   ]
 }
