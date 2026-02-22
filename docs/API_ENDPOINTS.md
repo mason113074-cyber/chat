@@ -85,6 +85,9 @@
 | GET | `/api/conversations/counts` | 對話計數（依狀態等） |
 | PATCH | `/api/conversations/[id]/status` | 更新對話狀態 |
 | PATCH | `/api/conversations/[id]/tags` | 更新對話標籤 |
+| POST | `/api/conversations/[id]/reply` | 人工回覆客戶（支援 `suggestionId` 送出後標記建議為 sent） |
+| GET | `/api/conversations/[id]/suggestions` | 取得 AI 建議回覆（預設 pending，可帶 `status`） |
+| DELETE | `/api/conversations/[id]/suggestions/[suggestionId]` | 忽略/刪除 AI 建議回覆 |
 | POST | `/api/conversations/batch` | 批次操作對話 |
 
 ---
