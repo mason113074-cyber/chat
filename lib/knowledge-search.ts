@@ -10,26 +10,47 @@ const CACHE_PREFIX = 'knowledge_search:';
 const CJK_REGEX = /[\u4E00-\u9FFF]/;
 const MAX_TOKENS = 40;
 
+/** Minimal synonym normalization for KB search only (退錢/退費/退回款 → 退款). */
+function normalizeText(text: string): string {
+  return text
+    .replace(/退回款/g, '退款')
+    .replace(/退費/g, '退款')
+    .replace(/退錢/g, '退款');
+}
+
 function addCjkNgrams(token: string, n: number, out: Set<string>): void {
   for (let i = 0; i <= token.length - n; i++) {
     out.add(token.slice(i, i + n));
   }
 }
 
-/**
- * Tokenize query for knowledge search. Splits on whitespace/punctuation.
- * For tokens containing CJK, also emits 2- and 3-char n-grams so Chinese phrases can match.
- * Exported for tests.
- */
-export function tokenizeQuery(query: string): string[] {
-  const raw = query
+function splitToRawTokens(s: string): string[] {
+  return s
     .trim()
     .replace(/\s+/g, ' ')
     .split(/[\s，。！？、；：""''（）,.;:!?]+/)
     .filter((t) => t.length >= 2);
+}
+
+/**
+ * Tokenize query for knowledge search. Splits on whitespace/punctuation.
+ * Applies minimal synonym normalization (e.g. 退錢→退款), then for tokens containing CJK
+ * emits 2- and 3-char n-grams. Exported for tests.
+ */
+export function tokenizeQuery(query: string): string[] {
+  const raw = splitToRawTokens(query);
+  const rawNorm = splitToRawTokens(normalizeText(query));
 
   const set = new Set<string>();
   for (const token of raw) {
+    if (CJK_REGEX.test(token)) {
+      if (token.length >= 2) addCjkNgrams(token, 2, set);
+      if (token.length >= 3) addCjkNgrams(token, 3, set);
+    } else {
+      set.add(token);
+    }
+  }
+  for (const token of rawNorm) {
     if (CJK_REGEX.test(token)) {
       if (token.length >= 2) addCjkNgrams(token, 2, set);
       if (token.length >= 3) addCjkNgrams(token, 3, set);
