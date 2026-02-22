@@ -1,10 +1,21 @@
 import * as line from '@line/bot-sdk';
 import crypto from 'crypto';
 
-// Lazy initialization to avoid build-time errors
+/** Optional credentials for multi-bot; when set, used instead of env */
+export interface LineCredentials {
+  channelSecret: string;
+  channelAccessToken: string;
+}
+
+// Lazy initialization (global env) to avoid build-time errors
 let lineClientInstance: line.messagingApi.MessagingApiClient | null = null;
 
-function getLineClient(): line.messagingApi.MessagingApiClient {
+function getLineClient(credentials?: LineCredentials): line.messagingApi.MessagingApiClient {
+  if (credentials?.channelAccessToken) {
+    return new line.messagingApi.MessagingApiClient({
+      channelAccessToken: credentials.channelAccessToken,
+    });
+  }
   if (!lineClientInstance) {
     if (!process.env.LINE_CHANNEL_ACCESS_TOKEN) {
       throw new Error('LINE_CHANNEL_ACCESS_TOKEN environment variable is not set');
@@ -18,36 +29,35 @@ function getLineClient(): line.messagingApi.MessagingApiClient {
 
 export { getLineClient as lineClient };
 
-// Validate LINE signature
+// Validate LINE signature (optionally with injected channelSecret)
 export function validateSignature(
   body: string,
-  signature: string | null
+  signature: string | null,
+  channelSecretOverride?: string
 ): boolean {
   if (!signature) {
     return false;
   }
-
-  const channelSecret = process.env.LINE_CHANNEL_SECRET;
+  const channelSecret = channelSecretOverride ?? process.env.LINE_CHANNEL_SECRET;
   if (!channelSecret) {
     throw new Error('LINE_CHANNEL_SECRET environment variable is not set');
   }
-
   const hash = crypto
     .createHmac('SHA256', channelSecret)
     .update(body)
     .digest('base64');
-
   return hash === signature;
 }
 
-// Reply message to user
+// Reply message to user (optionally with injected client credentials)
 export async function replyMessage(
   replyToken: string,
   text: string,
-  quickReplyItems?: { label: string; text: string }[]
+  quickReplyItems?: { label: string; text: string }[],
+  credentials?: LineCredentials
 ): Promise<void> {
   try {
-    const client = getLineClient();
+    const client = getLineClient(credentials);
     const message: line.messagingApi.TextMessage = {
       type: 'text',
       text,
@@ -79,9 +89,10 @@ export async function replyMessage(
 /** Sprint 8: Push message (used after replyToken consumed, e.g. feedback template) */
 export async function pushMessage(
   userId: string,
-  message: line.messagingApi.Message
+  message: line.messagingApi.Message,
+  credentials?: LineCredentials
 ): Promise<void> {
-  const client = getLineClient();
+  const client = getLineClient(credentials);
   await client.pushMessage({ to: userId, messages: [message] });
 }
 
