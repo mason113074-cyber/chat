@@ -122,7 +122,7 @@ test.describe.serial('E2E 稽核', () => {
 
   test('A3. 未登入訪問 /dashboard 應導向登入', async ({ browser, baseURL }) => {
     test.skip(
-      baseURL?.includes('customeraipro.com'),
+      Boolean(baseURL?.includes('customeraipro.com')),
       'A3 需對 localhost 測試；production 須 deploy proxy auth 修正後再驗證'
     );
     // Next.js 多為 client-side 導向，用瀏覽器測未登入訪問
