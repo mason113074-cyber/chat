@@ -69,6 +69,7 @@ export interface Contact {
   name: string | null;
   tags: string[];
   status?: 'pending' | 'resolved';
+  bot_id?: string | null;
   created_at?: string;
 }
 
@@ -133,13 +134,42 @@ export interface Payment {
 
 // --- Helpers (use admin client for webhook / server) ---
 
-/** Get or create a contact for a LINE user under the given owner user. */
+/** Get or create a contact. When botId is set, scoped by (bot_id, line_user_id); else (user_id, line_user_id). */
 export async function getOrCreateContactByLineUserId(
   lineUserId: string,
   ownerUserId: string,
-  name?: string
+  name?: string,
+  botId?: string | null
 ): Promise<Contact> {
   const client = getSupabaseAdmin();
+
+  if (botId) {
+    const { data: existing } = await client
+      .from('contacts')
+      .select('*')
+      .eq('bot_id', botId)
+      .eq('line_user_id', lineUserId)
+      .maybeSingle();
+    if (existing) return existing as Contact;
+
+    const { data: inserted, error } = await client
+      .from('contacts')
+      .insert([{ user_id: ownerUserId, line_user_id: lineUserId, bot_id: botId, name: name ?? null }])
+      .select()
+      .single();
+    if (!error) return inserted as Contact;
+    if (error.code === '23505') {
+      const { data: row } = await client
+        .from('contacts')
+        .select('*')
+        .eq('bot_id', botId)
+        .eq('line_user_id', lineUserId)
+        .maybeSingle();
+      if (row) return row as Contact;
+    }
+    console.error('Error creating contact (bot):', error);
+    throw error;
+  }
 
   const { data: existing } = await client
     .from('contacts')
