@@ -144,24 +144,31 @@ export function BotFormDialog({ open, editBot, onClose, onSuccess, t }: Props) {
     }
   };
 
-  const handleRegenerateWebhookKey = () => {
+  const handleRegenerateWebhookKey = async () => {
     if (!editBot || !window.confirm(t('regenerateWebhookKey') + '？')) return;
     setSaving(true);
-    fetch(`/api/settings/bots/${editBot.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ regenerate_webhook_key: true }),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.webhook_key) {
-          setWebhookKey(data.webhook_key);
-          setAdvancedOpen(true);
-        }
-        onSuccess();
-      })
-      .catch(() => setError(t('updateError')))
-      .finally(() => setSaving(false));
+    setError(null);
+    try {
+      const res = await fetch(`/api/settings/bots/${editBot.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ regenerate_webhook_key: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? t('updateError'));
+        return;
+      }
+      if (data.webhook_key) {
+        setWebhookKey(data.webhook_key);
+        setAdvancedOpen(true);
+      }
+      onSuccess();
+    } catch {
+      setError(t('updateError'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!open) return null;
