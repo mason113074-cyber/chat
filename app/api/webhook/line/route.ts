@@ -226,8 +226,10 @@ export async function handleEvent(
   const msg = event.message;
   const msgType = msg.type;
   const eventId = getEventId(event);
-  if (await isProcessed(eventId)) {
-    console.info('[LINE webhook] Duplicate event skipped', { requestId, eventId });
+
+  // 統一冪等性檢查（帶 botId，所有消息類型共用）
+  if (await isProcessed(eventId, botId)) {
+    console.info('[LINE webhook] Duplicate event skipped', { requestId, eventId, botId });
     return;
   }
 
@@ -280,11 +282,6 @@ export async function handleEvent(
 
   const userMessage = msg.text;
   if (!userMessage || !lineUserId) {
-    return;
-  }
-
-  if (await isProcessed(eventId, botId)) {
-    console.info('[LINE webhook] Duplicate event skipped', { requestId, eventId });
     return;
   }
 
@@ -437,6 +434,8 @@ export async function handleEvent(
             systemPrompt: systemPrompt ?? undefined,
             aiModel: aiModel ?? undefined,
             variables: {},
+            credentials: creds,
+            botId,
           }
         );
 
