@@ -231,13 +231,21 @@ export function decideReplyAction(input: ReplyDecisionInput): ReplyDecisionResul
 
   if (sourcesCount === 0) {
     if (!simpleMessage) {
-      const askText = highRiskDetected
-        ? '為避免提供錯誤承諾，此問題將轉交專員協助處理。'
-        : '目前沒有足夠依據可直接回答，請提供訂單編號、商品名稱與相關日期。';
+      if (highRiskDetected) {
+        return {
+          action: 'SUGGEST',
+          draftText: DEFAULT_SAFE_DRAFT,
+          reason: '高風險且無知識庫命中，改為人工審核草稿後送出。',
+          confidence,
+          category,
+          sources: sourceSummary,
+        };
+      }
+      const askText = '目前沒有足夠依據可直接回答，請提供訂單編號、商品名稱與相關日期。';
       return {
-        action: highRiskDetected ? 'HANDOFF' : 'ASK',
+        action: 'ASK',
         draftText: askText,
-        askText: highRiskDetected ? undefined : askText,
+        askText,
         reason: '無知識庫命中，避免編造內容。',
         confidence,
         category,

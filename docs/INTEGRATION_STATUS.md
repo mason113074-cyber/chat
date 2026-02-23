@@ -13,9 +13,9 @@
 
 | 服務 | 狀態 | 設定位置 | 說明 |
 |------|------|----------|------|
-| **GitHub** | ✅ | `git remote` → origin (mason113074-cyber/chat) | 已連接；無 `.github/workflows`，無 CI/CD 自動測試/部署 |
+| **GitHub** | ✅ | `git remote` → origin (mason113074-cyber/chat)；`.github/workflows/ci.yml` | 已連接；CI 自動在 PR/push main 時執行 lint/type-check/test/build |
 | **Supabase** | ✅ | `lib/supabase/server.ts`, `lib/supabase/client.ts`, `lib/supabase.ts` | URL/Anon Key/Service Role 已使用；migrations 完整；RLS 已啟用 |
-| **Vercel** | ✅ | `vercel.json`（cron 健康檢查） | 部署依專案規則為 Vercel；build/start 正常；無 `middleware.ts`（next-intl 使用 i18n/request） |
+| **Vercel** | ✅ | `vercel.json`（cron：健康檢查 + webhook_events 清理） | 部署依專案規則為 Vercel；build/start 正常；無 `middleware.ts`（next-intl 使用 i18n/request） |
 | **LINE** | ✅ | `lib/line.ts`（env：LINE_CHANNEL_SECRET, LINE_CHANNEL_ACCESS_TOKEN）；webhook 用 LINE_OWNER_USER_ID | 單一 LINE Channel 設計；簽章驗證與回覆正常 |
 | **OpenAI** | ✅ | `lib/openai.ts`（OPENAI_API_KEY） | 已整合；超時與重試可設定 |
 | **Upstash Redis** | ⚠️ | `lib/rate-limit.ts`, `lib/idempotency.ts`, `lib/cache.ts` | 選用；未設定時使用記憶體 fallback，無 Redis 時冪等/rate limit 僅限單 instance |
@@ -48,6 +48,7 @@
 | `LINE_LOGIN_CHANNEL_ID` / `LINE_LOGIN_CHANNEL_SECRET` | LINE Login（綁定帳號） | `/api/auth/line` |
 | `NEXT_PUBLIC_APP_URL` | 站點 URL（OAuth callback、sitemap、robots） | 預設 https://www.customeraipro.com |
 | `HEALTHCHECK_CRON_SECRET` | 健康檢查 cron 驗證 | Vercel cron 呼叫 `/api/health-check` |
+| `WEBHOOK_CLEANUP_CRON_SECRET` | webhook_events 清理 cron 驗證 | Vercel cron 呼叫 `/api/cron/cleanup-webhook-events` |
 | `SECURITY_STRICT_MODE` | 敏感詞嚴格模式 | 預設 true |
 | `SECURITY_OUTPUT_FILTER_TIMEOUT` | 輸出過濾超時 | 預設 5000 |
 | `LEMONSQUEEZY_*` | Lemon Squeezy 付款 | 選用 |

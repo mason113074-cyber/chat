@@ -1,5 +1,7 @@
 # CustomerAIPro - AI 智能客服平台
 
+[![CI](https://github.com/mason113074-cyber/chat/actions/workflows/ci.yml/badge.svg)](https://github.com/mason113074-cyber/chat/actions/workflows/ci.yml)
+
 CustomerAIPro 是整合 **LINE**、**OpenAI GPT-4o-mini**、**Supabase** 的 AI 智能客服 SaaS；部署於 **Vercel**，程式碼在 **GitHub**，可選 **Upstash Redis** 做冪等與限流。
 
 ## 功能特色
@@ -8,6 +10,8 @@ CustomerAIPro 是整合 **LINE**、**OpenAI GPT-4o-mini**、**Supabase** 的 AI 
 - 💬 **LINE 整合**：LINE Messaging API Webhook
 - 📊 **對話記錄**：對話儲存於 Supabase
 - 🎨 **現代化介面**：Next.js App Router + Tailwind CSS
+- 🔍 **AI Copilot（SUGGEST/ASK）**：高風險訊息（如退款）轉人工審核，低風險自動回覆
+- 🧹 **webhook_events 自動清理**：每日 cron 清除過期 payload，保護 PII 與控制資料庫大小
 
 ## 技術架構
 

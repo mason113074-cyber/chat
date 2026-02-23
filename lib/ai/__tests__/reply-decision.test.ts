@@ -71,6 +71,20 @@ describe('decideReplyAction', () => {
     expect(['SUGGEST', 'ASK']).toContain(result.action);
   });
 
+  it('returns SUGGEST (not HANDOFF) for high-risk with no source hits', () => {
+    const result = decideReplyAction({
+      userMessage: '我要退款，商品名稱：藍芽耳機，訂單 #A123456，購買日 2025-01-10',
+      userId: 'u1',
+      contactId: 'c1',
+      sourcesCount: 0,
+      riskDetection: highRisk,
+      settings: { confidence_threshold: 0.6 },
+    });
+
+    expect(result.action).toBe('SUGGEST');
+    expect(result.action).not.toBe('HANDOFF');
+  });
+
   it('asks for order number first in refund template', () => {
     const result = decideReplyAction({
       userMessage: '我要退款，東西壞掉了',

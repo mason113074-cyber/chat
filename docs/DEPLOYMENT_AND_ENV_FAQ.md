@@ -45,6 +45,8 @@
 | **Upstash Redis** | `UPSTASH_REDIS_REST_URL` | 選用 | 未設則記憶體 fallback |
 | | `UPSTASH_REDIS_REST_TOKEN` | 選用 | 同上 |
 | **站點** | `NEXT_PUBLIC_SITE_URL` | 建議 | 正式站設為 https://www.customeraipro.com |
+| **Cron** | `HEALTHCHECK_CRON_SECRET` | 選用 | 健康檢查 cron 驗證 |
+| | `WEBHOOK_CLEANUP_CRON_SECRET` | 選用 | webhook_events 清理 cron 驗證（`/api/cron/cleanup-webhook-events`） |
 
 - **本地**：複製 `.env.example` 為 `.env.local`，依上表填入（不要提交 .env.local）。  
 - **Vercel**：專案 → Settings → Environment Variables，依上表新增（Production/Preview 依需求勾選）。  
