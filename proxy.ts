@@ -30,8 +30,30 @@ async function getSupabaseUser(
   return { user, response };
 }
 
+const isPublicApiPath = (pathname: string): boolean =>
+  pathname.startsWith('/api/webhook/') ||
+  pathname.startsWith('/api/health') ||
+  pathname.startsWith('/api/health-check') ||
+  pathname.startsWith('/api/auth/');
+
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
+
+  // API 路由：未登入且非公開 API 回 401
+  if (pathname.startsWith('/api/')) {
+    if (isPublicApiPath(pathname)) {
+      return NextResponse.next();
+    }
+    const { user } = await getSupabaseUser(request);
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+    return NextResponse.next();
+  }
+
   const segments = pathname.split('/').filter(Boolean);
   const firstSegment = segments[0] ?? '';
   const isDashboardOrSettingsPath =
@@ -126,5 +148,6 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     '/((?!api|_next|_vercel|favicon.ico|sitemap.xml|robots.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
+    '/api/((?!webhook|health|auth).*)',
   ],
 };

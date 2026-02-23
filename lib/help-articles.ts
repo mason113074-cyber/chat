@@ -879,8 +879,12 @@ export function getArticleContent(categorySlug: string, articleSlug: string, loc
   const key = `${categorySlug}/${articleSlug}`;
   const stored = ARTICLE_CONTENT[key] ?? null;
   if (!stored) return null;
-  const contentHtml =
+  let contentHtml =
     locale === 'zh-TW' && stored.contentHtmlZhTW ? stored.contentHtmlZhTW : stored.contentHtmlEn;
+  // 讓文章內連結保留語系：/help -> /zh-TW/help 或 /en/help，避免點擊後跳回預設語系
+  if (locale === 'zh-TW' || locale === 'en') {
+    contentHtml = contentHtml.replace(/href="\/help/g, `href="/${locale}/help`);
+  }
   return { ...stored, contentHtml };
 }
 

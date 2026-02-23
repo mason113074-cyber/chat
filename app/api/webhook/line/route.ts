@@ -226,8 +226,10 @@ export async function handleEvent(
   const msg = event.message;
   const msgType = msg.type;
   const eventId = getEventId(event);
-  if (await isProcessed(eventId)) {
-    console.info('[LINE webhook] Duplicate event skipped', { requestId, eventId });
+
+  // 統一冪等性檢查（帶 botId，所有消息類型共用）
+  if (await isProcessed(eventId, botId)) {
+    console.info('[LINE webhook] Duplicate event skipped', { requestId, eventId, botId });
     return;
   }
 
@@ -280,11 +282,6 @@ export async function handleEvent(
 
   const userMessage = msg.text;
   if (!userMessage || !lineUserId) {
-    return;
-  }
-
-  if (await isProcessed(eventId, botId)) {
-    console.info('[LINE webhook] Duplicate event skipped', { requestId, eventId });
     return;
   }
 
@@ -437,6 +434,8 @@ export async function handleEvent(
             systemPrompt: systemPrompt ?? undefined,
             aiModel: aiModel ?? undefined,
             variables: {},
+            credentials: creds,
+            botId,
           }
         );
 
@@ -629,8 +628,21 @@ export async function handleEvent(
     }
 
     // Sprint 3: 回覆延遲（模擬真人打字）
-    const delayMs = (replyDelaySeconds ?? 0) * 1000;
+    // 限制最大 3 秒，避免 Serverless 超時 + LINE webhook 重試
+    const MAX_REPLY_DELAY_MS = 3000;
+    const rawDelayMs = Math.max(0, (replyDelaySeconds ?? 0) * 1000);
+    const delayMs = Math.min(rawDelayMs, MAX_REPLY_DELAY_MS);
+
+    if (rawDelayMs > MAX_REPLY_DELAY_MS) {
+      console.warn('[LINE webhook] Reply delay clamped', {
+        requestId,
+        configuredMs: rawDelayMs,
+        clampedMs: delayMs,
+      });
+    }
+
     if (delayMs > 0) {
+      console.info('[LINE webhook] Reply delay applied', { requestId, delayMs });
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
 

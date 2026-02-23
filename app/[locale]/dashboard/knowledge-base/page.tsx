@@ -3,81 +3,18 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { useToast } from '@/components/Toast';
-
-const DEFAULT_CATEGORIES = [
-  { value: 'general', labelKey: 'catGeneral' as const },
-  { value: '常見問題', labelKey: 'catFaq' as const },
-  { value: '產品資訊', labelKey: 'catProduct' as const },
-  { value: '退換貨政策', labelKey: 'catReturn' as const },
-  { value: '營業資訊', labelKey: 'catBusiness' as const },
-] as const;
-
-const CATEGORY_COLOR: Record<string, string> = {
-  general: 'bg-gray-100 text-gray-700',
-  常見問題: 'bg-indigo-100 text-indigo-700',
-  產品資訊: 'bg-emerald-100 text-emerald-700',
-  退換貨政策: 'bg-amber-100 text-amber-700',
-  營業資訊: 'bg-purple-100 text-purple-700',
-};
-
-type Item = {
-  id: string;
-  title: string;
-  content: string;
-  category: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-};
-
-type Stats = { total: number; activeCount: number; lastUpdated: string | null; byCategory: Record<string, number> };
-type GapSuggestion = {
-  id: string;
-  questionExample: string;
-  frequency: number;
-  suggestedTitle: string;
-  suggestedAnswer: string;
-  suggestedCategory: string;
-};
-
-const PREVIEW_LEN = 100;
-
-function categoryLabelKey(category: string): (typeof DEFAULT_CATEGORIES)[number]['labelKey'] | null {
-  return DEFAULT_CATEGORIES.find((c) => c.value === category)?.labelKey ?? null;
-}
-
-function parseTxt(content: string): { title: string; content: string; category: string }[] {
-  const lines = content.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  const out: { title: string; content: string; category: string }[] = [];
-  for (const line of lines) {
-    const idx = line.indexOf('|||');
-    if (idx >= 0) {
-      const title = line.slice(0, idx).trim();
-      const content = line.slice(idx + 3).trim();
-      if (title) out.push({ title, content, category: 'general' });
-    }
-  }
-  return out;
-}
-
-function parseCsv(content: string): { title: string; content: string; category: string }[] {
-  const lines = content.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  if (lines.length < 2) return [];
-  const headers = lines[0].toLowerCase().split(',').map((h) => h.trim().replace(/^"|"$/g, ''));
-  const titleIdx = headers.indexOf('title');
-  const contentIdx = headers.indexOf('content');
-  const categoryIdx = headers.indexOf('category');
-  if (titleIdx < 0 || contentIdx < 0) return [];
-  const out: { title: string; content: string; category: string }[] = [];
-  for (let i = 1; i < lines.length; i++) {
-    const row = lines[i].match(/("([^"]*)")|([^,]+)/g)?.map((c) => c.replace(/^"|"$/g, '').trim()) ?? lines[i].split(',');
-    const title = (row[titleIdx] ?? '').trim();
-    const content = (row[contentIdx] ?? '').trim();
-    const category = categoryIdx >= 0 && row[categoryIdx] ? (row[categoryIdx] ?? 'general').trim() : 'general';
-    if (title) out.push({ title, content, category });
-  }
-  return out;
-}
+import { categoryLabelKey, parseTxt, parseCsv } from './components/kb-helpers';
+import { DEFAULT_CATEGORIES, type Item, type Stats, type GapSuggestion } from './components/kb-types';
+import {
+  KBStatsCards,
+  KBToolbar,
+  KBKnowledgeList,
+  KBTestPanel,
+  KBGapAnalysis,
+  KBAddEditModal,
+  KBImportModal,
+  KBUrlImportModal,
+} from './components';
 
 export default function KnowledgeBasePage() {
   const t = useTranslations('knowledgeBase');
@@ -443,497 +380,109 @@ export default function KnowledgeBasePage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-gray-900">{t('title')}</h1>
 
-      {/* Stats */}
-      {stats && (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
-            <p className="text-sm text-gray-500">{t('statTotal')}</p>
-            <p className="text-xl font-bold text-gray-900">{stats.total}</p>
-          </div>
-          <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
-            <p className="text-sm text-gray-500">{t('statActive')}</p>
-            <p className="text-xl font-bold text-gray-900">{stats.activeCount}</p>
-          </div>
-          <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
-            <p className="text-sm text-gray-500">{t('statLastUpdated')}</p>
-            <p className="text-lg font-bold text-gray-900">
-              {stats.lastUpdated ? new Date(stats.lastUpdated).toLocaleString(locale === 'zh-TW' ? 'zh-TW' : 'en') : '—'}
-            </p>
-          </div>
-          <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
-            <p className="text-sm text-gray-500">{t('statByCategory')}</p>
-            <p className="text-sm text-gray-700">
-              {Object.entries(stats.byCategory)
-                .map(([k, v]) => `${getCategoryLabel(k)}: ${v}`)
-                .join('、') || '—'}
-            </p>
-          </div>
-        </div>
-      )}
+      <KBStatsCards stats={stats} locale={locale} getCategoryLabel={getCategoryLabel} />
 
-      {/* Top bar */}
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          onClick={openAdd}
-          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-        >
-          {t('addKnowledge')}
-        </button>
-        <label className="sr-only" htmlFor="kb-import-file">{t('importFaq')}</label>
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-        >
-          {t('importFaq')}
-        </button>
-        <button
-          type="button"
-          onClick={() => setUrlImportOpen(true)}
-          className="rounded-lg border border-indigo-300 bg-indigo-50 px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
-        >
-          {t('importFromUrl')}
-        </button>
-        <input
-          id="kb-import-file"
-          ref={fileInputRef}
-          type="file"
-          accept=".txt,.csv"
-          className="hidden"
-          onChange={handleFileChange}
-          aria-label={t('importFaq')}
-        />
-        <a
-          href="#"
-          onClick={(e) => { e.preventDefault(); downloadSample('txt'); }}
-          className="text-sm text-indigo-600 hover:underline"
-        >
-          {t('downloadTxtSample')}
-        </a>
-        <a
-          href="#"
-          onClick={(e) => { e.preventDefault(); downloadSample('csv'); }}
-          className="text-sm text-indigo-600 hover:underline"
-        >
-          {t('downloadCsvSample')}
-        </a>
-        <label htmlFor="kb-search" className="sr-only">{t('searchPlaceholder')}</label>
-        <input
-          id="kb-search"
-          type="text"
-          placeholder={t('searchPlaceholder')}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm w-48"
-        />
-        <select
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
-          aria-label={t('allCategories')}
-        >
-          <option value="">{t('allCategories')}</option>
-          {categoryOptions.map((category) => (
-            <option key={category} value={category}>{getCategoryLabel(category)}</option>
-          ))}
-        </select>
-      </div>
+      <KBToolbar
+        search={search}
+        onSearchChange={setSearch}
+        categoryFilter={categoryFilter}
+        onCategoryFilterChange={setCategoryFilter}
+        categoryOptions={categoryOptions}
+        getCategoryLabel={getCategoryLabel}
+        onOpenAdd={openAdd}
+        onImportFile={() => fileInputRef.current?.click()}
+        onOpenUrlImport={() => setUrlImportOpen(true)}
+        onDownloadSample={downloadSample}
+        fileInputRef={fileInputRef}
+        onFileChange={handleFileChange}
+      />
 
       {/* List + Test panel: desktop 2-col, mobile stack */}
       <div className="lg:grid lg:grid-cols-[1fr,320px] lg:gap-8 lg:items-start">
         <div>
-      {/* List */}
-      {loading ? (
-        <p className="text-gray-500">{t('loading')}</p>
-      ) : items.length === 0 ? (
-        <div className="rounded-xl border border-gray-200 bg-white p-12 text-center shadow-sm">
-          <div className="rounded-full bg-indigo-100 w-20 h-20 flex items-center justify-center mx-auto mb-4 text-4xl">📚</div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('emptyTitle')}</h3>
-          <p className="text-gray-600 mb-4">{t('emptyDesc')}</p>
-          <p className="text-sm text-gray-500 mb-4">{t('downloadTxtSample')} / {t('downloadCsvSample')}</p>
-          <button
-            type="button"
-            onClick={openAdd}
-            className="mt-4 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-          >
-            {t('addKnowledge')}
-          </button>
-        </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {items.map((item) => (
-            <div
-              key={item.id}
-              className={`rounded-xl border bg-white p-4 shadow-sm ${item.is_active ? 'border-gray-200' : 'border-gray-100 bg-gray-50 opacity-80'}`}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <h3 className="font-semibold text-gray-900 line-clamp-1">{item.title}</h3>
-                <span className={`shrink-0 rounded px-2 py-0.5 text-xs ${CATEGORY_COLOR[item.category] ?? CATEGORY_COLOR.general}`}>
-                  {getCategoryLabel(item.category)}
-                </span>
-              </div>
-              <p className="mt-2 text-sm text-gray-600 line-clamp-2">
-                {(item.content || '').slice(0, PREVIEW_LEN)}
-                {(item.content?.length ?? 0) > PREVIEW_LEN ? '...' : ''}
-              </p>
-              <p className="mt-2 text-xs text-gray-400">
-                {new Date(item.updated_at).toLocaleString(locale === 'zh-TW' ? 'zh-TW' : 'en')}
-              </p>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => openEdit(item)}
-                  className="text-gray-500 hover:text-indigo-600"
-                  title="編輯"
-                >
-                  ✏️
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(item.id)}
-                  className="text-gray-500 hover:text-red-600"
-                  title="刪除"
-                >
-                  🗑️
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleToggleActive(item)}
-                  className="text-sm text-gray-600 hover:text-gray-900"
-                >
-                  {item.is_active ? t('disable') : t('enable')}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <KBKnowledgeList
+        items={items}
+        loading={loading}
+        locale={locale}
+        getCategoryLabel={getCategoryLabel}
+        onOpenAdd={openAdd}
+        onOpenEdit={openEdit}
+        onDelete={handleDelete}
+        onToggleActive={handleToggleActive}
+      />
         </div>
 
-        {/* Test AI 回答 panel - sticky on desktop, collapsible on mobile */}
-        <div className="mt-6 lg:mt-0 lg:sticky lg:top-24">
-          <div className="rounded-xl border border-indigo-200 bg-gradient-to-b from-indigo-50/80 to-purple-50/80 p-4 shadow-sm">
-            <button
-              type="button"
-              onClick={() => setTestPanelOpen((o) => !o)}
-              className="flex w-full items-center justify-between text-left font-semibold text-gray-900"
-            >
-              <span>{t('testAiReply')}</span>
-              <span className="text-gray-500">{testPanelOpen ? '▼' : '▶'}</span>
-            </button>
-            {testPanelOpen && (
-              <div className="mt-4 space-y-3">
-                <input
-                  type="text"
-                  data-testid="kb-test-question"
-                  value={testQuestion}
-                  onChange={(e) => setTestQuestion(e.target.value)}
-                  placeholder={t('testPlaceholder')}
-                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
-                  disabled={testLoading}
-                />
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={handleTestSubmit}
-                    disabled={testLoading || !testQuestion.trim()}
-                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-                  >
-                    {testLoading ? t('testSubmitting') : t('testSubmit')}
-                  </button>
-                  {(testAnswer !== null || testSources.length > 0) && (
-                    <button
-                      type="button"
-                      onClick={clearTestResult}
-                      className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    >
-                      {t('testClear')}
-                    </button>
-                  )}
-                </div>
-                {testAnswer !== null && (
-                  <div className="rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-800">
-                    <p className="font-medium text-gray-700">{t('testAiResponse')}</p>
-                    <p className="mt-1 whitespace-pre-wrap">{testAnswer}</p>
-                  </div>
-                )}
-                {(testAnswer !== null || testSources.length > 0) && (
-                  <div className="rounded-lg border border-gray-200 bg-white p-3 text-sm">
-                    <p className="font-medium text-gray-700">{t('testSources')}</p>
-                    {testSources.length === 0 ? (
-                      <p className="mt-1 text-amber-700">
-                        {t('testNoSources')}
-                      </p>
-                    ) : (
-                      <>
-                        <p className="mt-1 text-gray-600">{t('testSourceCount', { count: testSources.length })}</p>
-                        <div className="mt-2 space-y-2">
-                          {testSources.map((s) => (
-                            <div
-                              key={s.id}
-                              className="rounded border border-gray-100 bg-gray-50 px-2 py-1.5"
-                            >
-                              <span className="font-medium text-gray-900">{s.title}</span>
-                              <span className={`ml-2 rounded px-1.5 py-0.5 text-xs ${CATEGORY_COLOR[s.category] ?? CATEGORY_COLOR.general}`}>
-                                {getCategoryLabel(s.category)}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+        <KBTestPanel
+          testPanelOpen={testPanelOpen}
+          setTestPanelOpen={setTestPanelOpen}
+          testQuestion={testQuestion}
+          setTestQuestion={setTestQuestion}
+          testLoading={testLoading}
+          testAnswer={testAnswer}
+          testSources={testSources}
+          handleTestSubmit={handleTestSubmit}
+          clearTestResult={clearTestResult}
+          getCategoryLabel={getCategoryLabel}
+          t={t}
+        />
       </div>
 
-      {/* Gap analysis */}
-      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">{t('gapAnalysisTitle')}</h2>
-            <p className="text-sm text-gray-500">{t('gapAnalysisDesc')}</p>
-          </div>
-          <button
-            type="button"
-            onClick={loadGapAnalysis}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-          >
-            {t('reload')}
-          </button>
-        </div>
-        <div className="mt-4">
-          {gapLoading ? (
-            <p className="text-sm text-gray-500">{t('loading')}</p>
-          ) : gapSuggestions.length === 0 ? (
-            <p className="text-sm text-gray-500">{t('noData')}</p>
-          ) : (
-            <div className="space-y-3">
-              {gapSuggestions.map((s) => (
-                <div key={s.id} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-medium text-gray-900 truncate">{s.suggestedTitle}</p>
-                      <p className="mt-1 text-sm text-gray-600 line-clamp-2">{s.questionExample}</p>
-                      <p className="mt-1 text-xs text-gray-500">
-                        {t('frequency')}: {s.frequency} · {t('fieldCategory')}: {getCategoryLabel(s.suggestedCategory)}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => adoptSuggestion(s)}
-                      disabled={adoptingId === s.id}
-                      className="shrink-0 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-                    >
-                      {adoptingId === s.id ? t('saving') : t('adoptSuggestion')}
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+      <KBGapAnalysis
+        gapLoading={gapLoading}
+        gapSuggestions={gapSuggestions}
+        adoptingId={adoptingId}
+        loadGapAnalysis={loadGapAnalysis}
+        adoptSuggestion={adoptSuggestion}
+        getCategoryLabel={getCategoryLabel}
+        t={t}
+      />
 
-      {/* URL import modal */}
-      {urlImportOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6 shadow-lg">
-            <h2 className="text-lg font-semibold text-gray-900">{t('importFromUrl')}</h2>
-            <div className="mt-4 space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">{t('urlLabel')}</label>
-                <input
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                  placeholder="https://..."
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                />
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">{t('crawlDepth')}</label>
-                  <select
-                    value={urlDepth}
-                    onChange={(e) => setUrlDepth(Number(e.target.value))}
-                    aria-label={t('crawlDepth')}
-                    className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                  >
-                    <option value={1}>{t('depthOnePage')}</option>
-                    <option value={3}>{t('depthSubPages')}</option>
-                  </select>
-                </div>
-                <label className="flex items-center gap-2 text-sm text-gray-700 mt-6">
-                  <input
-                    type="checkbox"
-                    checked={urlAutoCategories}
-                    onChange={(e) => setUrlAutoCategories(e.target.checked)}
-                  />
-                  {t('autoCategory')}
-                </label>
-              </div>
-              {urlPreview.length > 0 && (
-                <div className="rounded-lg border border-gray-200 p-3">
-                  <p className="text-sm font-medium text-gray-700 mb-2">{t('importPreviewDesc', { count: urlPreview.length })}</p>
-                  <div className="max-h-52 overflow-y-auto space-y-2">
-                    {urlPreview.map((row, idx) => (
-                      <div key={`${row.title}-${idx}`} className="rounded border border-gray-100 bg-gray-50 px-2 py-1.5 text-sm">
-                        <p className="font-medium text-gray-900">{row.title}</p>
-                        <p className="text-xs text-gray-600">
-                          {getCategoryLabel(row.category)}{row.sourceUrl ? ` · ${row.sourceUrl}` : ''}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setUrlImportOpen(false);
-                  setUrlPreview([]);
-                }}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-              >
-                {t('cancel')}
-              </button>
-              <button
-                type="button"
-                onClick={handleUrlPreview}
-                disabled={urlLoading || !urlInput.trim()}
-                className="rounded-lg border border-indigo-300 bg-indigo-50 px-4 py-2 text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
-              >
-                {urlLoading ? t('loading') : t('preview')}
-              </button>
-              <button
-                type="button"
-                onClick={handleUrlImportConfirm}
-                disabled={urlLoading || !urlInput.trim()}
-                className="rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {urlLoading ? t('importing') : t('confirmImport')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <KBUrlImportModal
+        urlImportOpen={urlImportOpen}
+        urlInput={urlInput}
+        setUrlInput={setUrlInput}
+        urlDepth={urlDepth}
+        setUrlDepth={setUrlDepth}
+        urlAutoCategories={urlAutoCategories}
+        setUrlAutoCategories={setUrlAutoCategories}
+        urlPreview={urlPreview}
+        urlLoading={urlLoading}
+        handleUrlPreview={handleUrlPreview}
+        handleUrlImportConfirm={handleUrlImportConfirm}
+        setUrlImportOpen={setUrlImportOpen}
+        setUrlPreview={setUrlPreview}
+        getCategoryLabel={getCategoryLabel}
+        t={t}
+      />
 
-      {/* Add/Edit Modal */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-lg">
-            <h2 className="text-lg font-semibold text-gray-900">{editingId ? t('editKnowledge') : t('addKnowledge')}</h2>
-            <div className="mt-4 space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">{t('fieldTitle')} *</label>
-                <input
-                  value={formTitle}
-                  onChange={(e) => setFormTitle(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                  placeholder={t('titlePlaceholder')}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700" id="form-category-label">{t('fieldCategory')}</label>
-                <select
-                  value={formCategory}
-                  onChange={(e) => setFormCategory(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                  aria-labelledby="form-category-label"
-                >
-                  {categoryOptions.map((category) => (
-                    <option key={category} value={category}>{getCategoryLabel(category)}</option>
-                  ))}
-                  <option value="__custom">{t('customCategory')}</option>
-                </select>
-                {formCategory === '__custom' && (
-                  <input
-                    value={formCustomCategory}
-                    onChange={(e) => setFormCustomCategory(e.target.value)}
-                    className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2"
-                    placeholder={t('customCategoryPlaceholder')}
-                  />
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">{t('fieldContent')}</label>
-                <textarea
-                  value={formContent}
-                  onChange={(e) => setFormContent(e.target.value)}
-                  rows={6}
-                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
-                  placeholder={t('contentPlaceholder')}
-                />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-700">{t('aiPreview')}</p>
-                <p className="mt-1 rounded bg-gray-50 p-2 text-sm text-gray-600">
-                  {formTitle || formContent ? `【${formTitle || t('noTitle')}】\n${formContent || t('noContent')}` : t('aiPreviewEmpty')}
-                </p>
-              </div>
-            </div>
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setModalOpen(false)}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-              >
-                {t('cancel')}
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={saving || !formTitle.trim()}
-                className="rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {saving ? t('saving') : t('save')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <KBAddEditModal
+        modalOpen={modalOpen}
+        editingId={editingId}
+        formTitle={formTitle}
+        setFormTitle={setFormTitle}
+        formContent={formContent}
+        setFormContent={setFormContent}
+        formCategory={formCategory}
+        setFormCategory={setFormCategory}
+        formCustomCategory={formCustomCategory}
+        setFormCustomCategory={setFormCustomCategory}
+        categoryOptions={categoryOptions}
+        saving={saving}
+        handleSave={handleSave}
+        setModalOpen={setModalOpen}
+        getCategoryLabel={getCategoryLabel}
+        t={t}
+      />
 
-      {/* Import preview modal */}
-      {importOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-lg">
-            <h2 className="text-lg font-semibold text-gray-900">{t('importPreview')}</h2>
-            <p className="mt-2 text-sm text-gray-600">{t('importPreviewDesc', { count: importPreview.length })}</p>
-            <div className="mt-4 max-h-60 overflow-y-auto rounded border border-gray-200 p-2 text-sm">
-              {importPreview.slice(0, 20).map((row, i) => (
-                <div key={i} className="border-b border-gray-100 py-1 last:border-0">
-                  <span className="font-medium">{row.title}</span>
-                  {row.content && <span className="text-gray-500"> — {row.content.slice(0, 40)}...</span>}
-                </div>
-              ))}
-              {importPreview.length > 20 && <p className="text-gray-400">{t('importRemaining', { count: importPreview.length - 20 })}</p>}
-            </div>
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => { setImportOpen(false); setImportPreview([]); }}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-              >
-                {t('cancel')}
-              </button>
-              <button
-                type="button"
-                onClick={handleImportConfirm}
-                disabled={importing}
-                className="rounded-lg bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-50"
-              >
-                {importing ? t('importing') : t('confirmImport')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <KBImportModal
+        importOpen={importOpen}
+        importPreview={importPreview}
+        importing={importing}
+        handleImportConfirm={handleImportConfirm}
+        setImportOpen={setImportOpen}
+        setImportPreview={setImportPreview}
+        t={t}
+      />
     </div>
   );
 }

@@ -6,8 +6,14 @@ const DEFAULT_LIMIT = 3;
 const DEFAULT_MAX_CHARS = 2000;
 const KNOWLEDGE_SEARCH_CACHE_TTL = 300; // 5 分鐘
 const CACHE_PREFIX = 'knowledge_search:';
+const MAX_KNOWLEDGE_ROWS = 200;
 
 const CJK_REGEX = /[\u4E00-\u9FFF]/;
+
+/** Escape special characters for Supabase ilike pattern */
+function escapeIlike(str: string): string {
+  return str.replace(/[%_\\]/g, '\\$&');
+}
 const MAX_TOKENS = 40;
 
 /** Minimal synonym normalization for KB search only (退錢/退費/退回款 → 退款). */
@@ -88,22 +94,59 @@ export async function searchKnowledgeWithSources(
     cacheKey,
     async () => {
       const client = getSupabaseAdmin();
-      const { data: rows, error } = await client
-        .from('knowledge_base')
-        .select('id, title, content, category')
-        .eq('user_id', userId)
-        .eq('is_active', true)
-        .limit(50);
+      const keywords = tokenizeQuery(message);
+      let rows: { id: string; title: string; content: string; category: string }[] = [];
 
-      if (error || !rows || rows.length === 0) {
-        return { text: '', sources: [] };
+      if (keywords.length > 0) {
+        const searchKeywords = keywords
+          .filter((k) => k.length >= 2)
+          .slice(0, 5);
+
+        if (searchKeywords.length > 0) {
+          const orConditions = searchKeywords
+            .map((k) => {
+              const escaped = escapeIlike(k);
+              return `title.ilike.%${escaped}%,content.ilike.%${escaped}%`;
+            })
+            .join(',');
+
+          try {
+            const { data, error } = await client
+              .from('knowledge_base')
+              .select('id, title, content, category')
+              .eq('user_id', userId)
+              .eq('is_active', true)
+              .or(orConditions)
+              .limit(MAX_KNOWLEDGE_ROWS);
+
+            if (!error && data && data.length > 0) {
+              rows = data as { id: string; title: string; content: string; category: string }[];
+            }
+          } catch {
+            // ilike 查詢失敗時 fallback 到階段 2
+          }
+        }
       }
 
-      const keywords = tokenizeQuery(message);
+      if (rows.length === 0) {
+        const { data: fallbackData, error: fallbackError } = await client
+          .from('knowledge_base')
+          .select('id, title, content, category')
+          .eq('user_id', userId)
+          .eq('is_active', true)
+          .order('created_at', { ascending: false })
+          .limit(MAX_KNOWLEDGE_ROWS);
+
+        if (fallbackError || !fallbackData || fallbackData.length === 0) {
+          return { text: '', sources: [] };
+        }
+        rows = fallbackData as { id: string; title: string; content: string; category: string }[];
+      }
+
       let top: { id: string; title: string; content: string; category: string }[];
 
       if (keywords.length === 0) {
-        top = rows.slice(0, limit) as { id: string; title: string; content: string; category: string }[];
+        top = rows.slice(0, limit);
       } else {
         const scored = rows.map((row: { id: string; title: string; content: string; category?: string }) => {
           const text = `${row.title} ${row.content}`.toLowerCase();
