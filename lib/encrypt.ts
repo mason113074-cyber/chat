@@ -13,13 +13,33 @@ const KEY_LENGTH = 32;
 
 function getEncryptionKey(): Buffer {
   const raw = process.env.LINE_BOT_ENCRYPTION_KEY;
-  if (!raw || raw.length < 32) {
-    throw new Error('LINE_BOT_ENCRYPTION_KEY must be set and at least 32 chars (or 64-char hex)');
+  if (!raw || raw.length < 16) {
+    throw new Error(
+      'LINE_BOT_ENCRYPTION_KEY must be set. Accepted formats: 64-char hex, 44-char base64, or 32+ ASCII bytes.'
+    );
   }
-  if (raw.length === 64 && /^[0-9a-fA-F]+$/.test(raw)) {
-    return Buffer.from(raw, 'hex');
+
+  const trimmed = raw.trim();
+
+  if (trimmed.length === 64 && /^[0-9a-fA-F]+$/.test(trimmed)) {
+    return Buffer.from(trimmed, 'hex');
   }
-  return Buffer.from(raw.slice(0, KEY_LENGTH), 'utf8');
+
+  if (trimmed.length === 44 && /^[A-Za-z0-9+/]+=*$/.test(trimmed)) {
+    const buf = Buffer.from(trimmed, 'base64');
+    if (buf.length === KEY_LENGTH) {
+      return buf;
+    }
+  }
+
+  const buf = Buffer.from(trimmed, 'utf8');
+  if (buf.length < KEY_LENGTH) {
+    throw new Error(
+      `LINE_BOT_ENCRYPTION_KEY as UTF-8 is only ${buf.length} bytes, need ${KEY_LENGTH}. ` +
+        'Use 64-char hex (openssl rand -hex 32) or 44-char base64 (openssl rand -base64 32).'
+    );
+  }
+  return buf.subarray(0, KEY_LENGTH);
 }
 
 /**
