@@ -130,6 +130,7 @@ export function SettingsGeneralTab() {
               </button>
             </>
           ) : (
+            // eslint-disable-next-line @next/next/no-html-link-for-pages
             <a
               href="/api/auth/line?action=bind"
               className="inline-flex items-center gap-2 rounded-lg bg-[#06C755] px-4 py-2 text-sm font-medium text-white hover:bg-[#05b34a]"

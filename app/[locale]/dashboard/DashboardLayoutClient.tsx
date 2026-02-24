@@ -16,12 +16,11 @@ export function DashboardLayoutClient({
   children: React.ReactNode;
 }) {
   const [searchOpen, setSearchOpen] = useState(false);
-  const [sidebarExpanded, setSidebarExpanded] = useState(true);
-
-  useEffect(() => {
-    const stored = typeof window !== 'undefined' ? localStorage.getItem(SIDEBAR_STORAGE_KEY) : null;
-    if (stored !== null) setSidebarExpanded(stored === 'true');
-  }, []);
+  const [sidebarExpanded, setSidebarExpanded] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    const stored = localStorage.getItem(SIDEBAR_STORAGE_KEY);
+    return stored !== null ? stored === 'true' : true;
+  });
 
   useEffect(() => {
     const fn = (e: KeyboardEvent) => {
