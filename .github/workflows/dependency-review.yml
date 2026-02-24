@@ -28,12 +28,11 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             "${URL}")
 
-          echo "http_code=${CODE}"
           if [ "${CODE}" = "200" ]; then
             echo "enabled=true" >> "${GITHUB_OUTPUT}"
           else
             echo "enabled=false" >> "${GITHUB_OUTPUT}"
-            echo "::notice title=Dependency Review skipped::Dependency graph API not available (HTTP ${CODE}). Enable 'Dependency graph' in GitHub Settings → Code security and analysis to turn this check on."
+            echo "::notice title=Dependency Review skipped::Dependency graph API not available (HTTP ${CODE}). Enable Settings → Code security and analysis → Dependency graph to turn this check on."
             cat /tmp/depgraph.json || true
           fi
 
