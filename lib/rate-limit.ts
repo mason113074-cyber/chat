@@ -80,12 +80,8 @@ export async function checkRateLimit(identifier: string): Promise<{
     try {
       return await redisCheck(identifier);
     } catch (e) {
-      console.error('[rate-limit] Redis failed, allowing request', e);
-      return {
-        allowed: true,
-        remaining: MAX_REQUESTS_PER_WINDOW,
-        resetAt: new Date(Date.now() + RATE_LIMIT_WINDOW * 1000),
-      };
+      console.error('[rate-limit] Redis failed, falling back to memory', e);
+      return memoryCheck(identifier);
     }
   }
   return memoryCheck(identifier);

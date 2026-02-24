@@ -11,10 +11,10 @@ type Props = { params: Promise<{ locale: string; category: string; article: stri
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale, category, article } = await params;
   const content = getArticleContent(category, article, locale);
-  if (!content) return { title: 'Help' };
   const t = await getTranslations('help');
+  if (!content) return { title: t('breadcrumb.help') };
   const title = t(content.titleKey);
-  return { title: `${title} | Help` };
+  return { title: `${title} | ${t('breadcrumb.help')}` };
 }
 
 export default async function HelpArticlePage({ params }: Props) {
@@ -34,7 +34,7 @@ export default async function HelpArticlePage({ params }: Props) {
       <main className="pt-[72px]">
         <div className="container mx-auto px-4 py-8 max-w-4xl">
           <nav className="flex items-center gap-2 text-sm text-gray-600 mb-6" aria-label="Breadcrumb">
-            <Link href="/help" className="hover:text-blue-600">Help</Link>
+            <Link href="/help" className="hover:text-blue-600">{t('breadcrumb.help')}</Link>
             <span>/</span>
             <Link href={`/help/${category}`} className="hover:text-blue-600">{categoryTitle}</Link>
             <span>/</span>
@@ -44,8 +44,8 @@ export default async function HelpArticlePage({ params }: Props) {
           <div className="bg-white rounded-xl shadow-sm p-8 mb-6">
             <h1 className="text-4xl font-bold text-gray-900 mb-4">{articleTitle}</h1>
             <div className="flex items-center gap-4 text-sm text-gray-600">
-              <span>{content.readTime} min read</span>
-              <span>Last updated: {content.lastUpdated}</span>
+              <span>{content.readTime} {t('minuteRead')}</span>
+              <span>{t('lastUpdatedLabel')} {content.lastUpdated}</span>
             </div>
           </div>
 
@@ -57,13 +57,13 @@ export default async function HelpArticlePage({ params }: Props) {
           </div>
 
           <div className="bg-white rounded-xl shadow-sm p-6 text-center">
-            <p className="text-gray-700 mb-4">Was this article helpful?</p>
+            <p className="text-gray-700 mb-4">{t('articleHelpful')}</p>
             <div className="flex gap-4 justify-center">
               <button type="button" className="flex items-center gap-2 px-6 py-3 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors">
-                Yes
+                {t('feedbackYes')}
               </button>
               <button type="button" className="flex items-center gap-2 px-6 py-3 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors">
-                No
+                {t('feedbackNo')}
               </button>
             </div>
           </div>

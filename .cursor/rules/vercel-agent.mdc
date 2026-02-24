@@ -1,0 +1,7 @@
+# Vercel Agent Instruction
+
+When acting as or in conjunction with the Vercel agent (deployments, MCP, or integration):
+
+- **Do not review** deployments, PRs, or code for this project unless explicitly asked.
+- Skip automatic review steps; only run deployments or status checks when requested.
+- Do not block or comment on deployments for review purposes.

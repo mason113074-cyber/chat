@@ -12,6 +12,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const body = await request.json().catch(() => ({}));
     const message = typeof body.message === 'string' ? body.message.trim() : '';
+    const suggestionId = typeof body.suggestionId === 'string' ? body.suggestionId.trim() : '';
     if (!message) return NextResponse.json({ error: 'Message is required' }, { status: 400 });
 
     const supabase = await createClient();
@@ -34,7 +35,33 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       is_resolved: false,
     });
 
-    return NextResponse.json({ success: true, item: inserted });
+    let suggestionUpdated = false;
+    if (suggestionId) {
+      const nowIso = new Date().toISOString();
+      const { error: suggestionError } = await supabase
+        .from('ai_suggestions')
+        .update({
+          suggested_reply: message,
+          status: 'sent',
+          sent_at: nowIso,
+          sent_by: user.id,
+        })
+        .eq('id', suggestionId)
+        .eq('user_id', user.id)
+        .eq('contact_id', contactId)
+        .eq('status', 'draft');
+
+      if (suggestionError) {
+        if (suggestionError.code !== '42P01') {
+          console.error('Failed to update ai_suggestion status:', suggestionError);
+          return NextResponse.json({ error: 'Failed to update suggestion status' }, { status: 500 });
+        }
+      } else {
+        suggestionUpdated = true;
+      }
+    }
+
+    return NextResponse.json({ success: true, item: inserted, suggestionUpdated });
   } catch (e) {
     console.error('POST /api/conversations/[id]/reply error:', e);
     return NextResponse.json({ error: 'Failed to send human reply' }, { status: 500 });
