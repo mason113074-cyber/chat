@@ -1,0 +1,36 @@
+---
+description: 完成任何任務後必須同時 push 到 GitHub 並更新 Notion；本規則說明同步流程與檢查清單。
+alwaysApply: true
+---
+
+# GitHub + Notion 同步工作流程
+
+## 原則
+
+- 做完任何事（功能、修復、重構、文件）後，必須同時：
+  1. **Push 到 GitHub**（commit + push 到對應分支）
+  2. **更新 Notion**（與專案狀態同步）
+
+## 完成任務後的檢查清單
+
+依序執行：
+
+1. **驗證**
+   - `npx tsc --noEmit`
+   - `npm run build`（必要時跑單元/E2E）
+
+2. **Git**
+   - `git add -A` 或只 add 相關檔案
+   - `git commit -m "類型: 簡短描述"`
+   - `git push origin <分支名>`
+
+3. **Notion**
+   - 更新 Notion 上 CustomerAIPro 專案頁面，使內容與 repo 一致：
+     - 功能/結構變更 → 更新「專案概述」「程式碼結構」「API」「現狀與風險」等對應段落
+     - 修復/上線 → 更新「現狀與已知風險」或「最後更新」日期
+   - **Notion 內容來源**：repo 內 `docs/NOTION_SYNC.md` 為結構化總覽，可整份複製到 Notion 或手動同步變更段落。
+
+## 參考
+
+- Notion 同步用總覽文件：`docs/NOTION_SYNC.md`
+- 專案脈絡與 API：`.cursor/rules/project-context.mdc`

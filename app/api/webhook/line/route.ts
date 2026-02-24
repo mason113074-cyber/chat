@@ -9,7 +9,7 @@ import { autoTagContact } from '@/lib/auto-tag';
 import { isProcessed, markAsProcessed } from '@/lib/idempotency';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { invalidateAnalyticsCache } from '@/lib/analytics-cache';
-import { detectSensitiveKeywords } from '@/lib/security/sensitive-keywords';
+import { detectSensitiveKeywords, isStructuredRefundOrReturnRequest } from '@/lib/security/sensitive-keywords';
 import { isWithinBusinessHours } from '@/lib/business-hours';
 import { summarizeConversation } from '@/lib/conversation-summary';
 import { WorkflowEngine, type WorkflowData } from '@/lib/workflow-engine';
@@ -19,6 +19,7 @@ import {
   getDefaultHandoffText,
   type ReplyDecisionSource,
 } from '@/lib/ai/reply-decision';
+import { buildRateLimitIdentifier } from '@/lib/webhook-utils';
 
 const KNOWLEDGE_PREFIX =
   '\n\n## 以下是你可以參考的知識庫內容（只能根據以下內容回答，勿使用其他知識）：\n';
@@ -96,6 +97,15 @@ function applyReplyGuardrail(reply: string): { safeReply: string; guardrailTrigg
 }
 
 export async function POST(request: NextRequest) {
+  const legacyEnabled = process.env.LINE_WEBHOOK_LEGACY_ENABLED === 'true';
+  const isProd = process.env.NODE_ENV === 'production';
+  if (isProd && !legacyEnabled) {
+    return NextResponse.json(
+      { error: 'Legacy LINE webhook is disabled. Use /api/webhook/line/{botId}/{webhookKey}.' },
+      { status: 410 }
+    );
+  }
+
   const start = Date.now();
   const requestId = `line-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
@@ -174,11 +184,18 @@ export async function handleEvent(
   requestId: string,
   overrides?: WebhookLineOverrides
 ): Promise<void> {
+  const botId = overrides?.botId;
+  const eventId = getEventId(event);
+
+  if (await isProcessed(eventId, botId)) {
+    console.info('[LINE webhook] Duplicate event skipped', { requestId, eventId, botId });
+    return;
+  }
+
   const replyToken = event.replyToken;
   const lineUserId = event.source?.userId;
   const ownerUserId = overrides?.ownerUserId ?? process.env.LINE_OWNER_USER_ID;
   const creds = overrides?.credentials;
-  const botId = overrides?.botId;
 
   // Sprint 10: follow event - welcome message
   if (event.type === 'follow' && lineUserId && ownerUserId && replyToken) {
@@ -191,6 +208,7 @@ export async function handleEvent(
     } catch (e) {
       console.error('[LINE webhook] Welcome message failed', { requestId, error: e });
     }
+    await markAsProcessed(eventId, botId);
     return;
   }
 
@@ -214,6 +232,7 @@ export async function handleEvent(
         console.warn('[LINE webhook] Feedback insert failed', { requestId, error: e });
       }
     }
+    await markAsProcessed(eventId, botId);
     return;
   }
 
@@ -225,13 +244,6 @@ export async function handleEvent(
 
   const msg = event.message;
   const msgType = msg.type;
-  const eventId = getEventId(event);
-
-  // 統一冪等性檢查（帶 botId，所有消息類型共用）
-  if (await isProcessed(eventId, botId)) {
-    console.info('[LINE webhook] Duplicate event skipped', { requestId, eventId, botId });
-    return;
-  }
 
   // Non-text message types: reply once and mark processed
   if (msgType === 'image') {
@@ -285,7 +297,8 @@ export async function handleEvent(
     return;
   }
 
-  const { allowed: rateLimitOk, remaining, resetAt } = await checkRateLimit(lineUserId);
+  const identifier = buildRateLimitIdentifier({ botId, ownerUserId, lineUserId });
+  const { allowed: rateLimitOk, remaining, resetAt } = await checkRateLimit(identifier);
   if (!rateLimitOk) {
     console.warn('[LINE webhook] Rate limit exceeded', { requestId, lineUserId, remaining, resetAt: resetAt.toISOString() });
     try {
@@ -293,11 +306,13 @@ export async function handleEvent(
     } catch {
       // ignore
     }
+    await markAsProcessed(eventId, botId);
     return;
   }
 
   const sensitiveCheck = detectSensitiveKeywords(userMessage);
-  if (sensitiveCheck.riskLevel !== 'low') {
+  const isStructuredRefundRequest = isStructuredRefundOrReturnRequest(userMessage);
+  if (sensitiveCheck.riskLevel !== 'low' && !isStructuredRefundRequest) {
     console.info('[LINE webhook] Sensitive message detected', {
       requestId,
       eventId,
@@ -349,6 +364,7 @@ export async function handleEvent(
     } catch {
       // ignore
     }
+    await markAsProcessed(eventId, botId);
     return;
   }
 
@@ -358,6 +374,7 @@ export async function handleEvent(
     const { limit, used } = await getConversationUsageForUser(admin, ownerUserId);
     if (limit !== -1 && used >= limit) {
       await replyMessage(replyToken, '很抱歉，本月對話額度已用完，請聯繫商家。', undefined, creds);
+      await markAsProcessed(eventId, botId);
       return;
     }
 
@@ -817,5 +834,8 @@ export async function handleEvent(
 
 // Handle GET request (for LINE webhook verification)
 export async function GET() {
-  return NextResponse.json({ status: 'LINE webhook is ready' });
+  return NextResponse.json({
+    status: 'deprecated',
+    message: 'Legacy LINE webhook. Use /api/webhook/line/{botId}/{webhookKey} for multi-bot.',
+  });
 }

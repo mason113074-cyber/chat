@@ -68,6 +68,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Failed to persist' }, { status: 500 });
     }
 
+    const isProd = process.env.NODE_ENV === 'production';
+    const redisOk = !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+    if (isProd && !redisOk) {
+      await admin
+        .from('webhook_events')
+        .update({
+          status: 'failed',
+          error_message: 'Upstash Redis is required in production for webhook idempotency/rate-limit',
+          processed_at: new Date().toISOString(),
+        })
+        .eq('id', webhookRow.id);
+      return NextResponse.json({ success: true });
+    }
+
     const webhookBody: LineWebhookBody = JSON.parse(body);
     const events = webhookBody.events ?? [];
 
