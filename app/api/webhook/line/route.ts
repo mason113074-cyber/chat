@@ -574,7 +574,9 @@ export async function handleEvent(
       sources: decisionSources,
     });
 
-    const shouldGenerateDraft = decision.action === 'AUTO' || decision.action === 'SUGGEST';
+    const shouldGenerateDraft =
+      decision.action === 'AUTO' ||
+      (decision.action === 'SUGGEST' && decision.category !== 'refund');
     let guardrailTriggered = false;
     if (shouldGenerateDraft) {
       const count = Math.max(1, Math.min(30, memoryCount ?? 5));
