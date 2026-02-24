@@ -31,7 +31,9 @@ ALTER TABLE public.ai_suggestions
   ADD COLUMN IF NOT EXISTS risk_category text NOT NULL DEFAULT 'low',
   ADD COLUMN IF NOT EXISTS expires_at timestamptz NOT NULL DEFAULT (now() + interval '24 hours'),
   ADD COLUMN IF NOT EXISTS sent_at timestamptz,
-  ADD COLUMN IF NOT EXISTS sent_by uuid;
+  ADD COLUMN IF NOT EXISTS sent_by uuid,
+  ADD COLUMN IF NOT EXISTS category text,
+  ADD COLUMN IF NOT EXISTS sources jsonb DEFAULT '[]'::jsonb;
 
 -- Add FK for bot_id only if line_bots table exists
 DO $$
