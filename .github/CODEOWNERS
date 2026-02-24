@@ -1,0 +1,10 @@
+# Default owner for the repo. GitHub will request review from these owners.
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+* @mason113074-cyber
+
+# Optional: path-specific owners (uncomment and adjust if needed)
+# /app/                @mason113074-cyber
+# /lib/                @mason113074-cyber
+# /supabase/migrations/ @mason113074-cyber
+# /.github/            @mason113074-cyber
