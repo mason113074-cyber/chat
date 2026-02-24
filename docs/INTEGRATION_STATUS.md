@@ -16,9 +16,9 @@
 | **GitHub** | ✅ | `git remote` → origin (mason113074-cyber/chat) | 已連接；無 `.github/workflows`，無 CI/CD 自動測試/部署 |
 | **Supabase** | ✅ | `lib/supabase/server.ts`, `lib/supabase/client.ts`, `lib/supabase.ts` | URL/Anon Key/Service Role 已使用；migrations 完整；RLS 已啟用 |
 | **Vercel** | ✅ | `vercel.json`（cron 健康檢查） | 部署依專案規則為 Vercel；build/start 正常；無 `middleware.ts`（next-intl 使用 i18n/request） |
-| **LINE** | ✅ | `lib/line.ts`（env：LINE_CHANNEL_SECRET, LINE_CHANNEL_ACCESS_TOKEN）；webhook 用 LINE_OWNER_USER_ID | 單一 LINE Channel 設計；簽章驗證與回覆正常 |
+| **LINE** | ✅ | `lib/line.ts`（env：LINE_CHANNEL_SECRET, LINE_CHANNEL_ACCESS_TOKEN）；multi-bot 設定於 `line_bots` 表（加密儲存） | **multi-bot**：每個 bot 的 webhook URL 為 `/api/webhook/line/{botId}/{webhookKey}`，channel secret/token 加密存於 DB。**legacy** `/api/webhook/line` 在 production 預設回傳 **410 Gone**（可設 `LINE_WEBHOOK_LEGACY_ENABLED=true` 重新啟用，供舊版單 bot 短期過渡） |
 | **OpenAI** | ✅ | `lib/openai.ts`（OPENAI_API_KEY） | 已整合；超時與重試可設定 |
-| **Upstash Redis** | ⚠️ | `lib/rate-limit.ts`, `lib/idempotency.ts`, `lib/cache.ts` | 選用；未設定時使用記憶體 fallback，無 Redis 時冪等/rate limit 僅限單 instance |
+| **Upstash Redis** | ⚠️ | `lib/rate-limit.ts`, `lib/idempotency.ts`, `lib/cache.ts` | **本機開發選用**；未設定時使用記憶體 fallback（單 instance）。**multi-bot production 必填**：多 instance Vercel 部署下，未設定 Redis 冪等與 rate limit 僅在單機生效，系統會輸出警告。 |
 | **Lemon Squeezy** | ⚠️ | `.env.example` 有變數 | 選用；API 有 subscription/payments 端點，實際串接待實作 |
 
 ---
@@ -33,9 +33,10 @@
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 匿名金鑰（前端 + 服務端 session） | server/client/createClient |
 | `SUPABASE_SERVICE_ROLE_KEY` | 服務角色（webhook、後台、跨租戶） | `lib/supabase.ts` getSupabaseAdmin |
 | `OPENAI_API_KEY` | OpenAI API | `lib/openai.ts`, health-check |
-| `LINE_CHANNEL_SECRET` | LINE Webhook 簽章驗證 | `lib/line.ts` validateSignature |
-| `LINE_CHANNEL_ACCESS_TOKEN` | LINE 回覆訊息 | `lib/line.ts` getLineClient |
-| `LINE_OWNER_USER_ID` | Webhook 對應的「業主」user id（單一 LINE Channel） | `app/api/webhook/line/route.ts` |
+| `LINE_CHANNEL_SECRET` | LINE Webhook 簽章驗證（legacy 單 bot） | `lib/line.ts` validateSignature |
+| `LINE_CHANNEL_ACCESS_TOKEN` | LINE 回覆訊息（legacy 單 bot） | `lib/line.ts` getLineClient |
+| `LINE_OWNER_USER_ID` | Webhook 對應的「業主」user id（legacy 單 bot） | `app/api/webhook/line/route.ts` |
+| `LINE_BOT_ENCRYPTION_KEY` | multi-bot 模式：`line_bots` 表的 channel secret/token 加密金鑰（AES-256） | `lib/encrypt.ts` |
 
 ### 選填 / 功能開關
 
@@ -43,8 +44,9 @@
 |------|------|------|
 | `OPENAI_TIMEOUT_MS` | OpenAI 請求超時 | 預設 30000 |
 | `OPENAI_MAX_RETRIES` | 重試次數 | 預設 2 |
-| `UPSTASH_REDIS_REST_URL` | Redis（rate limit、冪等、快取） | 無則記憶體 fallback |
+| `UPSTASH_REDIS_REST_URL` | Redis（rate limit、冪等、快取） | **本機選用**；**multi-bot production 必填**（多 instance 下無 Redis 冪等僅限單機） |
 | `UPSTASH_REDIS_REST_TOKEN` | Redis 認證 | 同上 |
+| `LINE_WEBHOOK_LEGACY_ENABLED` | 重新啟用 legacy webhook `/api/webhook/line` | 預設空（production 回 410）；設 `true` 可重新啟用（短期過渡） |
 | `LINE_LOGIN_CHANNEL_ID` / `LINE_LOGIN_CHANNEL_SECRET` | LINE Login（綁定帳號） | `/api/auth/line` |
 | `NEXT_PUBLIC_APP_URL` | 站點 URL（OAuth callback、sitemap、robots） | 預設 https://www.customeraipro.com |
 | `HEALTHCHECK_CRON_SECRET` | 健康檢查 cron 驗證 | Vercel cron 呼叫 `/api/health-check` |
@@ -128,7 +130,7 @@ flowchart LR
 ## 6.4 待修復問題清單
 
 - [ ] **無 CI/CD**（中）：無 `.github/workflows`，無自動 lint/test/deploy。建議新增 workflow 跑 `type-check`、`lint`、`playwright test`（可僅在 PR 跑）。
-- [ ] **LINE 多租戶**（低）：目前 webhook 使用全域 `LINE_CHANNEL_SECRET` / `LINE_CHANNEL_ACCESS_TOKEN` 與單一 `LINE_OWNER_USER_ID`。若未來要「每用戶自己的 LINE Channel」，需改為依 `destination` 或 body 查 `users` 表取對應 channel 設定再驗證/回覆。
+- [x] **LINE 多租戶**（已實作）：multi-bot 模式支援每用戶自己的 LINE Channel；channel secret/token 加密存於 `line_bots` 表，webhook URL 為 `/api/webhook/line/{botId}/{webhookKey}`。legacy endpoint `/api/webhook/line` 在 production 預設 410 Gone，可設 `LINE_WEBHOOK_LEGACY_ENABLED=true` 重新啟用（舊版單 bot 過渡用）。
 - [ ] **Supabase 型別未生成**（低）：專案無 `types/database.types.ts` 或 `supabase gen types` 產物，表結構僅在 migrations 與程式內散落。建議定期執行 `supabase gen types typescript` 並寫入 repo，以利型別安全。
 - [ ] **.env.example 與實際使用對照**（低）：`LINE_LOGIN_CHANNEL_SECRET` 在 .env.example 為 `LINE_LOGIN_CHANNEL_SECRET`，程式使用相同名稱；`LINE_CHANNEL_SECRET` 在 .env.example 為 `LINE_CHANNEL_SECRET`，與 `lib/line.ts` 一致。已涵蓋主要變數；若有新增 env 請同步更新 .env.example。
 - [ ] **無 CORS 設定**（低）：API 未回傳 `Access-Control-*` headers；若未來需從其他 domain 的 SPA 呼叫 API，需在對應 route 或 middleware 加上 CORS。
