@@ -11,7 +11,7 @@
 | **GitHub** | 程式碼來源 | Repo：`mason113074-cyber/chat`，主要分支 `main`。 |
 | **Vercel** | 部署與託管 | 連線上述 GitHub repo，push `main` 即觸發 build + 部署。正式網址：www.customeraipro.com。 |
 | **Supabase** | 資料庫與認證 | 專案建立於 Supabase，URL/Key 在 **Vercel 與本地** 都要設（見下方變數表）。 |
-| **Upstash Redis** | 冪等／限流／快取 | 選用。未設定時使用記憶體 fallback（單實例可運作；多實例建議必設）。 |
+| **Upstash Redis** | 冪等／限流／快取 | **本機開發選用**；未設定時使用記憶體 fallback（單 instance 可運作；多 instance 建議必設）。**multi-bot production 必填**。 |
 
 **邏輯流程**：程式碼在 GitHub → Vercel 從 GitHub 拉 main 建置並部署 → 建置／執行時讀取 Vercel 上的環境變數 → 後端連線 Supabase（必備）與 Upstash Redis（選用）。
 
@@ -42,8 +42,9 @@
 | **站點（callback）** | `NEXT_PUBLIC_APP_URL` | 用 LINE 登入時 | 正式站請設為 https://www.customeraipro.com（OAuth callback 與登入後導向用） |
 | **OpenAI** | `OPENAI_API_KEY` | ✅ | AI 回覆 |
 | | `OPENAI_MONTHLY_BUDGET`、`OPENAI_TIMEOUT_MS` 等 | 選用 | 見 .env.example |
-| **Upstash Redis** | `UPSTASH_REDIS_REST_URL` | 選用 | 未設則記憶體 fallback |
-| | `UPSTASH_REDIS_REST_TOKEN` | 選用 | 同上 |
+| **Upstash Redis** | `UPSTASH_REDIS_REST_URL` | **multi-bot production 必填** | **本機開發選用**；multi-bot production 必填（多 instance 下無 Redis 冪等僅限單機，系統輸出警告） |
+| | `UPSTASH_REDIS_REST_TOKEN` | 同上 | 同上 |
+| **LINE Webhook** | `LINE_WEBHOOK_LEGACY_ENABLED` | 選用 | 預設空（production 回 **410 Gone**）；設 `true` 可重新啟用 legacy `/api/webhook/line`（僅短期過渡用） |
 | **站點** | `NEXT_PUBLIC_SITE_URL` | 建議 | 正式站設為 https://www.customeraipro.com |
 | **Cron** | `HEALTHCHECK_CRON_SECRET` | 選用 | 健康檢查 cron 驗證 secret |
 | | `WEBHOOK_CLEANUP_CRON_SECRET` | 建議 | Webhook 事件清理 cron 驗證 secret（見下方說明） |
@@ -56,10 +57,23 @@
 ## 4. Redis（Upstash）
 
 - **程式**：`lib/cache.ts`、`lib/idempotency.ts`、`lib/rate-limit.ts` 讀取 **`UPSTASH_REDIS_REST_URL`**、**`UPSTASH_REDIS_REST_TOKEN`**。  
-- **用途**：冪等、rate limit、快取；未設定時使用記憶體 fallback。  
+- **用途**：冪等、rate limit、快取；未設定時使用記憶體 fallback（單 instance 可運作）。  
+- **multi-bot production 必填**：Vercel 多 instance 部署下，未設定 Upstash 將導致跨 instance 的冪等與 rate limit 失效。系統會在 Vercel Functions log 輸出 `[LINE webhook] Upstash Redis is not configured` 警告。  
 - **設定處**：.env.example 有註解範例；Vercel 後台手動新增或透過 Upstash 整合；本機在 .env.local。  
 
 > 專案**僅使用 Upstash Redis** 與上述兩個變數，沒有使用 Vercel KV 或 `KV_REST_API_*`。
+
+---
+
+## 4.1 LINE Webhook
+
+- **multi-bot（正式 URL）**：`/api/webhook/line/{botId}/{webhookKey}`  
+  - `botId`：`line_bots` 表的 UUID；`webhookKey`：建立 bot 時產生的 webhook key。  
+  - Channel secret / access token 加密存於 DB（需設定 `LINE_BOT_ENCRYPTION_KEY`）。  
+- **legacy endpoint** `/api/webhook/line`：  
+  - 在 **production 預設回傳 410 Gone**（避免新人誤用舊設定）。  
+  - 設定 `LINE_WEBHOOK_LEGACY_ENABLED=true` 可重新啟用（僅供舊版單 bot 短期過渡）。  
+  - 本機開發（`NODE_ENV !== production`）不受影響，仍正常運作。  
 
 ---
 
