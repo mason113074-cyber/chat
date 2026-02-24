@@ -35,3 +35,5 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
