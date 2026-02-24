@@ -11,6 +11,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const start = Date.now();
   const requestId = `line-bot-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
+  // Production guard: Upstash Redis is required for multi-bot to ensure cross-instance
+  // idempotency and rate limiting. Log an error so it surfaces in monitoring.
+  if (
+    process.env.NODE_ENV === 'production' &&
+    (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN)
+  ) {
+    console.error(
+      '[LINE webhook] Upstash Redis is not configured. ' +
+        'Multi-bot production requires UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN ' +
+        'for cross-instance idempotency and rate limiting. Falling back to in-memory store ' +
+        '(NOT safe for multi-instance deployments).',
+      { requestId }
+    );
+  }
+
   try {
     const { botId, webhookKey } = await params;
     if (!botId || !webhookKey) {

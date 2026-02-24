@@ -96,6 +96,21 @@ function applyReplyGuardrail(reply: string): { safeReply: string; guardrailTrigg
 }
 
 export async function POST(request: NextRequest) {
+  // Legacy webhook: disabled in production unless LINE_WEBHOOK_LEGACY_ENABLED=true
+  if (
+    process.env.NODE_ENV === 'production' &&
+    process.env.LINE_WEBHOOK_LEGACY_ENABLED !== 'true'
+  ) {
+    return NextResponse.json(
+      {
+        error: 'Gone',
+        message:
+          'This legacy webhook endpoint is disabled in production. Use /api/webhook/line/{botId}/{webhookKey} instead. Set LINE_WEBHOOK_LEGACY_ENABLED=true to re-enable.',
+      },
+      { status: 410 }
+    );
+  }
+
   const start = Date.now();
   const requestId = `line-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
