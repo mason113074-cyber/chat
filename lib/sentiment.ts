@@ -1,7 +1,24 @@
 import OpenAI from 'openai';
 import { getSupabaseAdmin } from './supabase';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+let sentimentOpenAI: OpenAI | null = null;
+let hasWarnedMissingOpenAIKey = false;
+
+function getSentimentOpenAI(): OpenAI | null {
+  if (sentimentOpenAI) return sentimentOpenAI;
+
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    if (!hasWarnedMissingOpenAIKey) {
+      console.warn('[sentiment] OPENAI_API_KEY is missing, skip sentiment analysis.');
+      hasWarnedMissingOpenAIKey = true;
+    }
+    return null;
+  }
+
+  sentimentOpenAI = new OpenAI({ apiKey });
+  return sentimentOpenAI;
+}
 
 export type SentimentResult = {
   sentiment: 'positive' | 'neutral' | 'negative' | 'urgent';
@@ -13,6 +30,9 @@ export type SentimentResult = {
 
 export async function analyzeSentiment(text: string): Promise<SentimentResult | null> {
   try {
+    const openai = getSentimentOpenAI();
+    if (!openai) return null;
+
     const res = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [

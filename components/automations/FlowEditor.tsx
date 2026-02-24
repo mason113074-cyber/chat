@@ -73,7 +73,9 @@ export const FlowEditor = forwardRef<FlowEditorHandle, FlowEditorProps>(function
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
+  // eslint-disable-next-line react-hooks/refs
   nodesRef.current = nodes;
+  // eslint-disable-next-line react-hooks/refs
   edgesRef.current = edges;
 
   useImperativeHandle(ref, () => ({

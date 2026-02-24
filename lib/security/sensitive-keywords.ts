@@ -105,3 +105,31 @@ export function detectSensitiveKeywords(
     riskLevel,
   };
 }
+
+/** 退費/退貨類關鍵字（結構化請求判斷用） */
+const REFUND_RETURN_KEYWORDS = [
+  '退款',
+  '退錢',
+  '退貨',
+  '退換貨',
+  '換貨',
+  '取消訂單',
+];
+
+/** 訂單/識別類關鍵字（結構化請求判斷用） */
+const ORDER_CONTEXT_KEYWORDS = ['訂單', '訂單編號', '編號', 'order'];
+
+/**
+ * 判斷是否為「結構化退費/退貨請求」：同時包含退費關鍵字與訂單/編號語境。
+ * 此類訊息放行走 KB + 決策（可產 SUGGEST 草稿），仍受輸出 guardrail 與決策層約束。
+ */
+export function isStructuredRefundOrReturnRequest(text: string): boolean {
+  const normalized = text.toLowerCase().trim();
+  const hasRefundReturn = REFUND_RETURN_KEYWORDS.some((kw) =>
+    normalized.includes(kw.toLowerCase())
+  );
+  const hasOrderContext = ORDER_CONTEXT_KEYWORDS.some((kw) =>
+    normalized.includes(kw.toLowerCase())
+  );
+  return hasRefundReturn && hasOrderContext;
+}
