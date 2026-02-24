@@ -7,6 +7,13 @@
 
 ---
 
+## 如何把本頁放到 Notion
+
+1. **複製貼上**：在編輯器打開本檔案 → 全選（Ctrl+A）→ 複製（Ctrl+C）→ 在 Notion 新增一個 Page → 貼上（Ctrl+V）。標題、表格、列表會保留。
+2. **匯入 Markdown**：Notion 左側選 **Import** → **Markdown & CSV** → 選擇本專案的 `docs/NOTION_SYNC.md` 匯入。
+
+---
+
 ## 一、專案概述（由上而下）
 
 | 項目 | 說明 |
@@ -168,7 +175,9 @@ chat/
 | Knowledge Base 頁面 | ✅ 已拆分元件（Phase 1+2）：Stats、Toolbar、List、TestPanel、GapAnalysis、AddEditModal、ImportModal、UrlImportModal |
 | Settings 頁面 | ✅ 已拆分：General、Integrations、Personality、Behavior、Experience、Optimize、LINE Modal、Live Preview |
 | ai_suggestions schema | ⚠️ 以 029_multibot 為準；若 DB 曾跑舊版需 forward-only migration 收斂 |
-| WorkflowEngine 回覆 | ⚠️ 目前使用全域 LINE client，多 bot 觸發時回覆可能走錯頻道，待改為傳入 credentials |
+| WorkflowEngine 回覆 | ✅ 已支援傳入 credentials，多 bot 觸發時回覆走該 bot 憑證 |
+| 安全性修復（P0/P1/P2） | ✅ 已完成（/api/chat 需驗證、idempotency+botId、KB 搜尋限制 200 筆、加密驗證、回覆延遲上限等） |
+| Guardrail 退錢+訂單 | ✅ 已放行結構化退費請求（退錢/退款+訂單語境可走 KB+SUGGEST 產 draft） |
 | 測試 | 單元：reply-decision、knowledge-search-tokenize、StatusBadge、StatCard、TestDashboard；E2E：auth、smoke、full-flow-production、automations 等；缺口：webhook 整合、多 bot 路徑、Guardrail 邊界 |
 
 ---
@@ -220,6 +229,30 @@ chat/
 | .cursor/rules/project-context.mdc | 產品、技術、API、方案限制（alwaysApply） |
 | .cursor/rules/ai-copilot-policy.mdc | AI 副駕工程規則（alwaysApply） |
 | .cursor/rules/github-and-notion-workflow.mdc | 完成任務後 GitHub + Notion 同步流程 |
+| scripts/notion-insert-row.ts | 以自然語言屬性插入 Notion 資料庫一列（屬性名稱匹配與驗證） |
+
+### 指令列：插入 Notion 資料庫一列
+
+使用 `scripts/notion-insert-row.ts` 可依「自然語言」屬性名稱插入一筆資料庫列，會自動匹配屬性名稱（不區分大小寫、去空白）並依類型驗證與轉換：
+
+```bash
+# 需先設定 NOTION_API_KEY（.env.local 或環境變數）
+npx tsx scripts/notion-insert-row.ts "<database_id 或 Notion 資料庫 URL>" "Title=我的標題" "Status=Done"
+# 或 JSON
+npx tsx scripts/notion-insert-row.ts "<database_id>" '{"Title":"我的標題","Status":"Done"}'
+```
+
+支援類型：title、rich_text、number、select、multi_select、date、checkbox、url、email、phone_number。
+
+---
+
+## 十、Notion Second Brain Hub
+
+- **主索引頁**：[🧠 CustomerAI Pro — Second Brain Hub](https://www.notion.so/310de94875b581a1b80ef8f44e7e3606)
+- **開發日記資料庫**：📓 Cursor AI Dev Diary（DB ID: `3dcdf229ea164a9b90c24789c31f4de1`）
+  - 欄位：Title / Date / Sprint / Task / Status / Commit / Notes / Created
+  - 已記錄：Settings Phase 2 ✅、KB Phase 1 ✅
+- **同步規則**：每完成一個 Cursor AI 工作階段，寫一筆日記到此資料庫。
 
 ---
 
