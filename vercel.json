@@ -1,6 +1,12 @@
 {
   "crons": [
-    { "path": "/api/health-check", "schedule": "*/15 * * * *" },
-    { "path": "/api/internal/webhook-events/drain", "schedule": "* * * * *" }
+    {
+      "path": "/api/health-check",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-webhook-events",
+      "schedule": "0 3 * * *"
+    }
   ]
 }

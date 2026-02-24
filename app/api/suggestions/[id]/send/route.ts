@@ -3,8 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getSupabaseAdmin } from '@/lib/supabase';
 import { pushMessage } from '@/lib/line';
 import { insertConversationMessage } from '@/lib/supabase';
-import { decrypt as decryptEnvelope } from '@/lib/crypto/envelope';
-import { decrypt as legacyDecrypt } from '@/lib/encrypt';
+import { decrypt } from '@/lib/encrypt';
 
 type RouteParams = { params: Promise<{ id: string }> };
 
@@ -21,8 +20,24 @@ export async function POST(_request: Request, { params }: RouteParams) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const { data: suggestion, error: sugError } = await supabase
+      .from('ai_suggestions')
+      .select('id, contact_id, user_id, bot_id, suggested_reply, status, expires_at')
+      .eq('id', suggestionId)
+      .maybeSingle();
+
+    if (sugError || !suggestion) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+    if (suggestion.user_id !== user.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+    if (new Date(suggestion.expires_at) <= new Date()) {
+      return NextResponse.json({ error: 'Suggestion expired' }, { status: 400 });
+    }
+
     const admin = getSupabaseAdmin();
-    const { data: suggestion, error: lockErr } = await admin
+    const { data: updatedRow, error: updateErr } = await admin
       .from('ai_suggestions')
       .update({
         status: 'sent',
@@ -30,14 +45,15 @@ export async function POST(_request: Request, { params }: RouteParams) {
         sent_by: user.id,
       })
       .eq('id', suggestionId)
-      .eq('user_id', user.id)
       .eq('status', 'draft')
-      .gt('expires_at', new Date().toISOString())
-      .select('id, contact_id, user_id, bot_id, suggested_reply')
+      .select('id')
       .maybeSingle();
 
-    if (lockErr || !suggestion) {
-      return NextResponse.json({ error: 'Not found or already sent' }, { status: 404 });
+    if (updateErr || !updatedRow) {
+      return NextResponse.json(
+        { error: 'Suggestion already sent or not found' },
+        { status: 400 }
+      );
     }
 
     const { data: contact } = await supabase
@@ -50,7 +66,7 @@ export async function POST(_request: Request, { params }: RouteParams) {
 
     const { data: bot } = await admin
       .from('line_bots')
-      .select('encrypted_channel_access_token, encryption_version')
+      .select('encrypted_channel_access_token')
       .eq('id', suggestion.bot_id)
       .eq('user_id', user.id)
       .maybeSingle();
@@ -58,15 +74,10 @@ export async function POST(_request: Request, { params }: RouteParams) {
 
     let channelAccessToken: string;
     try {
-      const version = Number(bot.encryption_version) || 1;
-      channelAccessToken = decryptEnvelope(bot.encrypted_channel_access_token, version);
-    } catch {
-      try {
-        channelAccessToken = legacyDecrypt(bot.encrypted_channel_access_token);
-      } catch (e) {
-        console.error('POST /api/suggestions/[id]/send decrypt error:', e);
-        return NextResponse.json({ error: 'Configuration error' }, { status: 500 });
-      }
+      channelAccessToken = decrypt(bot.encrypted_channel_access_token);
+    } catch (e) {
+      console.error('POST /api/suggestions/[id]/send decrypt error:', e);
+      return NextResponse.json({ error: 'Configuration error' }, { status: 500 });
     }
 
     await pushMessage(

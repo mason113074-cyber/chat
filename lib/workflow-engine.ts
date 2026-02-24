@@ -2,8 +2,7 @@
  * Workflow Engine — 自動化工作流程執行引擎
  * 從觸發節點開始，依 nodes/edges 依序執行節點邏輯
  */
-import OpenAI from 'openai';
-import { replyMessage } from './line';
+import { replyMessage, type LineCredentials } from './line';
 import { getSupabaseAdmin, insertConversationMessage } from './supabase';
 import { isWithinBusinessHours } from './business-hours';
 import { searchKnowledgeWithSources } from './knowledge-search';
@@ -55,6 +54,10 @@ export interface ExecutionContext {
   variables: Record<string, unknown>;
   /** 若為 true，不發送 LINE 訊息、不寫入 conversations/contacts（測試用） */
   dryRun?: boolean;
+  /** 多 bot：該事件所屬 bot 的憑證；未設則使用全域 env */
+  credentials?: LineCredentials;
+  /** 多 bot：該事件所屬 bot id（稽核/冪等用） */
+  botId?: string;
 }
 
 export interface ExecutedNodeRecord {
@@ -115,21 +118,11 @@ function checkTrigger(
 
 async function executeAINode(
   node: WorkflowNode,
-  ctx: ExecutionContext,
-  openai: OpenAI
+  ctx: ExecutionContext
 ): Promise<unknown> {
   const subType = node.data?.subType ?? 'sentiment';
-  let systemPrompt = '';
-  if (subType === 'sentiment') {
-    systemPrompt =
-      '分析以下客戶訊息的情緒，只回覆 positive、neutral 或 negative 其中之一。';
-  } else if (subType === 'intent') {
-    systemPrompt =
-      '分析以下客戶訊息的意圖，只回覆以下其中一個：inquiry（詢價）、aftersales（售後）、complaint（投訴）、general（一般諮詢）。';
-  } else if (subType === 'language') {
-    systemPrompt =
-      '偵測以下訊息的語言，只回覆語言代碼，如 zh-TW、en、ja。';
-  } else if (subType === 'reply') {
+
+  if (subType === 'reply') {
     const { text } = await searchKnowledgeWithSources(
       ctx.ownerUserId,
       ctx.message,
@@ -152,26 +145,39 @@ async function executeAINode(
     );
     ctx.variables.ai_reply = reply;
     return reply;
-  } else {
+  }
+
+  if (subType !== 'sentiment' && subType !== 'intent' && subType !== 'language') {
     return ctx.variables[node.data?.field as string];
   }
 
-  const completion = await openai.chat.completions.create({
-    model: ctx.aiModel ?? 'gpt-4o-mini',
-    messages: [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: ctx.message },
-    ],
-    max_tokens: 20,
-    temperature: 0,
-  });
-  const result = (
-    completion.choices?.[0]?.message?.content ?? ''
-  ).trim().toLowerCase();
-  if (subType === 'sentiment') ctx.variables.sentiment = result;
-  if (subType === 'intent') ctx.variables.intent = result;
-  if (subType === 'language') ctx.variables.language = result;
-  return result;
+  let systemPrompt = '';
+  if (subType === 'sentiment') {
+    systemPrompt =
+      '分析以下客戶訊息的情緒，只回覆 positive、neutral 或 negative 其中之一。';
+  } else if (subType === 'intent') {
+    systemPrompt =
+      '分析以下客戶訊息的意圖，只回覆以下其中一個：inquiry（詢價）、aftersales（售後）、complaint（投訴）、general（一般諮詢）。';
+  } else {
+    systemPrompt =
+      '偵測以下訊息的語言，只回覆語言代碼，如 zh-TW、en、ja。';
+  }
+
+  const result = await generateReply(
+    ctx.message,
+    systemPrompt,
+    ctx.aiModel ?? 'gpt-4o-mini',
+    ctx.ownerUserId,
+    ctx.contactId,
+    [],
+    { maxReplyLength: 20, replyTemperature: 0 }
+  );
+
+  const trimmed = result.trim().toLowerCase();
+  if (subType === 'sentiment') ctx.variables.sentiment = trimmed;
+  if (subType === 'intent') ctx.variables.intent = trimmed;
+  if (subType === 'language') ctx.variables.language = trimmed;
+  return trimmed;
 }
 
 function evaluateCondition(
@@ -205,10 +211,11 @@ async function executeActionNode(
       await replyMessage(
         ctx.replyToken,
         actionMessage,
-        buttons.map((b) => ({ label: b.label, text: b.value }))
+        buttons.map((b) => ({ label: b.label, text: b.value })),
+        ctx.credentials
       );
     } else {
-      await replyMessage(ctx.replyToken, actionMessage);
+      await replyMessage(ctx.replyToken, actionMessage, undefined, ctx.credentials);
     }
     if (!ctx.dryRun && ctx.contactId) {
       await insertConversationMessage(ctx.contactId, actionMessage, 'assistant', {
@@ -248,24 +255,12 @@ async function executeRoutingNode(
       resolved_by: 'unresolved',
       is_resolved: false,
     });
-    await replyMessage(ctx.replyToken, handoffMsg);
+    await replyMessage(ctx.replyToken, handoffMsg, undefined, ctx.credentials);
   }
 }
 
 async function executeEndNode(): Promise<void> {
   // 結束節點：可在此標記 conversation resolved 等
-}
-
-let openaiInstance: OpenAI | null = null;
-
-function getOpenAI(): OpenAI {
-  if (!openaiInstance) {
-    if (!process.env.OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY is not set');
-    }
-    openaiInstance = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  }
-  return openaiInstance;
 }
 
 export class WorkflowEngine {
@@ -275,7 +270,6 @@ export class WorkflowEngine {
   ): Promise<ExecutionResult> {
     const { nodes, edges } = workflow;
     const executed: ExecutedNodeRecord[] = [];
-    const openai = getOpenAI();
 
     const triggerNodes = findTriggerNodes(nodes, edges);
     if (triggerNodes.length === 0) {
@@ -304,7 +298,7 @@ export class WorkflowEngine {
           if (!checkTrigger(node, ctx)) continue;
           executed.push({ nodeId, type: 'trigger', subType: node.data?.subType });
         } else if (node.type === 'ai') {
-          const output = await executeAINode(node, ctx, openai);
+          const output = await executeAINode(node, ctx);
           executed.push({
             nodeId,
             type: 'ai',

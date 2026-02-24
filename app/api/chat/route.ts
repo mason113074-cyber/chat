@@ -33,29 +33,32 @@ export async function POST(request: NextRequest) {
 
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    let systemPrompt: string | null = null;
-    let aiModel: string | null = null;
 
-    if (user) {
-      const { limit, used } = await getConversationUsageForUser(supabase, user.id);
-      if (limit !== -1 && used >= limit) {
-        return NextResponse.json(
-          { error: '已達到本月對話上限，請升級方案' },
-          { status: 402 }
-        );
-      }
-
-      const { data } = await supabase
-        .from('users')
-        .select('system_prompt, ai_model')
-        .eq('id', user.id)
-        .maybeSingle();
-      systemPrompt = data?.system_prompt ?? null;
-      aiModel = data?.ai_model ?? null;
-
-      const knowledgeText = await searchKnowledgeForUser(user.id, message, 3, 2000);
-      systemPrompt = (systemPrompt?.trim() ?? '') + (knowledgeText ? KNOWLEDGE_PREFIX + knowledgeText : KNOWLEDGE_EMPTY_INSTRUCTION);
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
     }
+
+    const { limit, used } = await getConversationUsageForUser(supabase, user.id);
+    if (limit !== -1 && used >= limit) {
+      return NextResponse.json(
+        { error: '已達到本月對話上限，請升級方案' },
+        { status: 402 }
+      );
+    }
+
+    const { data } = await supabase
+      .from('users')
+      .select('system_prompt, ai_model')
+      .eq('id', user.id)
+      .maybeSingle();
+    let systemPrompt: string | null = data?.system_prompt ?? null;
+    let aiModel: string | null = data?.ai_model ?? null;
+
+    const knowledgeText = await searchKnowledgeForUser(user.id, message, 3, 2000);
+    systemPrompt = (systemPrompt?.trim() ?? '') + (knowledgeText ? KNOWLEDGE_PREFIX + knowledgeText : KNOWLEDGE_EMPTY_INSTRUCTION);
 
     const content = await generateReply(message, systemPrompt, aiModel);
     return NextResponse.json({ content });

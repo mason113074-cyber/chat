@@ -2,7 +2,7 @@
 
 import { Link } from '@/i18n/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 
 const COLOR_CLASS: Record<string, string> = {
@@ -42,6 +42,24 @@ type Conversation = {
   status?: string | null;
 };
 
+type SuggestionSources =
+  | { count?: number; titles?: string[]; items?: unknown[] }
+  | unknown[]
+  | null;
+
+type AiSuggestion = {
+  id: string;
+  source_message_id: string | null;
+  draft_text: string;
+  action: 'AUTO' | 'SUGGEST' | 'ASK' | 'HANDOFF';
+  category: string;
+  confidence: number;
+  reason: string | null;
+  sources: SuggestionSources;
+  status: 'pending' | 'approved' | 'sent';
+  created_at: string;
+};
+
 export default function ConversationDetailPage() {
   const params = useParams();
   const contactId = params.contactId as string;
@@ -56,7 +74,50 @@ export default function ConversationDetailPage() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [noteInput, setNoteInput] = useState('');
   const [noteSaving, setNoteSaving] = useState(false);
+  const [suggestions, setSuggestions] = useState<AiSuggestion[]>([]);
+  const [suggestionDrafts, setSuggestionDrafts] = useState<Record<string, string>>({});
+  const [suggestionLoading, setSuggestionLoading] = useState(false);
+  const [suggestionSendingId, setSuggestionSendingId] = useState<string | null>(null);
+  const [suggestionDeletingId, setSuggestionDeletingId] = useState<string | null>(null);
+  const [suggestionError, setSuggestionError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  function getSourcesCount(sources: SuggestionSources): number {
+    if (!sources) return 0;
+    if (Array.isArray(sources)) return sources.length;
+    if (typeof sources === 'object' && 'count' in sources) {
+      const count = (sources as { count?: unknown }).count;
+      return typeof count === 'number' ? count : 0;
+    }
+    return 0;
+  }
+
+  const loadSuggestions = useCallback(async () => {
+    if (!contactId) return;
+    setSuggestionLoading(true);
+    setSuggestionError(null);
+    try {
+      const res = await fetch(`/api/conversations/${contactId}/suggestions?status=pending`);
+      if (!res.ok) {
+        setSuggestionError('無法取得 AI 建議回覆');
+        return;
+      }
+      const json = await res.json();
+      const list = Array.isArray(json.suggestions) ? (json.suggestions as AiSuggestion[]) : [];
+      setSuggestions(list);
+      setSuggestionDrafts((prev) => {
+        const next: Record<string, string> = {};
+        for (const item of list) {
+          next[item.id] = prev[item.id] ?? item.draft_text;
+        }
+        return next;
+      });
+    } catch {
+      setSuggestionError('無法取得 AI 建議回覆');
+    } finally {
+      setSuggestionLoading(false);
+    }
+  }, [contactId]);
 
   useEffect(() => {
     if (!contactId) {
@@ -92,6 +153,8 @@ export default function ConversationDetailPage() {
         setNotes(notesJson.notes ?? []);
       }
 
+      await loadSuggestions();
+
       const { data: conversationsData } = await supabase
         .from('conversations')
         .select('id, message, role, created_at, status')
@@ -111,7 +174,7 @@ export default function ConversationDetailPage() {
     };
 
     loadData();
-  }, [contactId]);
+  }, [contactId, loadSuggestions]);
 
   // 自動捲動到最新訊息
   useEffect(() => {
@@ -208,6 +271,67 @@ export default function ConversationDetailPage() {
       if (res.ok) setConversationStatus(newStatus);
     } finally {
       setStatusSaving(false);
+    }
+  }
+
+  async function sendSuggestion(suggestion: AiSuggestion, useEditedDraft: boolean) {
+    const edited = (suggestionDrafts[suggestion.id] ?? '').trim();
+    const original = suggestion.draft_text.trim();
+    const message = useEditedDraft ? edited : original;
+    if (!message) return;
+
+    setSuggestionSendingId(suggestion.id);
+    setSuggestionError(null);
+    try {
+      const res = await fetch(`/api/conversations/${contactId}/reply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, suggestionId: suggestion.id }),
+      });
+      if (!res.ok) {
+        setSuggestionError('送出建議回覆失敗');
+        return;
+      }
+      const json = await res.json().catch(() => ({}));
+      const inserted = json.item as Conversation | undefined;
+      if (inserted) {
+        setConversations((prev) => [...prev, inserted]);
+      }
+      setConversationStatus('needs_human');
+      setSuggestions((prev) => prev.filter((item) => item.id !== suggestion.id));
+      setSuggestionDrafts((prev) => {
+        const next = { ...prev };
+        delete next[suggestion.id];
+        return next;
+      });
+    } catch {
+      setSuggestionError('送出建議回覆失敗');
+    } finally {
+      setSuggestionSendingId(null);
+    }
+  }
+
+  async function deleteSuggestion(suggestionId: string) {
+    setSuggestionDeletingId(suggestionId);
+    setSuggestionError(null);
+    try {
+      const res = await fetch(`/api/conversations/${contactId}/suggestions/${suggestionId}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        setSuggestionError('刪除建議失敗');
+        return;
+      }
+      setSuggestions((prev) => prev.filter((item) => item.id !== suggestionId));
+      setSuggestionDrafts((prev) => {
+        const next = { ...prev };
+        delete next[suggestionId];
+        return next;
+      });
+    } catch {
+      setSuggestionError('刪除建議失敗');
+    } finally {
+      setSuggestionDeletingId(null);
     }
   }
 
@@ -378,6 +502,99 @@ export default function ConversationDetailPage() {
             重新開啟
           </button>
         </div>
+      </div>
+
+      {/* AI 建議回覆 */}
+      <div className="bg-white border-b border-gray-200 p-4">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-medium text-gray-700">AI 建議回覆</h3>
+            <p className="text-xs text-gray-500">草稿會先待人工確認，不會自動送給客戶</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void loadSuggestions()}
+            disabled={suggestionLoading}
+            className="rounded border border-gray-300 px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            重新整理
+          </button>
+        </div>
+
+        {suggestionError && (
+          <p className="mb-2 rounded bg-red-50 px-2 py-1 text-xs text-red-700">{suggestionError}</p>
+        )}
+
+        {suggestionLoading ? (
+          <p className="text-xs text-gray-500">載入建議中...</p>
+        ) : suggestions.length === 0 ? (
+          <p className="text-xs text-gray-500">目前沒有待處理的 AI 建議。</p>
+        ) : (
+          <div className="space-y-3">
+            {suggestions.map((suggestion) => {
+              const sourceCount = getSourcesCount(suggestion.sources);
+              const confidence = Number(suggestion.confidence ?? 0);
+              const confidenceText = Number.isFinite(confidence)
+                ? `${Math.round(confidence * 100)}%`
+                : '—';
+              const editedDraft = suggestionDrafts[suggestion.id] ?? suggestion.draft_text;
+              const isSending = suggestionSendingId === suggestion.id;
+              const isDeleting = suggestionDeletingId === suggestion.id;
+
+              return (
+                <div key={suggestion.id} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+                    <span className="rounded bg-indigo-100 px-2 py-0.5 text-indigo-700">
+                      {suggestion.action}
+                    </span>
+                    <span className="rounded bg-gray-200 px-2 py-0.5 text-gray-700">
+                      類別：{suggestion.category || 'general'}
+                    </span>
+                    <span className="text-gray-600">信心：{confidenceText}</span>
+                    <span className="text-gray-600">來源：{sourceCount}</span>
+                  </div>
+                  <p className="mb-2 text-xs text-gray-600">
+                    原因：{suggestion.reason?.trim() || '信心不足或涉及高風險，需人工確認'}
+                  </p>
+                  <textarea
+                    value={editedDraft}
+                    onChange={(e) =>
+                      setSuggestionDrafts((prev) => ({ ...prev, [suggestion.id]: e.target.value }))
+                    }
+                    rows={4}
+                    className="mb-2 w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void sendSuggestion(suggestion, false)}
+                      disabled={isSending || isDeleting}
+                      className="rounded bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                      {isSending ? '送出中...' : '一鍵送出'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void sendSuggestion(suggestion, true)}
+                      disabled={isSending || isDeleting || !editedDraft.trim()}
+                      className="rounded bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      編輯後送出
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void deleteSuggestion(suggestion.id)}
+                      disabled={isSending || isDeleting}
+                      className="rounded bg-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-300 disabled:opacity-50"
+                    >
+                      {isDeleting ? '刪除中...' : '忽略 / 刪除建議'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Conversation messages */}

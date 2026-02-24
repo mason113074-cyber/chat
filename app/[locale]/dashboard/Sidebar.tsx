@@ -49,18 +49,16 @@ export function Sidebar({ userEmail, expanded: controlledExpanded, onExpandedCha
   const pathname = usePathname();
   const t = useTranslations('nav');
   const tCommon = useTranslations('common');
-  const [internalExpanded, setInternalExpanded] = useState(true);
+  const [internalExpanded, setInternalExpanded] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    const stored = localStorage.getItem(SIDEBAR_STORAGE_KEY);
+    return stored !== null ? stored === 'true' : true;
+  });
   const expanded = controlledExpanded ?? internalExpanded;
   const setExpanded = onExpandedChange ?? setInternalExpanded;
   const [mobileOpen, setMobileOpen] = useState(false);
   const [needsHumanCount, setNeedsHumanCount] = useState(0);
   const prevCountRef = useRef(0);
-
-  useEffect(() => {
-    if (onExpandedChange) return;
-    const stored = typeof window !== 'undefined' ? localStorage.getItem(SIDEBAR_STORAGE_KEY) : null;
-    if (stored !== null) setInternalExpanded(stored === 'true');
-  }, [onExpandedChange]);
 
   useEffect(() => {
     const fn = async () => {
