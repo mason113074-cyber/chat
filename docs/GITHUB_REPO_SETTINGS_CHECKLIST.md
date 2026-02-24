@@ -47,6 +47,11 @@ Save with **Create** or **Save changes**.
 - [ ] **Secret scanning** — **Enabled** if available for your plan (scans for leaked secrets)
 - [ ] **Push protection** (for secret scanning) — **Enabled** if you want to block pushes that contain known secrets
 
+**Workflow-related (optional):**
+
+- **Dependency Review** (`.github/workflows/dependency-review.yml`) requires **Dependency graph** to be enabled. If it is off, the workflow will skip with a notice and will not block the PR. Enable **Dependency graph** in Code security and analysis to run the check.
+- **CodeQL** (`.github/workflows/codeql.yml`) requires **Code scanning** / **Advanced Security** (private repos may need a plan that includes GHAS). If unavailable, the workflow will skip with a notice and will not block the PR. Enable Code scanning in Settings to run this check.
+
 ---
 
 ## D) Optional: PR / Issue defaults
