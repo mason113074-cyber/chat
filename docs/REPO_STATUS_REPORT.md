@@ -11,11 +11,11 @@
 - **目前分支**：`fix/knowledge-search-cjk-tokenizer` 與 `main` 並存；主線為 `main`（Merge PR #16 fix/ai-suggestions-schema-and-audit）。
 - **已完成核心**：LINE Webhook（單 bot + 多 bot 路由）、AI Copilot 決策層（AUTO/SUGGEST/ASK/HANDOFF）、知識庫 RAG（含 CJK tokenizer 分支）、Suggestions 草稿→送出流程、Guardrail 敏感詞、工作流程引擎（Automations）、Dashboard（對話/聯絡人/知識庫/設定/數據/活動/帳單等）。
 - **⚠️ ai_suggestions 有兩份 migration 衝突**：`029_ai_copilot_suggestions.sql`（draft_text、status pending/approved/sent）與 `029_multibot_copilot.sql`（suggested_reply、status draft/sent/expired/rejected、bot_id/event_id/sent_by）。程式與 API 實際使用 **029_multibot_copilot** 欄位；若 DB 曾先跑 029_ai_copilot_suggestions，可能缺欄或狀態值不一致，需以「不破壞既有資料」方式收斂為單一 schema。
-- **⚠️ WorkflowEngine 使用全域 LINE client**：`lib/workflow-engine.ts` 內 `replyMessage(ctx.replyToken, msg)` 未傳入 credentials；由多 bot webhook 觸發工作流程時，回覆會走 `process.env.LINE_*` 而非該 bot 的加密憑證，多租戶/多 bot 情境下可能回錯頻道。
+- **WorkflowEngine 已支援傳入 credentials**：`lib/workflow-engine.ts` 內 `replyMessage` 已依 `ExecutionContext.credentials` 傳入；多 bot webhook 觸發工作流程時回覆走該 bot 憑證，多租戶情境正確。
 - **前端草稿 UI**：對話詳情頁 `app/[locale]/dashboard/conversations/[contactId]/page.tsx` 已串接 `/api/conversations/[id]/suggestions`，顯示 `draft_text`（API 對應 `suggested_reply`）與一鍵送出；無獨立的「Suggestions 草稿區」頁面。Settings 有 `/api/settings/bots`，但 **Settings 多 bot 管理 UI 未確認是否完整**（API 存在，前端需再確認）。
 - **測試**：Vitest 單元（reply-decision、knowledge-search-tokenize、StatusBadge、StatCard、TestDashboard）、Playwright E2E（auth、smoke、checklist、crisp-p1-p2、automations、full-flow-production 等）；缺口：webhook 整合測試、多 bot 路徑、Guardrail 邊界。
 - **環境變數**：Supabase（URL、anon、service_role）、OpenAI、LINE（channel、Login）、選用 Redis/ LemonSqueezy/ 健康檢查/ 加密/ 告警；多 bot 需 `LINE_BOT_ENCRYPTION_KEY`。
-- **建議優先**：(1) 收斂 ai_suggestions 為單一 migration 定義並補齊欄位；(2) WorkflowEngine 支援傳入 credentials；(3) 確認 production 已部署 CJK tokenizer 並驗收 DoD1/DoD2（或調整 guardrail 使退錢流程可出 draft）。
+- **建議優先**：(1) 收斂 ai_suggestions 為單一 migration 定義並補齊欄位；(2) ~~WorkflowEngine 支援傳入 credentials~~（已完成）；(3) 確認 production 已部署 CJK tokenizer 並驗收 DoD1/DoD2（或調整 guardrail 使退錢流程可出 draft）。
 
 ---
 
@@ -42,7 +42,7 @@ lib/
   line.ts                 # LINE client（支援注入 credentials）
   encrypt.ts              # AES-256-GCM 加密、webhook key hash
   knowledge-search.ts     # RAG + CJK tokenizer（分支）
-  workflow-engine.ts      # 自動化流程執行（reply 用全域 LINE）
+  workflow-engine.ts      # 自動化流程執行（reply 依 context 傳入 credentials）
   supabase.ts             # createClient、getSupabaseAdmin
 docs/
   AI_COPILOT_POLICY.md    # 產品層 AI 副駕規則
@@ -170,7 +170,7 @@ e2e/                      # Playwright 規格（auth、smoke、checklist、crisp
 | /api/settings | GET/POST | 使用者設定 | 同上 | users 等 | - |
 | /api/knowledge-base/* | 多種 | 知識庫 CRUD、搜尋、匯入、測試 | 同上 | knowledge_base | - |
 | /api/chat | POST | 聊天（非 webhook） | 同上 | conversations, 知識庫 | - |
-| /api/workflows/[id]/execute | POST | 手動執行工作流程 | 同上 | workflow_logs, conversations, contacts | ⚠️ 使用全域 LINE 發送 |
+| /api/workflows/[id]/execute | POST | 手動執行工作流程 | 同上 | workflow_logs, conversations, contacts | 依 context 傳入 credentials |
 | /api/health-check, /api/health/* | GET | 健康檢查 | 部分 cron secret | 讀取各服務 | 不暴露內部細節 |
 | 其餘 | - | analytics, billing, onboarding, campaigns, contacts, tags… | 多為 session | 各對應表 | 依 RLS |
 
@@ -190,7 +190,7 @@ e2e/                      # Playwright 規格（auth、smoke、checklist、crisp
 - **app/api/webhook/line/route.ts**：驗簽 → 解析 events → 依 event 取得/建立 contact → 可選走 Workflow 觸發 → 敏感詞 guardrail → KB 搜尋 → decideReplyAction → AUTO 直回 / SUGGEST 寫 ai_suggestions + ack / ASK 或 HANDOFF 固定話術；idempotency 以 eventId+botId 為準；支援 overrides（ownerUserId, credentials, botId）供多 bot 路由呼叫。
 - **app/api/webhook/line/[botId]/[webhookKey]/route.ts**：查 line_bots → 驗 webhook_key_hash → 解密 channel secret/token → 寫 webhook_events → 呼叫 handleEvent(..., overrides) 傳入 credentials。
 - **lib/encrypt.ts**：AES-256-GCM；KEY 來自 LINE_BOT_ENCRYPTION_KEY（32+ 字元或 64 hex）；hashWebhookKey 為 SHA-256 hex。
-- **WorkflowEngine 觸發時 LINE client**：`lib/workflow-engine.ts` 內 replyMessage(ctx.replyToken, ...) **未傳入 credentials**，使用 `getLineClient()` 預設值 → **process.env.LINE_CHANNEL_***。多 bot webhook 觸發流程時，回覆會走全域 env，非該 bot 憑證。⚠️ 風險見下。
+- **WorkflowEngine 觸發時 LINE client**：`lib/workflow-engine.ts` 內 replyMessage 已依 context 傳入 credentials；webhook 呼叫 execute 時傳入 overrides.credentials，多 bot 回覆走該 bot 憑證。
 
 ---
 
@@ -261,9 +261,27 @@ e2e/                      # Playwright 規格（auth、smoke、checklist、crisp
 | 對話詳情頁串接草稿 UI | ✅ |
 | 獨立 Suggestions 草稿區頁面 | ❌ |
 | ai_suggestions 雙 migration 收斂 | ⚠️ 未收斂 |
-| WorkflowEngine 多 bot 憑證傳遞 | ⚠️ 使用全域 LINE |
+| WorkflowEngine 多 bot 憑證傳遞 | ✅ 已支援傳入 credentials |
 | Settings 多 bot 管理 UI 完整度 | 未確認（API 存在） |
-| Guardrail 先於 KB 導致無 draft | ⚠️ 已知限制 |
+| Guardrail 先於 KB 導致無 draft | ✅ 已放行結構化退費請求（退錢/退款+訂單語境可走 KB+SUGGEST 產 draft，見 isStructuredRefundOrReturnRequest） |
+
+### Sprint 5 — 巨型檔案拆解進度
+
+| Task | 頁面 | 拆解前 | 拆解後 | 狀態 |
+|------|------|--------|--------|------|
+| 1 | Settings | 93.6KB | 26.3KB | ✅ 完成 (09f40c0) |
+| 2 | Knowledge Base | 38.5KB | ~12KB | ✅ Phase 1+2 完成（Stats、Toolbar、List、TestPanel、GapAnalysis、AddEditModal、ImportModal、UrlImportModal） |
+| 3 | Contacts | 37KB | ~12KB | 📋 排隊中 |
+| 4 | Analytics | 31KB | ~10KB | 📋 排隊中 |
+| 5 | Conversations | 30KB | ~10KB | 📋 排隊中 |
+
+### 安全性修復（已驗證）
+
+| 級別 | 項目 | 狀態 |
+|------|------|------|
+| P0 | /api/chat 需身份驗證、WorkflowEngine 使用 generateReply 而非直呼 OpenAI | ✅ 已修復 |
+| P1 | idempotency 統一含 botId、受保護 API 之 auth guard | ✅ 已修復 |
+| P2 | 知識庫搜尋 DB 層限制 200 筆、加密金鑰驗證、回覆延遲上限 3 秒 | ✅ 已修復 |
 
 ---
 
@@ -272,9 +290,9 @@ e2e/                      # Playwright 規格（auth、smoke、checklist、crisp
 | 級別 | 項目 | 影響 | 重現/場景 | 建議修法 |
 |------|------|------|-----------|----------|
 | P0 | ai_suggestions 兩份 migration | 新環境或重跑可能建出舊表/欄位不一致；production 若為舊版會缺 suggested_reply/bot_id 等 | 依序執行兩份 029 | 收斂為單一 schema；forward-only migration 補欄與狀態對應 |
-| P0 | WorkflowEngine 使用全域 LINE | 多 bot webhook 觸發流程時，回覆發到預設 channel 而非該 bot | 多 bot 註冊 → 用 bot A webhook 觸發流程 → 回覆由 env 的 bot 發出 | ExecutionContext 增加可選 credentials；replyMessage 傳入 credentials；webhook 呼叫 execute 時傳入 overrides.credentials |
+| ~~P0~~ 已解決 | WorkflowEngine 使用全域 LINE | （已修復） | - | ExecutionContext 已帶 credentials；replyMessage 已傳入；webhook 已傳 overrides.credentials |
 | P1 | 前端草稿 UI 與 API 欄位映射 | 若 DB 仍為 draft_text 舊版，API 回傳會錯 | 僅在 DB 為舊 schema 時 | 確保 DB 已遷移至 multibot schema；或 API 同時支援 draft_text 讀取 |
-| P1 | Guardrail 先於 KB/決策 | 含「退錢」等詞直接回敏感句，sourcesCount 未參與、無 draft | 使用者發「我想退錢，訂單 123…」 | 調整順序或條件：先 KB+決策，再 guardrail；或放寬「退錢+訂單+流程」為非敏感路徑 |
+| P1 | ~~Guardrail 先於 KB/決策~~ | （已放行）結構化退費請求（退錢/退款+訂單語境）可走 KB+SUGGEST 產 draft | 見 lib/security/sensitive-keywords.ts isStructuredRefundOrReturnRequest、webhook 條件分支 | 已實作放行邏輯 |
 | P2 | hardcoded secrets | 若存在會洩漏 | 搜尋 repo | 僅使用 env；.env* 已 gitignore |
 | P2 | TypeScript any 濫用 | 型別不安全 | 局部 | 關鍵路徑補型別、漸進收斂 |
 | P2 | TODO/FIXME/HACK | 技術債 | lib/security/output-filter（儲存 security_logs）、lib/analytics-cache（avgResponseTime, topIssues） | 排期實作或註記追蹤 |
@@ -288,12 +306,12 @@ e2e/                      # Playwright 規格（auth、smoke、checklist、crisp
 ### MVP 完成度評估：**約 78%**
 
 - 核心：LINE 單/多 bot、決策層、RAG、草稿→送出、guardrail、工作流程、Dashboard 已具備。  
-- 未完成/待收斂：ai_suggestions 單一 schema、Workflow 多 bot 正確發送、Guardrail 與 KB 順序/條件、Settings 多 bot UI 完整度、部分 E2E/整合測試。
+- 未完成/待收斂：ai_suggestions 單一 schema、Settings 多 bot UI 完整度、部分 E2E/整合測試。Workflow 多 bot 已支援 credentials；Guardrail 退錢+訂單已放行走 KB+SUGGEST。
 
 ### 最優先三件事
 
 1. **收斂 ai_suggestions 為單一 migration 定義**，並視 production 現況做 forward-only 遷移（補欄、狀態對應）。  
-2. **WorkflowEngine 支援傳入 LINE credentials**，webhook 呼叫 execute 時傳入該 bot 憑證，避免回錯頻道。  
+2. ~~**WorkflowEngine 支援傳入 LINE credentials**~~（已完成）。  
 3. **確認 production 部署 CJK tokenizer** 並驗收 DoD1/DoD2（或調整 guardrail），使「退錢+訂單+流程」可產 draft 且一鍵送出與防雙發正常。
 
 ### 下一個 2 週 Sprint 建議（可開 Issue）
@@ -302,7 +320,7 @@ e2e/                      # Playwright 規格（auth、smoke、checklist、crisp
 |------|---------------------|
 | [DB] 收斂 ai_suggestions migration 並提供 forward-only 遷移 | 僅保留一份 029 定義；新環境建表一致；既有環境可無損升級至 suggested_reply/draft/sent 等欄位與狀態 |
 | [Backend] WorkflowEngine 支援依 context 使用 LINE credentials | ExecutionContext 可選帶 credentials；replyMessage 使用該 credentials；webhook 傳入 overrides.credentials |
-| [Policy] Guardrail 與 KB 順序或退錢流程例外 | 退錢+訂單+流程 可走 KB+SUGGEST 並產 draft；或文件明確標註現行「先 guardrail」為設計取捨 |
+| [Policy] Guardrail 與 KB 順序或退錢流程例外 | ~~退錢+訂單+流程 可走 KB+SUGGEST 並產 draft~~（已完成：isStructuredRefundOrReturnRequest 放行） |
 | [E2E] 多 bot webhook 路徑與建議送出 E2E | 可選：新增 e2e 覆蓋 [botId]/[webhookKey] 與 suggestions send 冪等 |
 | [Docs] Settings 多 bot UI 對應 API 清單與操作步驟 | 確認前端是否完整呼叫 GET/POST bots；缺則補或標註為後續迭代 |
 
@@ -313,7 +331,7 @@ CustomerAI Pro 為 AI 智能客服 SaaS，技術棧 Next.js 16、Supabase（Auth
 實作上：LINE webhook 有單一（/api/webhook/line）與多 bot（/api/webhook/line/[botId]/[webhookKey]）；多 bot 憑證存於 line_bots 表並以 AES-256-GCM 加密，webhook 驗簽後解密並傳入 handleEvent overrides。  
 知識庫 RAG 在 lib/knowledge-search.ts，分支 fix/knowledge-search-cjk-tokenizer 已加入 CJK 2/3-gram 與退錢→退款同義詞，提升中文命中率。  
 Suggestions 流程：webhook 在 action=SUGGEST 時寫入 ai_suggestions（suggested_reply、status draft），前端對話詳情頁呼叫 GET /api/conversations/[id]/suggestions 與 POST /api/suggestions/[id]/send 做一鍵送出與防雙發。  
-目前已知問題：supabase/migrations 內有兩份 029（029_ai_copilot_suggestions 與 029_multibot_copilot）定義 ai_suggestions，欄位與狀態列舉不同；程式與 API 皆依 029_multibot_copilot。另 WorkflowEngine 在發送 LINE 回覆時未接收 credentials，由多 bot 觸發時會使用全域 env 的 channel。  
+目前已知問題：supabase/migrations 內 029 以 029_multibot_copilot 為準（舊版已 .bak）；WorkflowEngine 已支援傳入 credentials，多 bot 回覆正確；Guardrail 已放行「退錢/退款+訂單」結構化請求走 KB+SUGGEST。  
 測試：Vitest（reply-decision、knowledge-search-tokenize、部分 UI）、Playwright E2E（auth、smoke、checklist、automations、full-flow-production 等）。環境變數見 .env.example；多 bot 需 LINE_BOT_ENCRYPTION_KEY，不得將真實 secret 寫入程式或報告。
 
 ---

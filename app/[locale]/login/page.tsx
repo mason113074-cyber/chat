@@ -187,6 +187,7 @@ function LoginForm() {
               <span className="text-xs text-gray-500">{locale === 'zh-TW' ? '或' : 'or'}</span>
               <span className="flex-1 border-t border-gray-200" />
             </div>
+            {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a
               href="/api/auth/line?action=login"
               className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white py-3 font-medium text-gray-700 hover:bg-gray-50"
