@@ -16,7 +16,7 @@ CustomerAIPro 是整合 **LINE**、**OpenAI GPT-4o-mini**、**Supabase** 的 AI 
 | 前端 | Next.js 16 (App Router)、TypeScript、Tailwind CSS |
 | 資料庫／認證 | Supabase (PostgreSQL + Auth) |
 | AI | OpenAI GPT-4o-mini |
-| Redis（選用） | Upstash Redis（冪等、rate limit、快取；未設則記憶體 fallback） |
+| Redis（本機選用 / multi-bot production 必填） | Upstash Redis（冪等、rate limit、快取；本機未設則記憶體 fallback；multi-bot production 必填） |
 | 部署 | Vercel（連線 GitHub，push main 自動部署） |
 | 訊息平台 | LINE Messaging API |
 
@@ -37,8 +37,8 @@ cp .env.example .env.local
 ```
 
 **必填**：`NEXT_PUBLIC_SUPABASE_URL`、`NEXT_PUBLIC_SUPABASE_ANON_KEY`、`SUPABASE_SERVICE_ROLE_KEY`、`OPENAI_API_KEY`。  
-**LINE**：使用 LINE 時需 `LINE_CHANNEL_SECRET`、`LINE_CHANNEL_ACCESS_TOKEN`、`LINE_OWNER_USER_ID`。  
-**選填**：`UPSTASH_REDIS_REST_URL`、`UPSTASH_REDIS_REST_TOKEN`（未設則記憶體 fallback）。
+**LINE**：使用 LINE 時需 `LINE_CHANNEL_SECRET`、`LINE_CHANNEL_ACCESS_TOKEN`、`LINE_OWNER_USER_ID`（legacy 單 bot）；multi-bot 需 `LINE_BOT_ENCRYPTION_KEY`。  
+**Upstash Redis**：本機開發選用（未設則記憶體 fallback）；**multi-bot production 必填** `UPSTASH_REDIS_REST_URL`、`UPSTASH_REDIS_REST_TOKEN`。
 
 ### 3. 連通檢查（本機）
 
@@ -72,16 +72,37 @@ npm run dev
 | Supabase | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | ✅ |
 | LINE | `LINE_CHANNEL_SECRET`, `LINE_CHANNEL_ACCESS_TOKEN`, `LINE_OWNER_USER_ID` | 用 LINE 時 |
 | OpenAI | `OPENAI_API_KEY`（另有 `OPENAI_MONTHLY_BUDGET` 等，見 .env.example） | ✅ |
-| Upstash Redis | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | 選用 |
+| Upstash Redis | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | 本機選用；**multi-bot production 必填** |
+| LINE Webhook | `LINE_WEBHOOK_LEGACY_ENABLED` | 選用（預設空；production legacy endpoint 回 410） |
 | 站點 | `NEXT_PUBLIC_SITE_URL` | 建議 |
 
 完整清單與說明見 `.env.example` 與 [部署與環境 FAQ](docs/DEPLOYMENT_AND_ENV_FAQ.md)。
 
 ## LINE Webhook
 
+### Multi-bot（正式推薦）
+
+每個 bot 有獨立的 webhook URL：
+
+```
+https://www.customeraipro.com/api/webhook/line/{botId}/{webhookKey}
+```
+
+- `{botId}`：Settings → Bots 頁面的 Bot UUID
+- `{webhookKey}`：建立 bot 時系統自動產生的 webhook key
+- Channel secret / access token 加密存於 DB（需設定 `LINE_BOT_ENCRYPTION_KEY`）
+- **Upstash Redis 為 multi-bot production 必填**
+
+在 [LINE Developers Console](https://developers.line.biz/) 的 Webhook URL 填入上述格式。
+
+### Legacy（單 bot，舊版，已棄用）
+
+> ⚠️ **在 production 環境預設回傳 HTTP 410 Gone。**  
+> 設定 `LINE_WEBHOOK_LEGACY_ENABLED=true` 可重新啟用（僅供舊版單 bot 短期過渡）。
+
 1. [LINE Developers Console](https://developers.line.biz/) 建立 Messaging API Channel
 2. Webhook URL：`https://www.customeraipro.com/api/webhook/line`（或你的網域）
-3. 將 Channel Secret、Access Token、擁有者 User ID 填入環境變數
+3. 將 `LINE_CHANNEL_SECRET`、`LINE_CHANNEL_ACCESS_TOKEN`、`LINE_OWNER_USER_ID` 填入環境變數
 
 ## 授權
 
