@@ -116,6 +116,18 @@ const REFUND_RETURN_KEYWORDS = [
   '取消訂單',
 ];
 
+/** 退款/退錢專屬關鍵字：改走 SUGGEST/ASK，不再 hard-stop */
+const REFUND_MONEY_KEYWORDS = ['退款', '退錢'] as const;
+
+/**
+ * 判斷是否為退款/退錢請求。
+ * 此類訊息應改走決策層（SUGGEST/ASK），不再 hard-stop。
+ */
+export function isRefundOrMoneyRequest(text: string): boolean {
+  const normalized = text.toLowerCase().trim();
+  return REFUND_MONEY_KEYWORDS.some((kw) => normalized.includes(kw));
+}
+
 /** 訂單/識別類關鍵字（結構化請求判斷用） */
 const ORDER_CONTEXT_KEYWORDS = ['訂單', '訂單編號', '編號', 'order'];
 

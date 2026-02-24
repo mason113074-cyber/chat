@@ -9,7 +9,7 @@ import { generateReply } from '@/lib/openai';
 import { searchKnowledgeWithSources } from '@/lib/knowledge-search';
 import { getOrCreateContactByLineUserId, getUserSettings, insertConversationMessage, getRecentConversationMessages } from '@/lib/supabase';
 import { getConversationUsageForUser } from '@/lib/billing-usage';
-import { detectSensitiveKeywords, HIGH_RISK_KEYWORDS } from '@/lib/security/sensitive-keywords';
+import { detectSensitiveKeywords, HIGH_RISK_KEYWORDS, isRefundOrMoneyRequest, isStructuredRefundOrReturnRequest } from '@/lib/security/sensitive-keywords';
 import { calculateConfidence } from '@/lib/confidence';
 import { invalidateAnalyticsCache } from '@/lib/analytics-cache';
 import type { LineWebhookEvent } from '@/lib/line';
@@ -26,6 +26,8 @@ const KNOWLEDGE_PREFIX = '\n\n## 以下是你可以參考的知識庫內容（�
 const KNOWLEDGE_EMPTY_INSTRUCTION = '\n\n注意：知識庫中沒有找到與此問題相關的內容，請回覆需要轉接專人，勿自行編造答案。';
 const HIGH_RISK_ACK = '已收到，我們將由專員協助處理。';
 const HANDOFF_MSG = '這個問題需要專人為您處理，請稍候。';
+const REFUND_SAFE_DRAFT = '已收到您的退款申請，我們將由專員確認後盡快為您處理，請稍候。';
+const REFUND_ASK_TEXT = '為協助您辦理退款，請提供訂單編號，方便我們查核訂單狀態。';
 const FORBIDDEN_PATTERNS = [/免費送你/, /我可以給你.*折/, /退.*全額/, /保證.*效果/, /我不是AI/, /我是真人/];
 const MAX_REPLY_LENGTH = 500;
 
@@ -81,6 +83,32 @@ export async function processOneWebhookEvent(ctx: ProcessContext): Promise<{ ok:
   const lineEventId = getEventId(rawEvent);
 
   if (isHighRisk) {
+    // 退款/退錢：改走 SUGGEST/ASK，不再 hard-stop
+    if (isRefundOrMoneyRequest(userMessage)) {
+      const hasOrderContext = isStructuredRefundOrReturnRequest(userMessage);
+      const suggestedReply = hasOrderContext ? REFUND_SAFE_DRAFT : REFUND_ASK_TEXT;
+      const category = hasOrderContext ? 'refund_suggest' : 'refund_ask';
+      await insertConversationMessage(contact.id, userMessage, 'user');
+      await admin.from('ai_suggestions').insert({
+        contact_id: contact.id,
+        user_id: ownerUserId,
+        bot_id: botId,
+        event_id: lineEventId,
+        user_message: userMessage,
+        suggested_reply: suggestedReply,
+        sources_count: 0,
+        confidence_score: 0,
+        risk_category: 'high',
+        category,
+        sources: [],
+        status: 'draft',
+        expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      });
+      await pushMessage(lineUserId, { type: 'text', text: hasOrderContext ? HIGH_RISK_ACK : REFUND_ASK_TEXT }, creds);
+      void invalidateAnalyticsCache(ownerUserId);
+      return { ok: true };
+    }
+
     await insertConversationMessage(contact.id, userMessage, 'user');
     await admin.from('ai_suggestions').insert({
       contact_id: contact.id,
