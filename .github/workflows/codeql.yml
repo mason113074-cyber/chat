@@ -34,12 +34,11 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             "${URL}")
 
-          echo "http_code=${CODE}"
           if [ "${CODE}" = "200" ]; then
             echo "enabled=true" >> "${GITHUB_OUTPUT}"
           else
             echo "enabled=false" >> "${GITHUB_OUTPUT}"
-            echo "::notice title=CodeQL skipped::Code scanning API not available (HTTP ${CODE}). For private repos, CodeQL may require GitHub Advanced Security / Code scanning enabled. Enable it in Settings to run this check."
+            echo "::notice title=CodeQL skipped::Code scanning API not available (HTTP ${CODE}). Enable Settings → Code security and analysis → Code scanning (or GHAS) to run this check."
             cat /tmp/codescanning.json || true
           fi
 
@@ -49,28 +48,6 @@ jobs:
         with:
           languages: javascript-typescript
           queries: security-extended
-
-      - name: Set up Node.js
-        if: steps.preflight.outputs.enabled == 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Install dependencies
-        if: steps.preflight.outputs.enabled == 'true'
-        run: npm ci
-
-      - name: Build (dummy env)
-        if: steps.preflight.outputs.enabled == 'true'
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy
-          SUPABASE_SERVICE_ROLE_KEY: dummy
-          NEXT_PUBLIC_APP_URL: http://localhost:3000
-          OPENAI_API_KEY: dummy
-          NEXT_TELEMETRY_DISABLED: 1
-        run: npm run build
 
       - name: Perform CodeQL Analysis
         if: steps.preflight.outputs.enabled == 'true'
