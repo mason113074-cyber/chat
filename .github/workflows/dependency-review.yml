@@ -1,0 +1,44 @@
+name: Dependency Review
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preflight dependency graph availability
+        id: depgraph
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/dependency-graph/compare/${BASE_SHA}...${HEAD_SHA}"
+
+          CODE=$(curl -s -o /tmp/depgraph.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "${URL}")
+
+          echo "http_code=${CODE}"
+          if [ "${CODE}" = "200" ]; then
+            echo "enabled=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+            echo "::notice title=Dependency Review skipped::Dependency graph API not available (HTTP ${CODE}). Enable 'Dependency graph' in GitHub Settings → Code security and analysis to turn this check on."
+            cat /tmp/depgraph.json || true
+          fi
+
+      - name: Run Dependency Review
+        if: steps.depgraph.outputs.enabled == 'true'
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
