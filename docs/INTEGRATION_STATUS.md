@@ -13,7 +13,7 @@
 
 | 服務 | 狀態 | 設定位置 | 說明 |
 |------|------|----------|------|
-| **GitHub** | ✅ | `git remote` → origin (mason113074-cyber/chat) | 已連接；無 `.github/workflows`，無 CI/CD 自動測試/部署 |
+| **GitHub** | ✅ | `git remote` → origin (mason113074-cyber/chat) | 已連接；已有 CI（PR/push main：type-check → lint → test:unit:run → build）；Dependabot：npm weekly |
 | **Supabase** | ✅ | `lib/supabase/server.ts`, `lib/supabase/client.ts`, `lib/supabase.ts` | URL/Anon Key/Service Role 已使用；migrations 完整；RLS 已啟用 |
 | **Vercel** | ✅ | `vercel.json`（cron 健康檢查） | 部署依專案規則為 Vercel；build/start 正常；無 `middleware.ts`（next-intl 使用 i18n/request） |
 | **LINE** | ✅ | `lib/line.ts`（env：LINE_CHANNEL_SECRET, LINE_CHANNEL_ACCESS_TOKEN）；multi-bot 設定於 `line_bots` 表（加密儲存） | **multi-bot**：每個 bot 的 webhook URL 為 `/api/webhook/line/{botId}/{webhookKey}`，channel secret/token 加密存於 DB。**legacy** `/api/webhook/line` 在 production 預設回傳 **410 Gone**（可設 `LINE_WEBHOOK_LEGACY_ENABLED=true` 重新啟用，供舊版單 bot 短期過渡） |
@@ -123,13 +123,13 @@ flowchart LR
   D --> E[Deploy]
 ```
 
-- 無 GitHub Actions；部署依 **Vercel 連動 GitHub** 自動 build + 環境變數。
+- 已有 GitHub Actions（`.github/workflows/ci.yml`）：PR/push main 會跑 type-check / lint / unit / build；部署仍由 **Vercel 連動 GitHub**（push main 自動 build + deploy + 環境變數）。
 
 ---
 
 ## 6.4 待修復問題清單
 
-- [ ] **無 CI/CD**（中）：無 `.github/workflows`，無自動 lint/test/deploy。建議新增 workflow 跑 `type-check`、`lint`、`playwright test`（可僅在 PR 跑）。
+- [ ] **GitHub branch protection（低）**：可在 GitHub 設定 main 保護（Require status checks：CI；禁止直接 push main）。CI 已存在。
 - [x] **LINE 多租戶**（已實作）：multi-bot 模式支援每用戶自己的 LINE Channel；channel secret/token 加密存於 `line_bots` 表，webhook URL 為 `/api/webhook/line/{botId}/{webhookKey}`。legacy endpoint `/api/webhook/line` 在 production 預設 410 Gone，可設 `LINE_WEBHOOK_LEGACY_ENABLED=true` 重新啟用（舊版單 bot 過渡用）。
 - [ ] **Supabase 型別未生成**（低）：專案無 `types/database.types.ts` 或 `supabase gen types` 產物，表結構僅在 migrations 與程式內散落。建議定期執行 `supabase gen types typescript` 並寫入 repo，以利型別安全。
 - [ ] **.env.example 與實際使用對照**（低）：`LINE_LOGIN_CHANNEL_SECRET` 在 .env.example 為 `LINE_LOGIN_CHANNEL_SECRET`，程式使用相同名稱；`LINE_CHANNEL_SECRET` 在 .env.example 為 `LINE_CHANNEL_SECRET`，與 `lib/line.ts` 一致。已涵蓋主要變數；若有新增 env 請同步更新 .env.example。
@@ -139,7 +139,7 @@ flowchart LR
 
 ## 6.5 優化建議
 
-1. **GitHub Actions**：新增 `.github/workflows/ci.yml`，在 push/PR 時執行 `npm run type-check`、`npm run lint`、可選 `npm run test`（Playwright 可僅在 main 或 tag 跑）。
+1. **GitHub Actions**：已存在 `.github/workflows/ci.yml`（PR/push main 跑 type-check、lint、test:unit:run、build）。可選啟用 branch protection：Require status checks、禁止直接 push main。
 2. **Vercel 環境變數**：在 Vercel Dashboard 對照 `.env.example` 檢查所有必填與選填變數是否已設定（尤其 `LINE_OWNER_USER_ID`、`HEALTHCHECK_CRON_SECRET`）。
 3. **Rate limit / 冪等**：正式環境建議設定 Upstash Redis，避免多 instance 下 rate limit 與冪等僅在單機生效。
 4. **Webhook 錯誤仍回 200**：目前為避免 LINE 重試，catch 後仍 `return NextResponse.json({ success: true })`；日誌已記錄錯誤。可考慮在嚴重錯誤時回 5xx 並在監控告警中區分「預期錯誤」與「需重試」。
@@ -151,7 +151,8 @@ flowchart LR
 ## 檢查摘要（對應指令 Part 1–5）
 
 ### Part 1: GitHub
-- 無 `.github/workflows/`，無 CI/CD。
+- 已有 `.github/workflows/ci.yml`：PR/push main 會跑 type-check、lint、test:unit:run、build。
+- Dependabot：npm weekly（`.github/dependabot.yml`）。
 - `git remote`: origin → https://github.com/mason113074-cyber/chat.git；分支：main。
 - `.gitignore` 已含 `node_modules`、`.env*.local`、`.env`，敏感檔未提交。
 
