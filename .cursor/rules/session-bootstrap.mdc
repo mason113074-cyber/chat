@@ -1,0 +1,34 @@
+---
+description: Session bootstrap — ensures AI loads persistent context at conversation start before doing any work.
+alwaysApply: true
+---
+
+# Session Bootstrap Protocol
+
+每次新對話開始時，在做任何工作之前，執行以下步驟：
+
+## 1. 讀取 Memory Bank（必做）
+
+用 MCP 工具 `project-0-chat-memory-bank-mcp` 讀取：
+- `read_memory_bank_file` → `active-context.md`（當前正在做什麼）
+- `read_memory_bank_file` → `progress.md`（整體進度）
+- `read_memory_bank_file` → `tasks.md`（活躍任務清單）
+
+## 2. 查 Knowledge Graph（按需）
+
+用 MCP 工具 `project-0-chat-knowledge-graph-memory`：
+- `read_graph` → 取得實體與關係全圖（涉及架構或 Supabase 決策時）
+
+## 3. 結束工作時（必做）
+
+完成任務後，更新記憶：
+- `update_active_context` → 寫入「剛做了什麼」「下一步是什麼」
+- `track_progress` → 更新進度
+- 若有重大架構決策 → `create_entities` / `add_observations` 寫入 Knowledge Graph
+
+## 4. 跨 Session 斷點恢復
+
+如果使用者說「繼續」或「上次做到哪」：
+1. 先讀 `active-context.md` 和 `tasks.md`
+2. 讀 `engineering-status.mdc`（已在 rules 自動載入）
+3. 回報上次進度，確認使用者要繼續哪個任務
