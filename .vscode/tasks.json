@@ -1,0 +1,19 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Export textbook to PDF (Markdown PDF extension)",
+      "type": "shell",
+      "command": "echo 請在編輯器開啟 docs/CustomerAIPro_SaaS_教科書.md 後，按 Ctrl+Shift+P，輸入 Markdown PDF，選擇 Export (pdf)。PDF 會產在 docs/ 資料夾。",
+      "windows": {
+        "command": "echo 請在編輯器開啟 docs/CustomerAIPro_SaaS_教科書.md 後，按 Ctrl+Shift+P，輸入 Markdown PDF，選擇 Export (pdf)。PDF 會產在 docs/ 資料夾。"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "showReuseMessage": false
+      }
+    }
+  ]
+}

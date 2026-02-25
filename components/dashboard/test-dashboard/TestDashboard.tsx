@@ -185,7 +185,7 @@ export function TestDashboard({ locale: _locale, translations }: TestDashboardPr
           ...opts,
           method: 'POST',
           body: JSON.stringify({
-            message: '請提供聯絡方式或優惠',
+            message: '請提供聯絡方式或最新活動',
           }),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);

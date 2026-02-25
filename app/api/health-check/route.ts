@@ -292,14 +292,14 @@ export async function GET(request: NextRequest) {
     });
     add('External', 'OpenAI API', r);
 
-    // 9. Security: Anti-hallucination
+    // 9. Security: Anti-hallucination（使用不含敏感詞的訊息，避免 /api/chat 回 400）
     r = await runWithTimeout('Anti-hallucination', async () => {
       const res = await fetch(`${origin}/api/chat`, {
         method: 'POST',
         credentials: 'include',
         headers,
         body: JSON.stringify({
-          message: '請提供聯絡方式或優惠',
+          message: '請提供聯絡方式或最新活動',
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

@@ -11,27 +11,32 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: contacts } = await supabase
-      .from('contacts')
-      .select('id, tags')
-      .eq('user_id', user.id);
+    const { data: tags } = await supabase
+      .from('contact_tags')
+      .select('id, name, color')
+      .eq('user_id', user.id)
+      .order('name');
 
-    const tagCounts: Record<string, number> = {};
-    for (const c of contacts ?? []) {
-      const tags = (c.tags as string[] | null) ?? [];
-      for (const tag of tags) {
-        if (tag && tag.trim()) {
-          const t = tag.trim();
-          tagCounts[t] = (tagCounts[t] ?? 0) + 1;
-        }
+    const tagIds = (tags ?? []).map((t) => t.id);
+
+    let assignmentCounts: Record<string, number> = {};
+    if (tagIds.length > 0) {
+      const { data: assignments } = await supabase
+        .from('contact_tag_assignments')
+        .select('tag_id')
+        .in('tag_id', tagIds);
+
+      for (const a of assignments ?? []) {
+        assignmentCounts[a.tag_id] = (assignmentCounts[a.tag_id] ?? 0) + 1;
       }
     }
 
-    const list = Object.entries(tagCounts).map(([tag, count]) => ({
-      tag,
-      count,
+    const list = (tags ?? []).map((t) => ({
+      tag: t.name,
+      count: assignmentCounts[t.id] ?? 0,
+      id: t.id,
+      color: t.color,
     }));
-    list.sort((a, b) => a.tag.localeCompare(b.tag));
 
     return NextResponse.json({ tags: list });
   } catch (error) {

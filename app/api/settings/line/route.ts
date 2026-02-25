@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { encrypt, decrypt } from '@/lib/encrypt';
 
 function mask(value: string | null): string {
   if (!value) return '';
   if (value.length <= 8) return '- - - - - - - - ';
   return '- - - - ' + value.slice(-4);
+}
+
+function tryDecrypt(value: string | null): string | null {
+  if (!value) return null;
+  try {
+    return decrypt(value);
+  } catch {
+    return value;
+  }
 }
 
 export async function GET() {
@@ -23,10 +33,13 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  const secret = tryDecrypt(data?.line_channel_secret ?? null);
+  const token = tryDecrypt(data?.line_channel_access_token ?? null);
+
   return NextResponse.json({
     channel_id: data?.line_channel_id ?? '',
-    channel_secret_masked: mask(data?.line_channel_secret ?? null),
-    access_token_masked: mask(data?.line_channel_access_token ?? null),
+    channel_secret_masked: mask(secret),
+    access_token_masked: mask(token),
   });
 }
 
@@ -46,10 +59,10 @@ export async function PUT(req: NextRequest) {
     updates.line_channel_id = body.channel_id.trim().slice(0, 100);
   }
   if (typeof body.channel_secret === 'string' && body.channel_secret.trim() && !body.channel_secret.startsWith('- - - -')) {
-    updates.line_channel_secret = body.channel_secret.trim().slice(0, 200);
+    updates.line_channel_secret = encrypt(body.channel_secret.trim().slice(0, 200));
   }
   if (typeof body.access_token === 'string' && body.access_token.trim() && !body.access_token.startsWith('- - - -')) {
-    updates.line_channel_access_token = body.access_token.trim();
+    updates.line_channel_access_token = encrypt(body.access_token.trim());
   }
 
   if (Object.keys(updates).length === 0) {
