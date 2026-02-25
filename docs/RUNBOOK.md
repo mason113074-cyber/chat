@@ -87,7 +87,7 @@
 ### 程式與 CI
 
 - [ ] 從 main 部署；CI（type-check / lint / unit / build）全綠
-- [ ] 無將測試用 API（如舊的 test-ai / test-alert）暴露在 production 的設定
+- [ ] 測試用 API：已移除 test-ai / test-alert；儀表板與 health-check 改為使用 `/api/chat`，production 無額外測試端點暴露
 
 ---
 

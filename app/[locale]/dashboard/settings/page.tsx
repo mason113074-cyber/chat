@@ -435,13 +435,10 @@ export default function SettingsPage() {
     setTestReply('');
 
     try {
-      const response = await fetch('/api/test-ai', {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: testMessage,
-          systemPrompt: systemPrompt,
-        }),
+        body: JSON.stringify({ message: testMessage }),
       });
 
       if (!response.ok) {
@@ -450,7 +447,7 @@ export default function SettingsPage() {
       }
 
       const data = await response.json().catch(() => ({}));
-      setTestReply(typeof data?.reply === 'string' ? data.reply : '');
+      setTestReply(typeof data?.content === 'string' ? data.content : '');
     } catch (error) {
       console.error('AI 測試失敗:', error);
       setTestError(error instanceof Error ? error.message : t('testFailed'));

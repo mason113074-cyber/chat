@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { useToast } from '@/components/Toast';
+import { getAppUrl } from '@/lib/app-url';
 import { useBots, type BotItem } from './hooks/use-bots';
 import { BotListEmpty } from './components/bot-list-empty';
 import { BotList } from './components/bot-list';
@@ -158,7 +159,7 @@ export default function BotsSettingsPage() {
       ) : (
         <BotList
           bots={bots}
-          origin={origin || 'https://www.customeraipro.com'}
+          origin={origin || getAppUrl()}
           onCopy={handleCopy}
           onTest={handleTest}
           onEdit={handleEdit}

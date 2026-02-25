@@ -58,7 +58,6 @@
 | POST | `/api/webhook/line` | LINE Webhook 接收（訊息、事件） |
 | GET | `/api/webhook/line` | LINE Webhook URL 驗證用 |
 | POST | `/api/chat` | 儀表板內建聊天（body: `{ message }`，回傳 `{ content }`） |
-| POST | `/api/test-ai` | 測試 AI 回覆 |
 
 ---
 
@@ -143,7 +142,6 @@
 | GET | `/api/health/security/rate-limit` | Rate limit 檢查 |
 | GET | `/api/health/security/sensitive` | 敏感詞檢查 |
 | GET | `/api/health/feature/handoff` | 轉人工功能檢查 |
-| GET | `/api/test-alert` | 測試告警 |
 
 ---
 

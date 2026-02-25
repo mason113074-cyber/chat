@@ -63,7 +63,7 @@ function createMockFetch(runDelayMs = 30) {
       json: () => {
         if (urlStr.includes('/api/settings') && !urlStr.includes('line')) return Promise.resolve({ systemPrompt: '', aiModel: 'gpt-4o-mini' });
         if (urlStr.includes('/api/knowledge-base') && !urlStr.includes('test')) return Promise.resolve({ items: [] });
-        if (urlStr.includes('/api/test-ai')) return Promise.resolve({ reply: 'ok' });
+        if (urlStr.includes('/api/chat')) return Promise.resolve({ content: 'ok' });
         if (urlStr.includes('/api/settings/line/test')) return Promise.resolve({ success: true });
         if (urlStr.includes('/api/health/supabase') || urlStr.includes('/api/health/openai')) return Promise.resolve({ status: 'ok' });
         if (urlStr.includes('/api/health/security')) return Promise.resolve({ status: 'ok' });

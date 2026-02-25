@@ -5,6 +5,21 @@ import { routing } from './i18n/routing';
 
 const intlMiddleware = createIntlMiddleware(routing);
 
+function addSecurityHeaders(res: NextResponse): NextResponse {
+  res.headers.set('X-Frame-Options', 'DENY');
+  res.headers.set('X-Content-Type-Options', 'nosniff');
+  res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.headers.set('X-DNS-Prefetch-Control', 'on');
+  res.headers.set(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-ancestors 'none';"
+  );
+  if (process.env.NODE_ENV === 'production') {
+    res.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  }
+  return res;
+}
+
 async function getSupabaseUser(
   request: NextRequest
 ): Promise<{ user: { id: string } | null; response: NextResponse }> {
@@ -46,12 +61,11 @@ export async function proxy(request: NextRequest) {
     }
     const { user } = await getSupabaseUser(request);
     if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
+      return addSecurityHeaders(
+        NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       );
     }
-    return NextResponse.next();
+    return addSecurityHeaders(NextResponse.next());
   }
 
   const segments = pathname.split('/').filter(Boolean);
@@ -67,7 +81,9 @@ export async function proxy(request: NextRequest) {
     if (!user) {
       const locale =
         firstSegment === 'zh-TW' || firstSegment === 'en' ? firstSegment : routing.defaultLocale;
-      return NextResponse.redirect(new URL(`/${locale}/login`, request.url));
+      return addSecurityHeaders(
+        NextResponse.redirect(new URL(`/${locale}/login`, request.url))
+      );
     }
   }
 
@@ -79,10 +95,12 @@ export async function proxy(request: NextRequest) {
       const { user } = await getSupabaseUser(request);
       if (!user) {
         const locale = /^\/(zh-TW|en)/.exec(targetPath)?.[1] ?? routing.defaultLocale;
-        return NextResponse.redirect(new URL(`/${locale}/login`, request.url));
+        return addSecurityHeaders(
+          NextResponse.redirect(new URL(`/${locale}/login`, request.url))
+        );
       }
     }
-    return intlResponse;
+    return addSecurityHeaders(intlResponse);
   }
 
   const pathSegs = request.nextUrl.pathname.split('/').filter(Boolean);
@@ -98,7 +116,8 @@ export async function proxy(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anonKey) {
-    return intlResponse ?? NextResponse.next({ request });
+    const res = intlResponse ?? NextResponse.next({ request });
+    return addSecurityHeaders(res);
   }
 
   let response = intlResponse ?? NextResponse.next({ request });
@@ -125,7 +144,7 @@ export async function proxy(request: NextRequest) {
   if ((isDashboard || isSettings) && !user) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = `/${locale}/login`;
-    return NextResponse.redirect(redirectUrl);
+    return addSecurityHeaders(NextResponse.redirect(redirectUrl));
   }
 
   if (user && isDashboard && !isDashboardOnboarding) {
@@ -138,11 +157,11 @@ export async function proxy(request: NextRequest) {
     if (!completed) {
       const redirectUrl = request.nextUrl.clone();
       redirectUrl.pathname = `/${locale}/dashboard/onboarding`;
-      return NextResponse.redirect(redirectUrl);
+      return addSecurityHeaders(NextResponse.redirect(redirectUrl));
     }
   }
 
-  return response;
+  return addSecurityHeaders(response);
 }
 
 export const config = {

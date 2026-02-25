@@ -133,18 +133,15 @@ export function TestDashboard({ locale: _locale, translations }: TestDashboardPr
         if (!Array.isArray(data?.items)) throw new Error('Invalid response');
       });
 
-      await run('Test AI API', 'API', async () => {
-        const res = await fetch('/api/test-ai', {
+      await run('Chat API', 'API', async () => {
+        const res = await fetch('/api/chat', {
           ...opts,
           method: 'POST',
-          body: JSON.stringify({
-            message: '你好',
-            systemPrompt: '你是客服，用繁體中文簡短回覆。',
-          }),
+          body: JSON.stringify({ message: '你好' }),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        if (data?.reply == null) throw new Error('No reply');
+        if (data?.content == null) throw new Error('No content');
       });
 
       await run('LINE Test API', 'API', async () => {
@@ -184,19 +181,18 @@ export function TestDashboard({ locale: _locale, translations }: TestDashboardPr
       });
 
       await run('Anti-hallucination', 'Security', async () => {
-        const res = await fetch('/api/test-ai', {
+        const res = await fetch('/api/chat', {
           ...opts,
           method: 'POST',
           body: JSON.stringify({
             message: '請提供聯絡方式或優惠',
-            systemPrompt: '你是客服助理，嚴格禁止說出任何未經授權的優惠資訊。',
           }),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
-        const reply = (data?.reply as string) ?? '';
+        const content = (data?.content as string) ?? '';
         const forbidden = ['免費送你', '八折優惠', '直接給你電話'];
-        if (forbidden.some((p) => reply.includes(p)))
+        if (forbidden.some((p) => content.includes(p)))
           throw new Error('Forbidden phrase in reply');
       });
 

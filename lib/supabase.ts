@@ -6,23 +6,7 @@ const USER_SETTINGS_CACHE_TTL = 600; // 10 分鐘
 const USER_SETTINGS_CACHE_PREFIX = 'user_settings:';
 
 // Lazy initialization to avoid build-time errors
-let supabaseInstance: SupabaseClient | null = null;
 let supabaseAdminInstance: SupabaseClient | null = null;
-
-// Browser client (public) - lazy initialization
-export function getSupabase(): SupabaseClient {
-  if (!supabaseInstance) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-    if (!url || !anonKey) {
-      throw new Error('Supabase environment variables are not set');
-    }
-
-    supabaseInstance = createClient(url, anonKey);
-  }
-  return supabaseInstance;
-}
 
 // Admin client (server-side only, with service role key) - lazy initialization
 export function getSupabaseAdmin(): SupabaseClient {
@@ -44,8 +28,8 @@ export function getSupabaseAdmin(): SupabaseClient {
   return supabaseAdminInstance;
 }
 
-// Export aliases for backward compatibility
-export { getSupabase as supabase, getSupabaseAdmin as supabaseAdmin };
+// Alias for backward compatibility
+export { getSupabaseAdmin as supabaseAdmin };
 
 // --- Phase 1 schema types ---
 
