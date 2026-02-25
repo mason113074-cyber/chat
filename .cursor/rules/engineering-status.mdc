@@ -1,0 +1,88 @@
+---
+description: Verified engineering status and technical debt — ground truth for all sessions. Prevents hallucinating missing features or re-investigating known facts.
+alwaysApply: true
+---
+
+# Engineering Status（已驗證事實，不要猜測）
+
+## 已完成且運作正常（不要再質疑這些）
+
+- **proxy.ts 存在**（根目錄，154 行）：Supabase Auth guard + next-intl routing + onboarding redirect + API 401 攔截。不缺 middleware。
+- **CI Pipeline 完整**：`.github/workflows/ci.yml` 含 type-check / lint / unit test / build 四步驟。
+- **冪等性**：`lib/idempotency.ts` 已實作 webhook 去重。
+- **Rate Limiting**：已實作。
+- **加密模組**：Bot credentials 用 AES-256-GCM 加密存 DB。
+- **AI 安全過濾**：輸入/輸出 filter、sensitive keywords、安全 prompt、token budget。
+- **多 Bot Webhook 路由**：`/api/webhook/line/[botId]/[webhookKey]` 已實作。
+- **Playwright E2E**：有完整配置，支援本地/production 兩種模式。
+- **Cache 雙層**：`lib/cache.ts` memory + Upstash Redis，Redis 未設定時 graceful fallback。
+
+## 已知技術債（按優先序）
+
+### P0 — 會影響穩定性或正確性
+- ~~React 18 + Next.js 16~~ → **已完成**（React 19.2.4）
+- ~~Supabase 密碼洩漏保護~~ → **已完成**（Dashboard 已開啟）
+- ~~ai_feedback RLS INSERT 過寬~~ → **已完成**（migration 已套用）
+- 目前無未完成 P0：Auth 設定的 HaveIBeenPwned 檢查是關閉的，需到 Supabase Dashboard 一鍵開。
+- **`ai_feedback` RLS INSERT 過寬**：`WITH CHECK (true)` 讓任何角色都能 INSERT，需限制為 service_role。
+
+### P1 — 應盡快處理
+- **test-ai / test-alert 測試 API 殘留**：應移除或加 production guard。
+- **cache.ts 的 setInterval**：L179，serverless 無效，應移除。
+- **28 條 RLS policy 用 `auth.uid()` 而非 `(select auth.uid())`**：影響效能，需 migration 修。
+- **7 個 FK 缺索引**：ab_test_assignments, ai_feedback(x2), ai_suggestions(x2), conversations, workflow_logs。
+- **Auth redirect 硬編碼 `/zh-TW`**：LINE callback 和 forgot-password 寫死 locale，需改 locale-aware。
+- **proxy.ts 缺安全標頭**：CSP / X-Frame-Options / X-Content-Type-Options / HSTS。
+- **testsprite_tests 遺留目錄**：應清理。
+- **21 個 merged branch 未刪**：清理後 28 → 5。
+
+### P2 — 改善品質
+- **sitemap.ts 缺 hreflang**。
+- **help-articles.ts 硬編碼**（891 行）。
+- **Landing page 偏大**（~350 行，11 section 可拆分）。
+- **沒有 shadcn/ui**。
+- **legacy `getSupabase()` 可能未使用**（`lib/supabase.ts`），需確認後移除。
+- **Supabase types 手動維護**：沒有 `database.types.ts` 自動生成。
+- **Dependabot ignore 不完整**：需加 tailwindcss、@line/bot-sdk major ignore。
+
+### P3 — 可選優化
+- **Supabase Custom Domain**：尚未啟用。
+- **OpenAI Streaming**：目前無。
+- **元件目錄結構**：兩個 components/ 並存。
+- **branch protection 未設定**：main 無強制 CI check。
+- **缺 SECURITY.md**。
+
+## GitHub 狀態（2026-02-25 驗證）
+
+- **Open PR**：7 個（應關閉 #32 #36 #47，保留 #48 #46 #39 #38）
+- **Open Issue**：1 個（#26 退款政策，PR #48 處理中）
+- **CI**：type-check + lint + unit + build + CodeQL + dependency-review
+- **gh CLI 未登入**：用 GitHub MCP 代替
+
+## Supabase 狀態（2026-02-25 驗證）
+
+- **專案**：ACTIVE_HEALTHY，Postgres 17，ap-southeast-1
+- **RLS 覆蓋率**：100%（20/20 表）
+- **Migration**：14 個已套用，0 pending
+- **DB 大小**：13 MB
+- **關鍵量**：users=3, contacts=1, conversations=36, knowledge_base=48
+
+## 版本關鍵數字
+
+| 依賴 | 當前版本 | 備註 |
+|------|---------|------|
+| next | ^16.1.6 | |
+| react / react-dom | ^19.0.0 (19.2.4) | 已升 19 |
+| @supabase/ssr | ^0.8.0 | |
+| @supabase/supabase-js | ^2.45.0 | |
+| next-intl | ^4.8.3 | |
+| openai | ^4.67.0 | |
+| typescript | ^5.6.2 | |
+
+## 工作守則
+
+- 修改前先跑 `npm run type-check && npm run lint && npm run test:unit:run && npm run build`，全綠才 commit。
+- 不要建議「新增 middleware.ts」— 用的是 `proxy.ts`（Next.js 16 模式）。
+- 不要建議「每個 API route 加 auth」— proxy.ts 已統一攔截。
+- React 升級必須 react + react-dom 同時升，不可分開 PR。
+- 環境變數一律從 `process.env` 讀，正式 URL 為 `https://www.customeraipro.com`。
