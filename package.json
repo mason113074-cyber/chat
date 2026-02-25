@@ -56,7 +56,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
     "axe-core": "^4.10.2",
-    "cross-env": "^7.0.3",
+    "cross-env": "^10.1.0",
     "eslint": "^9.39.3",
     "eslint-config-next": "^16.1.6",
     "jsdom": "^25.0.1",
