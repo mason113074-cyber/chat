@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAuthFromRequest } from '@/lib/auth-helper';
 
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 200;
+
 export async function GET(request: NextRequest) {
   try {
     const auth = await getAuthFromRequest(request);
@@ -13,20 +16,33 @@ export async function GET(request: NextRequest) {
       user = u;
     }
 
-    const cols = 'id, line_user_id, name, email, phone, notes, csat_score, top_topic, created_at, conversations(id, created_at, message)';
+    const params = request.nextUrl.searchParams;
+    const page = Math.max(1, Number(params.get('page')) || 1);
+    const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, Number(params.get('pageSize')) || DEFAULT_PAGE_SIZE));
+    const offset = (page - 1) * pageSize;
+
+    const baseCols = 'id, line_user_id, name, email, phone, notes, csat_score, top_topic, created_at';
     let contacts: Array<Record<string, unknown>> | null = null;
+
+    const { count: totalCount } = await supabase
+      .from('contacts')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id);
+
     const { data: data1, error: selErr } = await supabase
       .from('contacts')
-      .select(cols + ', source, lifecycle_stage')
+      .select(baseCols + ', source, lifecycle_stage')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(offset, offset + pageSize - 1);
 
     if (selErr?.code === '42703') {
       const { data: fallback } = await supabase
         .from('contacts')
-        .select(cols)
+        .select(baseCols)
         .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(offset, offset + pageSize - 1);
       for (const c of fallback ?? []) {
         (c as Record<string, unknown>).source = 'line';
         (c as Record<string, unknown>).lifecycle_stage = 'new_customer';
@@ -35,18 +51,25 @@ export async function GET(request: NextRequest) {
     } else {
       contacts = data1 as Array<Record<string, unknown>> | null;
     }
-    if (!contacts) return NextResponse.json({ contacts: [] });
+    if (!contacts) return NextResponse.json({ contacts: [], pagination: { page, pageSize, total: 0 } });
 
-    const contactIds = contacts.map((c) => c.id);
-    const { data: assignments } = await supabase
-      .from('contact_tag_assignments')
-      .select('contact_id, tag_id, assigned_by')
-      .in('contact_id', contactIds);
+    const contactIds = contacts.map((c) => c.id as string);
 
-    const { data: tagRows } = await supabase
-      .from('contact_tags')
-      .select('id, name, color')
-      .eq('user_id', user.id);
+    const [{ data: assignments }, { data: tagRows }, { data: convCounts }] = await Promise.all([
+      supabase
+        .from('contact_tag_assignments')
+        .select('contact_id, tag_id, assigned_by')
+        .in('contact_id', contactIds),
+      supabase
+        .from('contact_tags')
+        .select('id, name, color')
+        .eq('user_id', user.id),
+      supabase
+        .from('conversations')
+        .select('contact_id')
+        .in('contact_id', contactIds),
+    ]);
+
     const tagMap = new Map((tagRows ?? []).map((t) => [t.id, { id: t.id, name: t.name, color: t.color }]));
 
     const assignmentsByContact = new Map<string, { id: string; name: string; color: string; assigned_by: string }[]>();
@@ -58,50 +81,38 @@ export async function GET(request: NextRequest) {
       assignmentsByContact.set(a.contact_id, list);
     }
 
-    type Conv = { id: string; created_at: string; message?: string | null };
+    const convCountByContact = new Map<string, number>();
+    for (const row of convCounts ?? []) {
+      convCountByContact.set(row.contact_id, (convCountByContact.get(row.contact_id) ?? 0) + 1);
+    }
+
     type Row = Record<string, unknown> & { id: string };
-    const out = (contacts as Row[]).map((c) => {
-      const convs = (c.conversations as Conv[]) ?? [];
-      const conversationCount = convs.length;
-      const lastInteraction = convs.length > 0
-        ? convs.reduce((latest, conv) =>
-            new Date(conv.created_at) > new Date(latest) ? conv.created_at : latest,
-            convs[0].created_at)
-        : null;
+    const out = (contacts as Row[]).map((c) => ({
+      id: c.id,
+      name: c.name,
+      line_user_id: c.line_user_id,
+      email: c.email ?? null,
+      phone: c.phone ?? null,
+      notes: c.notes ?? null,
+      csat_score: c.csat_score ?? null,
+      top_topic: c.top_topic ?? null,
+      created_at: c.created_at,
+      source: (c.source as string | undefined) ?? 'line',
+      lifecycle_stage: (c.lifecycle_stage as string | undefined) ?? 'new_customer',
+      conversationCount: convCountByContact.get(c.id) ?? 0,
+      lastInteraction: null,
+      tags: assignmentsByContact.get(c.id) ?? [],
+    }));
 
-      const keywordFreq = new Map<string, number>();
-      for (const conv of convs) {
-        const text = (conv.message ?? '').toLowerCase();
-        const tokens = text
-          .replace(/[^\u4e00-\u9fa5a-z0-9\s]/g, ' ')
-          .split(/\s+/)
-          .filter((w) => w.length >= 2)
-          .slice(0, 20);
-        for (const token of tokens) {
-          keywordFreq.set(token, (keywordFreq.get(token) ?? 0) + 1);
-        }
-      }
-      const computedTopTopic = Array.from(keywordFreq.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
-
-      return {
-        id: c.id,
-        name: c.name,
-        line_user_id: c.line_user_id,
-        email: c.email ?? null,
-        phone: c.phone ?? null,
-        notes: c.notes ?? null,
-        csat_score: c.csat_score ?? null,
-        top_topic: c.top_topic ?? computedTopTopic,
-        created_at: c.created_at,
-        source: (c.source as string | undefined) ?? 'line',
-        lifecycle_stage: (c.lifecycle_stage as string | undefined) ?? 'new_customer',
-        conversationCount,
-        lastInteraction,
-        tags: assignmentsByContact.get(c.id) ?? [],
-      };
+    return NextResponse.json({
+      contacts: out,
+      pagination: {
+        page,
+        pageSize,
+        total: totalCount ?? 0,
+        totalPages: Math.ceil((totalCount ?? 0) / pageSize),
+      },
     });
-
-    return NextResponse.json({ contacts: out });
   } catch (err) {
     console.error('GET /api/contacts error:', err);
     return NextResponse.json({ error: 'Failed to fetch contacts' }, { status: 500 });

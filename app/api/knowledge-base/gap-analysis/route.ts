@@ -51,19 +51,28 @@ export async function GET(request: NextRequest) {
 
     if (!assistantRows?.length) return NextResponse.json({ suggestions: [] });
 
+    const allContactIds = [...new Set(assistantRows.map((r) => r.contact_id))];
+    const { data: userMessages } = await supabase
+      .from('conversations')
+      .select('contact_id, message, created_at')
+      .eq('role', 'user')
+      .in('contact_id', allContactIds)
+      .gte('created_at', since.toISOString())
+      .order('created_at', { ascending: false });
+
+    const userMsgsByContact = new Map<string, { message: string; created_at: string }[]>();
+    for (const m of userMessages ?? []) {
+      const arr = userMsgsByContact.get(m.contact_id) ?? [];
+      arr.push({ message: m.message, created_at: m.created_at });
+      userMsgsByContact.set(m.contact_id, arr);
+    }
+
     const grouped = new Map<string, { count: number; question: string }>();
     for (const row of assistantRows) {
-      const { data: prevUser } = await supabase
-        .from('conversations')
-        .select('message, created_at')
-        .eq('contact_id', row.contact_id)
-        .eq('role', 'user')
-        .lt('created_at', row.created_at)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const msgs = userMsgsByContact.get(row.contact_id) ?? [];
+      const prev = msgs.find((m) => m.created_at < row.created_at);
 
-      const question = (prevUser?.message ?? '').trim();
+      const question = (prev?.message ?? '').trim();
       if (!question) continue;
       const key = question.toLowerCase().slice(0, 80);
       const current = grouped.get(key);

@@ -32,23 +32,28 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const { data: assistantRows } = await supabase
-      .from('conversations')
-      .select('contact_id, status, created_at')
-      .eq('role', 'assistant')
-      .in('contact_id', contactIds)
-      .order('created_at', { ascending: false });
+    const batchSize = 100;
+    const latestByContact = new Map<string, string>();
 
-    const latestByContact = new Map<string, { status: string | null }>();
-    for (const row of assistantRows ?? []) {
-      if (!latestByContact.has(row.contact_id)) {
-        latestByContact.set(row.contact_id, { status: row.status ?? 'ai_handled' });
+    for (let i = 0; i < contactIds.length; i += batchSize) {
+      const batch = contactIds.slice(i, i + batchSize);
+      const { data: rows } = await supabase
+        .from('conversations')
+        .select('contact_id, status')
+        .eq('role', 'assistant')
+        .in('contact_id', batch)
+        .order('created_at', { ascending: false });
+
+      for (const row of rows ?? []) {
+        if (!latestByContact.has(row.contact_id)) {
+          latestByContact.set(row.contact_id, row.status ?? 'ai_handled');
+        }
       }
     }
 
     const counts = { ai_handled: 0, needs_human: 0, resolved: 0, closed: 0 };
     for (const id of contactIds) {
-      const s = latestByContact.get(id)?.status ?? 'ai_handled';
+      const s = latestByContact.get(id) ?? 'ai_handled';
       const key = (['ai_handled', 'needs_human', 'resolved', 'closed'].includes(s) ? s : 'ai_handled') as StatusKey;
       counts[key]++;
     }

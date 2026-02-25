@@ -60,6 +60,7 @@
     "eslint": "^9.39.3",
     "eslint-config-next": "^16.1.6",
     "jsdom": "^25.0.1",
+    "marked": "^17.0.3",
     "playwright-video": "^2.4.0",
     "postcss": "^8.4.47",
     "shebang-command": "^2.0.0",

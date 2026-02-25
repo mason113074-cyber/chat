@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { clearKnowledgeCache } from '@/lib/knowledge-search';
+import dns from 'dns/promises';
 
 type ImportItem = {
   title: string;
@@ -8,6 +9,43 @@ type ImportItem = {
   category: string;
   sourceUrl: string;
 };
+
+const FETCH_TIMEOUT_MS = 8_000;
+const TOTAL_TIMEOUT_MS = 25_000;
+const MAX_HTML_BYTES = 2 * 1024 * 1024; // 2 MB per page
+const MAX_TOTAL_BYTES = 10 * 1024 * 1024; // 10 MB total
+const ALLOWED_SCHEMES = ['http:', 'https:'];
+
+function isPrivateIP(ip: string): boolean {
+  if (ip === '127.0.0.1' || ip === '::1' || ip === 'localhost') return true;
+  const parts = ip.split('.').map(Number);
+  if (parts.length === 4) {
+    if (parts[0] === 10) return true;
+    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+    if (parts[0] === 192 && parts[1] === 168) return true;
+    if (parts[0] === 169 && parts[1] === 254) return true; // link-local
+    if (parts[0] === 0) return true;
+  }
+  if (ip.startsWith('fc') || ip.startsWith('fd') || ip.startsWith('fe80')) return true;
+  return false;
+}
+
+async function validateUrl(url: string): Promise<void> {
+  const parsed = new URL(url);
+  if (!ALLOWED_SCHEMES.includes(parsed.protocol)) {
+    throw new Error(`不允許的 URL scheme: ${parsed.protocol}`);
+  }
+  try {
+    const addresses = await dns.resolve4(parsed.hostname).catch(() => []);
+    const addresses6 = await dns.resolve6(parsed.hostname).catch(() => []);
+    const all = [...addresses, ...addresses6];
+    if (all.length > 0 && all.every(isPrivateIP)) {
+      throw new Error('不允許存取內部網路位址');
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.includes('不允許')) throw e;
+  }
+}
 
 function stripHtml(html: string): string {
   return html
@@ -38,31 +76,47 @@ function guessCategory(text: string): string {
 }
 
 async function fetchPage(url: string): Promise<{ title: string; content: string }> {
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': 'CustomerAIPro-KB-Importer/1.0',
-      Accept: 'text/html,application/xhtml+xml',
-    },
-    cache: 'no-store',
-  });
-  if (!res.ok) throw new Error(`Failed to fetch ${url}: ${res.status}`);
-  const html = await res.text();
-  return {
-    title: extractTitle(html, url),
-    content: stripHtml(html),
-  };
+  await validateUrl(url);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'CustomerAIPro-KB-Importer/1.0',
+        Accept: 'text/html,application/xhtml+xml',
+      },
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`Failed to fetch ${url}: ${res.status}`);
+    const contentLength = Number(res.headers.get('content-length') || 0);
+    if (contentLength > MAX_HTML_BYTES) throw new Error(`頁面過大 (${contentLength} bytes)`);
+    const html = await res.text();
+    if (html.length > MAX_HTML_BYTES) throw new Error(`頁面過大 (${html.length} bytes)`);
+    return {
+      title: extractTitle(html, url),
+      content: stripHtml(html),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function collectUrls(startUrl: string, depth: number, maxPages: number): Promise<string[]> {
   const urls = [startUrl];
   if (depth <= 1) return urls;
 
-  const res = await fetch(startUrl, {
-    headers: { 'User-Agent': 'CustomerAIPro-KB-Importer/1.0' },
-    cache: 'no-store',
-  });
-  if (!res.ok) return urls;
-  const html = await res.text();
+  await validateUrl(startUrl);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const res = await fetch(startUrl, {
+      headers: { 'User-Agent': 'CustomerAIPro-KB-Importer/1.0' },
+      cache: 'no-store',
+      signal: controller.signal,
+    });
+    if (!res.ok) return urls;
+    const html = await res.text();
 
   const origin = new URL(startUrl).origin;
   const hrefMatches = Array.from(html.matchAll(/href\s*=\s*["']([^"']+)["']/gi));
@@ -81,6 +135,9 @@ async function collectUrls(startUrl: string, depth: number, maxPages: number): P
     }
   }
   return Array.from(set).slice(0, maxPages);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -97,18 +154,25 @@ export async function POST(request: NextRequest) {
 
     if (!url) return NextResponse.json({ error: 'URL 為必填' }, { status: 400 });
     try {
-      // Validate URL
-      new URL(url);
+      const parsed = new URL(url);
+      if (!ALLOWED_SCHEMES.includes(parsed.protocol)) {
+        return NextResponse.json({ error: `不允許的 URL scheme: ${parsed.protocol}` }, { status: 400 });
+      }
     } catch {
       return NextResponse.json({ error: 'URL 格式不正確' }, { status: 400 });
     }
 
+    const deadline = Date.now() + TOTAL_TIMEOUT_MS;
     const targetUrls = await collectUrls(url, depth, 10);
     const items: ImportItem[] = [];
+    let totalBytes = 0;
     for (const target of targetUrls) {
+      if (Date.now() > deadline) break;
       try {
         const page = await fetchPage(target);
         if (!page.content) continue;
+        totalBytes += page.content.length;
+        if (totalBytes > MAX_TOTAL_BYTES) break;
         const clipped = page.content.slice(0, 4000);
         items.push({
           title: page.title.slice(0, 200),

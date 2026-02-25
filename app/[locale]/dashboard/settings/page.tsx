@@ -438,7 +438,11 @@ export default function SettingsPage() {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: testMessage }),
+        body: JSON.stringify({
+          message: testMessage,
+          systemPrompt: systemPrompt?.trim() || undefined,
+          aiModel: aiModel?.trim() || undefined,
+        }),
       });
 
       if (!response.ok) {

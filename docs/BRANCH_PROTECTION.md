@@ -2,6 +2,23 @@
 
 為避免未通過 CI 的程式合併進 main，建議在 GitHub 為 `main` 啟用 Branch protection rules。
 
+## 使用 GitHub CLI（gh）設定
+
+若已安裝並登入 GitHub CLI（`gh auth login`），可在 repo 根目錄執行以下指令，為 `main` 啟用 branch protection（需 merge 前通過 status check `ci`）：
+
+```bash
+gh api repos/mason113074-cyber/chat/branches/main/protection -X PUT \
+  -f required_status_checks='{"strict":false,"contexts":["ci"]}' \
+  -f enforce_admins=false \
+  -f required_pull_request_reviews='{"dismiss_stale_reviews":false,"require_code_owner_reviews":false}' \
+  -f restrictions=null \
+  -f allow_force_pushes=false \
+  -f allow_deletions=false
+```
+
+- **注意**：需具備 repo 的 **Admin** 權限；首次使用前請先執行 `gh auth login`。
+- 若 Status check 名稱尚未出現，請先對 main 觸發一次 CI（例如 push 或 PR merge），再執行上列指令或改從網頁設定。
+
 ## 設定步驟（GitHub 網頁）
 
 1. **進入設定**
