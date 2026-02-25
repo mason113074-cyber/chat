@@ -1,6 +1,29 @@
+# Dependabot: limit PRs and avoid major-update noise.
+# See docs/GITHUB_REPO_SETTINGS_CHECKLIST.md for Security/Dependabot UI options.
+
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /
     schedule:
       interval: weekly
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    # Optional: assignees (replace with your GitHub username)
+    # assignees:
+    #   - mason113074-cyber
+    ignore:
+      # Major updates often break the repo; handle manually when ready.
+      - dependency-name: eslint
+        update-types: [version-update:semver-major]
+      - dependency-name: eslint-config-next
+        update-types: [version-update:semver-major]
+      - dependency-name: "@types/node"
+        update-types: [version-update:semver-major]
+      - dependency-name: cross-env
+        update-types: [version-update:semver-major]
+      - dependency-name: tailwindcss
+        update-types: [version-update:semver-major]
+      - dependency-name: "@line/bot-sdk"
+        update-types: [version-update:semver-major]

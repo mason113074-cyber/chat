@@ -5,12 +5,26 @@ on:
     branches: [main]
   push:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   ci:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: read
+
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy
+      SUPABASE_SERVICE_ROLE_KEY: dummy
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      OPENAI_API_KEY: dummy
+      NEXT_TELEMETRY_DISABLED: 1
 
     steps:
       - uses: actions/checkout@v4
@@ -35,5 +49,3 @@ jobs:
 
       - name: Build
         run: npm run build
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

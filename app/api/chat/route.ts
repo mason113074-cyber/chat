@@ -15,6 +15,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const message = body?.message;
+    /** 選填：預覽用。若有傳入則使用，不讀 DB（供設定頁「測試 AI」預覽未儲存的 system prompt） */
+    const systemPromptOverride = body?.systemPrompt;
+    const aiModelOverride = body?.aiModel;
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json(
@@ -49,13 +52,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data } = await supabase
-      .from('users')
-      .select('system_prompt, ai_model')
-      .eq('id', user.id)
-      .maybeSingle();
-    let systemPrompt: string | null = data?.system_prompt ?? null;
-    let aiModel: string | null = data?.ai_model ?? null;
+    let systemPrompt: string | null;
+    let aiModel: string | null;
+
+    if (systemPromptOverride !== undefined && systemPromptOverride !== null) {
+      systemPrompt = typeof systemPromptOverride === 'string' ? systemPromptOverride : null;
+      aiModel = typeof aiModelOverride === 'string' ? aiModelOverride : null;
+    } else {
+      const { data } = await supabase
+        .from('users')
+        .select('system_prompt, ai_model')
+        .eq('id', user.id)
+        .maybeSingle();
+      systemPrompt = data?.system_prompt ?? null;
+      aiModel = data?.ai_model ?? null;
+    }
 
     const knowledgeText = await searchKnowledgeForUser(user.id, message, 3, 2000);
     systemPrompt = (systemPrompt?.trim() ?? '') + (knowledgeText ? KNOWLEDGE_PREFIX + knowledgeText : KNOWLEDGE_EMPTY_INSTRUCTION);

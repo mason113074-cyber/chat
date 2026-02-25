@@ -1,4 +1,4 @@
--- 030: ai_suggestions forward-compat migration
+-- 032: ai_suggestions forward-compat migration (renumbered from 030 for unique naming)
 -- Upgrades old schema (draft_text / status pending/approved/sent) to multibot schema
 -- without dropping legacy columns. Safe to run on both old and new schemas.
 
@@ -76,12 +76,10 @@ BEGIN
 END $$;
 
 -- 3. Replace status CHECK constraint and migrate values, then re-add canonical constraint
---    All done in one block: drop old constraint first (old values block 'draft'), update, re-add.
 DO $$
 DECLARE
   con_name text;
 BEGIN
-  -- Drop all existing CHECK constraints on status (covers old or new constraint names)
   FOR con_name IN
     SELECT conname FROM pg_constraint
     WHERE conrelid = 'public.ai_suggestions'::regclass
@@ -91,12 +89,10 @@ BEGIN
     EXECUTE format('ALTER TABLE public.ai_suggestions DROP CONSTRAINT %I', con_name);
   END LOOP;
 
-  -- Map old status values to new ones
   UPDATE public.ai_suggestions
     SET status = 'draft'
     WHERE status IN ('pending', 'approved');
 
-  -- Re-add canonical status constraint
   ALTER TABLE public.ai_suggestions
     ADD CONSTRAINT ai_suggestions_status_check
       CHECK (status IN ('draft', 'sent', 'expired', 'rejected'));
@@ -116,12 +112,10 @@ BEGIN
   END IF;
 END $$;
 
--- 5. Add indexes for new columns (idempotent)
 CREATE INDEX IF NOT EXISTS idx_ai_suggestions_contact ON public.ai_suggestions(contact_id);
 CREATE INDEX IF NOT EXISTS idx_ai_suggestions_user_status ON public.ai_suggestions(user_id, status);
 CREATE INDEX IF NOT EXISTS idx_ai_suggestions_event_id ON public.ai_suggestions(event_id);
 
--- 6. Enable RLS and apply multibot policy (idempotent)
 ALTER TABLE public.ai_suggestions ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Users manage own ai_suggestions via contact" ON public.ai_suggestions;
@@ -131,4 +125,4 @@ CREATE POLICY "Users manage own ai_suggestions via contact" ON public.ai_suggest
     AND EXISTS (SELECT 1 FROM public.contacts c WHERE c.id = contact_id AND c.user_id = auth.uid())
   );
 
-COMMENT ON TABLE public.ai_suggestions IS 'Draft AI replies (SUGGEST); forward-compat migration applied in 030';
+COMMENT ON TABLE public.ai_suggestions IS 'Draft AI replies (SUGGEST); forward-compat migration 032';

@@ -85,4 +85,64 @@ describe('decideReplyAction', () => {
     expect(result.action).toBe('ASK');
     expect(result.askText).toContain('訂單編號');
   });
+
+  it('refund with order number → SUGGEST with safe template (not AUTO, not HANDOFF)', () => {
+    const result = decideReplyAction({
+      userMessage: '我要退款，訂單 123',
+      userId: 'u1',
+      contactId: 'c1',
+      sourcesCount: 0,
+      riskDetection: lowRisk,
+      settings: { confidence_threshold: 0.6 },
+    });
+
+    expect(result.action).toBe('SUGGEST');
+    expect(result.category).toBe('refund');
+    // 安全草稿不得包含承諾、金額或時間
+    expect(result.draftText).not.toMatch(/保證|一定|絕對/);
+    expect(result.draftText).not.toMatch(/\d+\s*(天|小時|工作日)/);
+  });
+
+  it('refund with order number → SUGGEST also when riskDetection is high', () => {
+    const result = decideReplyAction({
+      userMessage: '我要退錢，訂單 456',
+      userId: 'u1',
+      contactId: 'c1',
+      sourcesCount: 0,
+      riskDetection: highRisk,
+      settings: { confidence_threshold: 0.6 },
+    });
+
+    expect(result.action).toBe('SUGGEST');
+    expect(result.category).toBe('refund');
+  });
+
+  it('refund without order number → ASK even with low riskDetection', () => {
+    const result = decideReplyAction({
+      userMessage: '我要退款，商品壞了',
+      userId: 'u1',
+      contactId: 'c1',
+      sourcesCount: 0,
+      riskDetection: lowRisk,
+      settings: { confidence_threshold: 0.6 },
+    });
+
+    expect(result.action).toBe('ASK');
+    expect(result.askText).toContain('訂單編號');
+  });
+
+  it('refund with 2-char number (too short) is treated as no order number → ASK', () => {
+    const result = decideReplyAction({
+      userMessage: '我要退款，訂單 12',
+      userId: 'u1',
+      contactId: 'c1',
+      sourcesCount: 0,
+      riskDetection: lowRisk,
+      settings: { confidence_threshold: 0.6 },
+    });
+
+    // "訂單 12" has only 2 chars after prefix → does not match ORDER_NUMBER_PATTERN → ASK
+    expect(result.action).toBe('ASK');
+    expect(result.askText).toContain('訂單編號');
+  });
 });

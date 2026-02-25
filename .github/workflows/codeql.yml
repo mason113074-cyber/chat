@@ -1,0 +1,54 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 0 * * 1'
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Preflight code scanning availability
+        id: preflight
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/code-scanning/alerts?per_page=1"
+
+          CODE=$(curl -s -o /tmp/codescanning.json -w "%{http_code}" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "${URL}")
+
+          if [ "${CODE}" = "200" ]; then
+            echo "enabled=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "enabled=false" >> "${GITHUB_OUTPUT}"
+            echo "::notice title=CodeQL skipped::Code scanning API not available (HTTP ${CODE}). Enable Settings → Code security and analysis → Code scanning (or GHAS) to run this check."
+            cat /tmp/codescanning.json || true
+          fi
+
+      - name: Initialize CodeQL
+        if: steps.preflight.outputs.enabled == 'true'
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+
+      - name: Perform CodeQL Analysis
+        if: steps.preflight.outputs.enabled == 'true'
+        uses: github/codeql-action/analyze@v3

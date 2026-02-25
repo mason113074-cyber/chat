@@ -4,9 +4,10 @@
  */
 
 // 高風險關鍵字（涉及金錢、法律責任）
+// 注意：退款/退錢 已移至決策層（SUGGEST/ASK），不再 hard-stop
 export const HIGH_RISK_KEYWORDS = [
   // 金錢相關
-  '退款', '賠償', '折扣', '免費', '贈送', '送你', '給你',
+  '賠償', '折扣', '免費', '贈送', '送你', '給你',
   '打折', '優惠', '現金', '匯款', '轉帳',
 
   // 訂單相關
@@ -114,6 +115,18 @@ const REFUND_RETURN_KEYWORDS = [
   '換貨',
   '取消訂單',
 ];
+
+/** 退款/退錢專屬關鍵字：改走 SUGGEST/ASK，不再 hard-stop */
+const REFUND_MONEY_KEYWORDS = ['退款', '退錢'] as const;
+
+/**
+ * 判斷是否為退款/退錢請求。
+ * 此類訊息應改走決策層（SUGGEST/ASK），不再 hard-stop。
+ */
+export function isRefundOrMoneyRequest(text: string): boolean {
+  const normalized = text.toLowerCase().trim();
+  return REFUND_MONEY_KEYWORDS.some((kw) => normalized.includes(kw));
+}
 
 /** 訂單/識別類關鍵字（結構化請求判斷用） */
 const ORDER_CONTEXT_KEYWORDS = ['訂單', '訂單編號', '編號', 'order'];

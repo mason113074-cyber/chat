@@ -49,11 +49,17 @@ async function getLineProfile(accessToken: string): Promise<LineProfile> {
  * - login: 依 line_login_user_id 查使用者，以 magic link 登入並導向 /dashboard
  * - bind: 已登入使用者綁定 LINE，更新 public.users 後導向 /dashboard/settings
  */
+function getLocaleFromRequest(request: NextRequest): string {
+  const cookie = request.cookies.get('NEXT_LOCALE')?.value;
+  return cookie === 'en' || cookie === 'zh-TW' ? cookie : 'zh-TW';
+}
+
 export async function GET(request: NextRequest) {
   const channelId = process.env.LINE_LOGIN_CHANNEL_ID;
   const channelSecret = process.env.LINE_LOGIN_CHANNEL_SECRET;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || 'https://www.customeraipro.com';
   const redirectUri = `${appUrl}/api/auth/line/callback`;
+  const locale = getLocaleFromRequest(request);
 
   const { searchParams } = new URL(request.url);
   const code = searchParams.get('code');
@@ -62,10 +68,10 @@ export async function GET(request: NextRequest) {
   const [action] = state.split(':');
 
   if (!channelId || !channelSecret) {
-    return NextResponse.redirect(`${appUrl}/zh-TW/login?error=line_not_configured`);
+    return NextResponse.redirect(`${appUrl}/${locale}/login?error=line_not_configured`);
   }
   if (!code) {
-    return NextResponse.redirect(`${appUrl}/zh-TW/login?error=missing_code`);
+    return NextResponse.redirect(`${appUrl}/${locale}/login?error=missing_code`);
   }
 
   try {
@@ -76,7 +82,7 @@ export async function GET(request: NextRequest) {
       const supabase = await createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        return NextResponse.redirect(`${appUrl}/zh-TW/login?error=bind_requires_login`);
+        return NextResponse.redirect(`${appUrl}/${locale}/login?error=bind_requires_login`);
       }
       const { error } = await supabase
         .from('users')
@@ -88,9 +94,9 @@ export async function GET(request: NextRequest) {
         .eq('id', user.id);
       if (error) {
         console.error('LINE bind update error:', error);
-        return NextResponse.redirect(`${appUrl}/zh-TW/dashboard/settings?line_bind=error`);
+        return NextResponse.redirect(`${appUrl}/${locale}/dashboard/settings?line_bind=error`);
       }
-      return NextResponse.redirect(`${appUrl}/zh-TW/dashboard/settings?line_bind=success`);
+      return NextResponse.redirect(`${appUrl}/${locale}/dashboard/settings?line_bind=success`);
     }
 
     // login: find user by line_login_user_id, or sign up new user with LINE
@@ -134,7 +140,7 @@ export async function GET(request: NextRequest) {
         if (createError || !newUserData.user) {
           console.error('LINE signup createUser error:', createError);
           return NextResponse.redirect(
-            `${appUrl}/zh-TW/login?error=line_not_linked&hint=請先註冊並在設定中綁定 LINE`
+            `${appUrl}/${locale}/login?error=line_not_linked&hint=請先註冊並在設定中綁定 LINE`
           );
         }
         row = { id: newUserData.user.id, email: syntheticEmail };
@@ -152,15 +158,15 @@ export async function GET(request: NextRequest) {
     const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
       type: 'magiclink',
       email: row.email,
-      options: { redirectTo: `${appUrl}/zh-TW/dashboard` },
+      options: { redirectTo: `${appUrl}/${locale}/dashboard` },
     });
     if (linkError || !linkData?.properties?.action_link) {
       console.error('LINE login magic link error:', linkError);
-      return NextResponse.redirect(`${appUrl}/zh-TW/login?error=login_failed`);
+      return NextResponse.redirect(`${appUrl}/${locale}/login?error=login_failed`);
     }
     return NextResponse.redirect(linkData.properties.action_link);
   } catch (err) {
     console.error('LINE callback error:', err);
-    return NextResponse.redirect(`${appUrl}/zh-TW/login?error=line_callback_failed`);
+    return NextResponse.redirect(`${appUrl}/${locale}/login?error=line_callback_failed`);
   }
 }

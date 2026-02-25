@@ -1,3 +1,5 @@
+import { getAppUrl } from './app-url';
+
 /** Single source of truth: only these 6 category slugs are valid. */
 export const HELP_CATEGORIES = [
   'getting-started',
@@ -885,6 +887,7 @@ export function getArticleContent(categorySlug: string, articleSlug: string, loc
   if (locale === 'zh-TW' || locale === 'en') {
     contentHtml = contentHtml.replace(/href="\/help/g, `href="/${locale}/help`);
   }
+  contentHtml = contentHtml.replace(/https:\/\/www\.customeraipro\.com/g, getAppUrl());
   return { ...stored, contentHtml };
 }
 

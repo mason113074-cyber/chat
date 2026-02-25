@@ -86,13 +86,15 @@ const CATEGORY_PATTERNS: Array<{ category: ReplyDecisionCategory; regex: RegExp 
 
 const SIMPLE_MESSAGE_PATTERN = /^(你好|哈囉|嗨|hi|hello|感謝|謝謝|thanks|ok|好的|收到|在嗎|有人嗎)[!！。. ]*$/i;
 const ORDER_NUMBER_PATTERN =
-  /((訂單|order)\s*[#:：-]?\s*[a-z0-9-]{4,}|#[a-z0-9-]{4,}|\b[a-z]{0,2}\d{6,}\b)/i;
+  /((訂單|order)\s*[#:：-]?\s*[a-z0-9-]{3,}|#[a-z0-9-]{4,}|\b[a-z]{0,2}\d{6,}\b)/i;
 const PRODUCT_PATTERN = /(商品|產品|品項|型號|款式|名稱|sku)/i;
 const DATE_PATTERN = /(\d{4}[\/\-年]\d{1,2}[\/\-月]\d{1,2}日?|\d{1,2}[\/\-月]\d{1,2}日?|今天|昨日|昨天|前天|上週|上個月)/i;
 const DETAILS_PATTERN = /(問題|狀況|情況|原因|內容|照片|截圖|描述)/i;
 
 const DEFAULT_SAFE_DRAFT = '已收到您的問題，我們會由專員確認後盡快回覆您。';
 const DEFAULT_HANDOFF_TEXT = '此問題需要專員協助處理，我們已為您轉交人工客服，請稍候。';
+/** 退款/退錢 安全草稿模板（不含承諾/金額/時間），供人工一鍵審核送出 */
+const REFUND_SAFE_TEMPLATE = '已收到您的退款申請，我們將安排專員確認訂單狀態後與您聯繫，感謝您的耐心。';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -128,9 +130,12 @@ function buildClarifyingQuestions(
   const hasDate = DATE_PATTERN.test(userMessage);
   const hasDetails = DETAILS_PATTERN.test(userMessage);
 
-  if (category === 'refund' || category === 'return_exchange') {
+  if (category === 'refund') {
+    // 退款類：訂單號是唯一必填欄位；有訂單號即可產生安全草稿，不強制補充商品/日期
     if (!hasOrderNumber) questions.push('請提供訂單編號，方便我們先查核訂單狀態。');
-    if (!hasProduct) questions.push('請告知欲退款/退換貨的商品名稱與規格。');
+  } else if (category === 'return_exchange') {
+    if (!hasOrderNumber) questions.push('請提供訂單編號，方便我們先查核訂單狀態。');
+    if (!hasProduct) questions.push('請告知欲退換貨的商品名稱與規格。');
     if (!hasDate) questions.push('請提供下單日期或付款日期。');
   } else if (category === 'discount' || category === 'price') {
     if (!hasProduct) questions.push('請問您要詢問哪一個商品或方案的價格/折扣呢？');
@@ -215,6 +220,8 @@ export function decideReplyAction(input: ReplyDecisionInput): ReplyDecisionResul
     titles: (input.sources ?? []).slice(0, 5).map((s) => s.title),
   };
   const candidateDraft = input.candidateDraft?.trim() || DEFAULT_SAFE_DRAFT;
+  // 退款類別固定使用安全草稿模板（不含承諾/金額/時間），避免 AI 產生不當承諾
+  const suggestDraft = category === 'refund' ? REFUND_SAFE_TEMPLATE : candidateDraft;
 
   if (highRiskDetected && missingRequiredFields) {
     const askText = formatAskText(clarifyingQuestions);
@@ -231,6 +238,17 @@ export function decideReplyAction(input: ReplyDecisionInput): ReplyDecisionResul
 
   if (sourcesCount === 0) {
     if (!simpleMessage) {
+      // 退款類有訂單號但無知識庫命中 → SUGGEST 安全模板草稿供人工審核（不走 HANDOFF）
+      if (category === 'refund' && !missingRequiredFields) {
+        return {
+          action: 'SUGGEST',
+          draftText: suggestDraft,
+          reason: '退款類已提供訂單號，以安全模板草稿供人工審核送出。',
+          confidence,
+          category,
+          sources: sourceSummary,
+        };
+      }
       const askText = highRiskDetected
         ? '為避免提供錯誤承諾，此問題將轉交專員協助處理。'
         : '目前沒有足夠依據可直接回答，請提供訂單編號、商品名稱與相關日期。';
@@ -273,7 +291,7 @@ export function decideReplyAction(input: ReplyDecisionInput): ReplyDecisionResul
 
     return {
       action: 'SUGGEST',
-      draftText: candidateDraft,
+      draftText: suggestDraft,
       reason: '信心值低於門檻，改為人工確認後送出。',
       confidence,
       category,
@@ -284,7 +302,7 @@ export function decideReplyAction(input: ReplyDecisionInput): ReplyDecisionResul
   if (highRiskDetected) {
     return {
       action: 'SUGGEST',
-      draftText: candidateDraft,
+      draftText: suggestDraft,
       reason: '高風險類別禁止 AUTO，需人工審核。',
       confidence,
       category,

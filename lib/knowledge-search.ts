@@ -69,7 +69,12 @@ export function tokenizeQuery(query: string): string[] {
 
 export type KnowledgeSource = { id: string; title: string; category: string };
 
-export type KnowledgeSearchResult = { text: string; sources: KnowledgeSource[] };
+export type KnowledgeSearchResult = {
+  text: string;
+  sources: KnowledgeSource[];
+  /** 0-1 confidence score: how well KB matched the query */
+  confidence: number;
+};
 
 /**
  * Search knowledge_base for a user by message keywords.
@@ -138,7 +143,7 @@ export async function searchKnowledgeWithSources(
           .limit(MAX_KNOWLEDGE_ROWS);
 
         if (fallbackError || !fallbackData || fallbackData.length === 0) {
-          return { text: '', sources: [] };
+          return { text: '', sources: [], confidence: 0 };
         }
         rows = fallbackData as { id: string; title: string; content: string; category: string }[];
       }
@@ -164,12 +169,13 @@ export async function searchKnowledgeWithSources(
       }
 
       if (top.length === 0) {
-        return { text: '', sources: [] };
+        return { text: '', sources: [], confidence: 0 };
       }
 
       const parts: string[] = [];
       const sources: KnowledgeSource[] = [];
       let total = 0;
+      let totalScore = 0;
       for (const r of top) {
         const block = `【${r.title}】\n${r.content}`;
         if (total + block.length > maxChars) break;
@@ -178,7 +184,21 @@ export async function searchKnowledgeWithSources(
         total += block.length;
       }
 
-      return { text: parts.join('\n\n'), sources };
+      if (keywords.length > 0 && top.length > 0) {
+        const bestScore = (top as Array<{ id: string; title: string; content: string; category: string }>).reduce((max, row) => {
+          const text = `${row.title} ${row.content}`.toLowerCase();
+          let s = 0;
+          for (const k of keywords) {
+            if (text.includes(k.toLowerCase())) s++;
+          }
+          return Math.max(max, s);
+        }, 0);
+        totalScore = Math.min(1, bestScore / Math.max(1, Math.min(keywords.length, 5)));
+      }
+
+      const confidence = sources.length === 0 ? 0 : keywords.length === 0 ? 0.3 : totalScore;
+
+      return { text: parts.join('\n\n'), sources, confidence };
     },
     { ttl: KNOWLEDGE_SEARCH_CACHE_TTL }
   );

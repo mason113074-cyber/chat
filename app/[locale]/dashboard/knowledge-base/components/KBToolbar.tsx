@@ -13,7 +13,7 @@ export interface KBToolbarProps {
   onImportFile: () => void;
   onOpenUrlImport: () => void;
   onDownloadSample: (type: 'txt' | 'csv') => void;
-  fileInputRef: React.RefObject<HTMLInputElement>;
+  fileInputRef: React.RefObject<HTMLInputElement | null>;
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 

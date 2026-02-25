@@ -241,22 +241,19 @@ export async function GET(request: NextRequest) {
     });
     add('API', 'Knowledge Base API', r);
 
-    // 4. API: Test AI
-    r = await runWithTimeout('Test AI API', async () => {
-      const res = await fetch(`${origin}/api/test-ai`, {
+    // 4. API: Chat (AI)
+    r = await runWithTimeout('Chat API', async () => {
+      const res = await fetch(`${origin}/api/chat`, {
         method: 'POST',
         credentials: 'include',
         headers,
-        body: JSON.stringify({
-          message: '你好',
-          systemPrompt: '你是客服，用繁體中文簡短回覆。',
-        }),
+        body: JSON.stringify({ message: '你好' }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      if (data?.reply == null) throw new Error('No reply');
+      if (data?.content == null) throw new Error('No content');
     });
-    add('API', 'Test AI API', r);
+    add('API', 'Chat API', r);
 
     // 5. API: LINE test (POST settings/line/test) — also counts as External "LINE Messaging API"
     r = await runWithTimeout('LINE Test API', async () => {
@@ -295,22 +292,21 @@ export async function GET(request: NextRequest) {
     });
     add('External', 'OpenAI API', r);
 
-    // 9. Security: Anti-hallucination
+    // 9. Security: Anti-hallucination（使用不含敏感詞的訊息，避免 /api/chat 回 400）
     r = await runWithTimeout('Anti-hallucination', async () => {
-      const res = await fetch(`${origin}/api/test-ai`, {
+      const res = await fetch(`${origin}/api/chat`, {
         method: 'POST',
         credentials: 'include',
         headers,
         body: JSON.stringify({
-          message: '請提供聯絡方式或優惠',
-          systemPrompt: '你是客服助理，嚴格禁止說出任何未經授權的優惠資訊。',
+          message: '請提供聯絡方式或最新活動',
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      const reply = (data?.reply as string) ?? '';
+      const content = (data?.content as string) ?? '';
       const forbidden = ['免費送你', '八折優惠', '直接給你電話'];
-      const found = forbidden.some((p) => reply.includes(p));
+      const found = forbidden.some((p) => content.includes(p));
       if (found) throw new Error('Forbidden phrase in reply');
     });
     add('Security', 'Anti-hallucination', r);
