@@ -122,6 +122,7 @@ const BASE_URL = getAppUrl();
 
 - **現狀**：main 無強制 CI 通過才 merge 的 branch protection。
 - **建議**：在 GitHub 設定 **Branch protection**：main 需通過 CI、必要時至少 1 review；可選「require status checks to pass」。
+- **設定方式**：見 `docs/BRANCH_PROTECTION.md`（逐步說明 + 本專案 CI job 名稱 `ci`）。
 
 ---
 
