@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CustomerAIPro SaaS 專案藍圖</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: #1a1a1a;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem;
+      background: #fff;
+    }
+    h1 { font-size: 1.75rem; border-bottom: 2px solid #333; padding-bottom: 0.5rem; }
+    h2 { font-size: 1.35rem; margin-top: 2rem; }
+    h3 { font-size: 1.15rem; margin-top: 1.5rem; }
+    p { margin: 0.75rem 0; }
+    ul { margin: 0.5rem 0; padding-left: 1.5rem; }
+    li { margin: 0.25rem 0; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+    th, td { border: 1px solid #ccc; padding: 0.5rem 0.75rem; text-align: left; }
+    th { background: #f5f5f5; font-weight: 600; }
+    pre {
+      background: #f8f8f8;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      padding: 1rem;
+      overflow-x: auto;
+      font-size: 0.8rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    code { font-family: 'Consolas', 'Monaco', monospace; font-size: 0.9em; background: #f0f0f0; padding: 0.1em 0.3em; border-radius: 3px; }
+    pre code { background: none; padding: 0; }
+    hr { border: none; border-top: 1px solid #ddd; margin: 2rem 0; }
+    .no-print { margin-top: 1.5rem; padding: 1rem; background: #e8f4fd; border-radius: 6px; font-size: 0.9rem; }
+    @media print {
+      body { padding: 1rem; max-width: 100%; }
+      .no-print { display: none !important; }
+      pre { white-space: pre-wrap; }
+      a { color: #000; text-decoration: none; }
+      h1, h2, h3 { page-break-after: avoid; }
+      table { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <h1>CustomerAIPro SaaS 專案藍圖</h1>
+  <p>本藍圖涵蓋四部分：<strong>系統運作方式</strong>、<strong>客戶使用時的前後端路線</strong>、<strong>DevOps 路線</strong>、<strong>全端技術路線</strong>。所有路徑與檔案以 repo 為準。</p>
+  <hr />
+
+  <h2>1. 系統如何運作（How Everything Works）</h2>
+  <h3>1.1 高層架構</h3>
+  <p>架構說明：Browser / LINE App → proxy.ts → Next.js Pages & API → Supabase / OpenAI / Upstash Redis。Webhook 為公開 API，其餘 API 需登入。</p>
+  <pre><code>flowchart LR
+  Client(Browser, LINE App) --> Proxy(proxy.ts)
+  Proxy --> Pages(App Router) & API(API Routes)
+  API --> Supabase | OpenAI | Upstash</code></pre>
+  <ul>
+    <li><strong>前端</strong>：Next.js 16 App Router，app/[locale]/ 多語系（zh-TW / en），Tailwind CSS，next-intl。</li>
+    <li><strong>入口</strong>：proxy.ts 負責 API 登入檢查（非 webhook/health/auth 則 401）、dashboard/settings 導向 login、onboarding 導向、i18n、安全標頭。</li>
+    <li><strong>後端</strong>：約 85 個 API route（Auth、Settings、KB、Webhook/Chat、Contacts、Conversations、Analytics、Billing、Workflows、Health 等）。</li>
+    <li><strong>資料與認證</strong>：Supabase PostgreSQL + Auth，RLS 全表開啟。</li>
+    <li><strong>AI</strong>：OpenAI GPT-4o-mini（lib/openai.ts）、知識庫 RAG（lib/knowledge-search.ts）。</li>
+    <li><strong>LINE</strong>：多 Bot 使用 /api/webhook/line/[botId]/[webhookKey]；handleEvent 在 app/api/webhook/line/route.ts。</li>
+    <li><strong>冪等與限流</strong>：Upstash Redis（未設定則記憶體 fallback）；multi-bot production 建議必填 Redis。</li>
+  </ul>
+
+  <h3>1.2 LINE 訊息到 AI 回覆的資料流</h3>
+  <p>LINE → POST webhook → 查 line_bots、寫 webhook_events → Redis 冪等/限流 → getOrCreateContact、getUserSettings → 可選 WorkflowEngine → insertConversationMessage(user) → searchKnowledgeWithSources → decideReplyAction (AUTO/SUGGEST/ASK/HANDOFF) → 若 AUTO：generateReply → guardrail → replyMessage → 寫入 DB；若 SUGGEST：寫 ai_suggestions、回覆 ACK；若 ASK/HANDOFF：回覆 askText/handoffText → 更新 webhook_events、markAsProcessed → 200 OK。</p>
+  <ul>
+    <li><strong>決策層</strong>（lib/ai/reply-decision.ts）：依知識庫來源數、信心度、風險類別決定 AUTO/SUGGEST/ASK/HANDOFF。</li>
+  </ul>
+
+  <h3>1.3 主要資料表（Supabase）</h3>
+  <table>
+    <thead><tr><th>領域</th><th>表名</th><th>用途</th></tr></thead>
+    <tbody>
+      <tr><td>使用者</td><td>users</td><td>帳號、system_prompt、onboarding_completed 等</td></tr>
+      <tr><td>聯絡人／對話</td><td>contacts, conversations</td><td>LINE 用戶、對話紀錄與狀態</td></tr>
+      <tr><td>知識庫</td><td>knowledge_base</td><td>RAG 來源</td></tr>
+      <tr><td>LINE 多 Bot</td><td>line_bots, webhook_events</td><td>Bot 設定、webhook 事件佇列</td></tr>
+      <tr><td>AI 副駕</td><td>ai_suggestions, ai_feedback, ai_guidance_rules</td><td>建議草稿、回饋、指引規則</td></tr>
+      <tr><td>訂閱／計費</td><td>plans, subscriptions, payments</td><td>方案與使用量</td></tr>
+      <tr><td>工作流程</td><td>workflows, workflow_logs</td><td>自動化流程與日誌</td></tr>
+      <tr><td>其他</td><td>campaigns, ab_tests, conversation_notes, api_keys 等</td><td>行銷、A/B 測試、備註、API 金鑰</td></tr>
+    </tbody>
+  </table>
+
+  <hr />
+  <h2>2. 客戶使用時的前後端路線（Customer Journey Roadmap）</h2>
+  <h3>2.1 使用者類型與入口</h3>
+  <ul>
+    <li><strong>訪客</strong>：Landing → Login / Sign up 或 LINE OAuth。</li>
+    <li><strong>已登入未完成 onboarding</strong>：proxy 導向 /dashboard/onboarding；前端呼叫 onboarding/status、onboarding/save。</li>
+    <li><strong>已登入</strong>：可進入 Dashboard 與 Settings；所有相關頁面與非公開 API 需 Supabase session。</li>
+  </ul>
+
+  <h3>2.2 前端路線（依路徑）</h3>
+  <table>
+    <thead><tr><th>路徑</th><th>主要後端 API</th></tr></thead>
+    <tbody>
+      <tr><td>/ , /pricing , /terms , /privacy</td><td>—</td></tr>
+      <tr><td>/login , /forgot-password</td><td>Supabase Auth（client）</td></tr>
+      <tr><td>/dashboard</td><td>analytics/overview、conversations/counts、billing/usage 等</td></tr>
+      <tr><td>/dashboard/onboarding</td><td>onboarding/status, save</td></tr>
+      <tr><td>/dashboard/knowledge-base</td><td>knowledge-base CRUD、import、test、gap-analysis、search、stats</td></tr>
+      <tr><td>/dashboard/conversations , conversations/[contactId]</td><td>conversations/counts、contacts、conversations/[id]/suggestions、reply、suggestions/[id]/send</td></tr>
+      <tr><td>/dashboard/contacts</td><td>contacts、contacts/tags、contacts/[id]/tags</td></tr>
+      <tr><td>/dashboard/analytics</td><td>analytics/overview、trends、resolution、export 等</td></tr>
+      <tr><td>/dashboard/billing</td><td>billing/usage、plans、subscription、payments</td></tr>
+      <tr><td>/dashboard/settings , settings/bots</td><td>settings、settings/preview、settings/bots、settings/bots/[id]、bots test</td></tr>
+      <tr><td>/dashboard/campaigns , automations , ai-quality , system-test</td><td>campaigns、workflows、analytics/ai-quality、health-check 等</td></tr>
+      <tr><td>/help , /help/[category]/[article]</td><td>靜態內容（lib/help-articles.ts）</td></tr>
+    </tbody>
+  </table>
+
+  <h3>2.3 後端路線（依客戶操作）</h3>
+  <p>登入／綁定：/api/auth/line、callback、unbind。設定：/api/settings、settings/line、settings/bots、preview。知識庫：/api/knowledge-base 及 [id]、import、import-url、test、search、gap-analysis、from-conversation。對話與建議：conversations/counts、[id]/suggestions、[id]/reply、suggestions/[id]/send、handback、takeover。聯絡人／標籤：contacts、contacts/[id]、contacts/tags。分析與帳單：analytics/*、billing/usage、plans、subscription、payments。LINE 端客戶僅經 Webhook 處理；Dashboard 對應 conversations/suggestions/reply API。</p>
+
+  <hr />
+  <h2>3. DevOps 路線（DevOps Roadmap）</h2>
+  <h3>3.1 CI（GitHub Actions）</h3>
+  <p>檔案：.github/workflows/ci.yml。觸發：pull_request / push 到 main、或手動。步驟：checkout → Node 20 → npm ci → type-check → lint → unit tests → build（約 15 分鐘 timeout）。</p>
+  <h3>3.2 部署</h3>
+  <p>平台：Vercel，連線 GitHub main。流程：push main → 自動 build + deploy；正式網址 https://www.customeraipro.com。環境變數在 Vercel Settings；multi-bot production 必填 Upstash Redis 與 LINE_BOT_ENCRYPTION_KEY。</p>
+  <h3>3.3 Cron（Vercel）</h3>
+  <p>vercel.json：/api/health-check 每 15 分鐘；/api/cron/cleanup-webhook-events 每日 03:00。建議設定 WEBHOOK_CLEANUP_CRON_SECRET。</p>
+  <h3>3.4 測試與品質</h3>
+  <p>單元：npm run test:unit:run（38 個）。E2E：Playwright 在 e2e/。Branch protection 見 docs/BRANCH_PROTECTION.md。</p>
+  <h3>3.5 維運檢查清單</h3>
+  <ul>
+    <li>定期確認 Supabase 狀態（RLS、migrations、DB 大小）。</li>
+    <li>確認 Vercel 部署與 Cron 執行正常。</li>
+    <li>監控 LINE webhook 日誌（冪等、rate limit、錯誤回覆）。</li>
+    <li>依 engineering-status.mdc 處理 P0/P1 技術債。</li>
+  </ul>
+
+  <hr />
+  <h2>4. 全端技術路線（Full Stack Roadmap）</h2>
+  <h3>4.1 技術棧分層</h3>
+  <p>Presentation（Next.js App Router + Tailwind、next-intl）→ API Layer（API Routes、proxy.ts Auth）→ Business/Lib（openai、knowledge-search、reply-decision、line、encrypt、idempotency、rate-limit、workflow-engine）→ Data（Supabase client、RLS）→ External（Supabase、OpenAI API、LINE API、Upstash Redis）。</p>
+  <h3>4.2 關鍵檔案對應</h3>
+  <table>
+    <thead><tr><th>層</th><th>路徑</th><th>說明</th></tr></thead>
+    <tbody>
+      <tr><td>入口</td><td>proxy.ts</td><td>Auth、locale、onboarding 導向、安全標頭</td></tr>
+      <tr><td>前端</td><td>app/[locale]/**/*.tsx</td><td>頁面與 layout；Landing 在 app/components/landing</td></tr>
+      <tr><td>API</td><td>app/api/**/route.ts</td><td>85+ 端點</td></tr>
+      <tr><td>認證</td><td>lib/supabase/server.ts, client.ts, auth-helper.ts</td><td>Supabase、從 request 取 user</td></tr>
+      <tr><td>AI</td><td>lib/openai.ts, knowledge-search.ts, lib/ai/reply-decision.ts</td><td>回覆生成、RAG、決策層</td></tr>
+      <tr><td>LINE</td><td>lib/line.ts, lib/encrypt.ts</td><td>驗簽、回覆、Bot 憑證加解密</td></tr>
+      <tr><td>冪等／限流</td><td>lib/idempotency.ts, lib/rate-limit.ts</td><td>Redis 或記憶體</td></tr>
+      <tr><td>方案與用量</td><td>lib/plans.ts, lib/billing-usage.ts</td><td>方案上限、對話用量</td></tr>
+      <tr><td>安全</td><td>lib/security/sensitive-keywords, output-filter, secure-prompt</td><td>敏感詞、輸出過濾、安全 prompt</td></tr>
+    </tbody>
+  </table>
+  <h3>4.3 安全與多租戶</h3>
+  <p>認證：Supabase Auth（Cookie）；API 經 proxy 或 getUser() 檢查。多租戶：RLS 以 user_id / auth.uid() 隔離。敏感資料：Bot 憑證 AES-256-GCM；webhook key 以 hash 比對。Production 多 Bot 依賴 Redis。</p>
+  <h3>4.4 後續可優化方向</h3>
+  <p>RLS 改為 (select auth.uid()) 與 FK 索引；Auth redirect 改 locale-aware；sitemap hreflang、CSP 收緊；Supabase types 自動生成；依 DEEP_DIVE_IMPROVEMENTS 與 engineering-status P2/P3 排程。</p>
+
+  <hr />
+  <p><strong>產出建議</strong>：可將本藍圖另存為 docs/PROJECT_BLUEPRINT.md，與 NOTION_SYNC、PROJECT_STRUCTURE、API_ENDPOINTS 並列。</p>
+
+  <div class="no-print">
+    <strong>下載為 PDF：</strong>請使用瀏覽器選單 <strong>檔案 → 列印</strong>（或 Ctrl+P），目的地選擇 <strong>「另存為 PDF」</strong> 或 <strong>「Microsoft Print to PDF」</strong>，然後儲存即可。
+  </div>
+</body>
+</html>

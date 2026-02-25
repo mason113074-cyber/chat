@@ -23,3 +23,7 @@ updates:
         update-types: [version-update:semver-major]
       - dependency-name: cross-env
         update-types: [version-update:semver-major]
+      - dependency-name: tailwindcss
+        update-types: [version-update:semver-major]
+      - dependency-name: "@line/bot-sdk"
+        update-types: [version-update:semver-major]

@@ -120,7 +120,7 @@ chat/
 - `POST /api/webhook/line` — 單 bot LINE Webhook
 - `POST /api/webhook/line/[botId]/[webhookKey]` — 多 bot Webhook
 - `POST /api/chat` — 儀表板內建聊天
-- `POST /api/test-ai` — 測試 AI
+- `POST /api/chat` — 儀表板內建聊天（登入後測試 AI 回覆）
 
 ### 聯絡人與標籤
 - `GET /api/contacts`、`GET /api/contacts/[id]`

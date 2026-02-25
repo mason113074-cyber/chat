@@ -155,7 +155,6 @@ chat/
 | `/api/health/security/rate-limit` | GET | `app/api/health/security/rate-limit/route.ts` | Rate limit 檢查 |
 | `/api/health/security/sensitive` | GET | `app/api/health/security/sensitive/route.ts` | 敏感詞檢查 |
 | `/api/health/feature/handoff` | GET | `app/api/health/feature/handoff/route.ts` | 轉人工功能檢查 |
-| `/api/test-alert` | GET | `app/api/test-alert/route.ts` | 測試告警 |
 | `/api/onboarding/status` | GET | `app/api/onboarding/status/route.ts` | Onboarding 狀態 |
 | `/api/onboarding/save` | POST | `app/api/onboarding/save/route.ts` | 儲存 Onboarding |
 | `/api/contacts` | GET | `app/api/contacts/route.ts` | 聯絡人列表 |
@@ -182,7 +181,7 @@ chat/
 | `/api/line/verify` | POST | `app/api/line/verify/route.ts` | LINE 驗證 |
 | `/api/search` | GET | `app/api/search/route.ts` | 全域搜尋 |
 | `/api/tags` | GET | `app/api/tags/route.ts` | 標籤列表 |
-| `/api/test-ai` | POST | `app/api/test-ai/route.ts` | 測試 AI 回覆 |
+| `/api/chat` | POST | `app/api/chat/route.ts` | 儀表板內建聊天（測試 AI 回覆） |
 
 ### 3.2 Server Actions
 

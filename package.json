@@ -24,7 +24,8 @@
     "test:e2e:prod:chromium": "cross-env E2E_BASE_URL=https://www.customeraipro.com playwright test --project=chromium",
     "test:demo": "playwright test --config=playwright.demo.config.ts",
     "test:demo:headed": "playwright test --config=playwright.demo.config.ts --headed",
-    "check-connections": "npx tsx scripts/check-connections.ts"
+    "check-connections": "npx tsx scripts/check-connections.ts",
+    "supabase:gen-types": "npx supabase gen types typescript --project-id aqnjiyuyopyuklragaau > types/supabase.ts"
   },
   "dependencies": {
     "@line/bot-sdk": "^9.4.0",

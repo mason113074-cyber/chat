@@ -175,7 +175,4 @@ export function cleanupMemoryCache(): void {
   }
 }
 
-// Auto cleanup every 5 minutes
-if (typeof setInterval !== 'undefined') {
-  setInterval(cleanupMemoryCache, 5 * 60 * 1000);
-}
+// No setInterval in serverless (Vercel); TTL expiry in getFromMemory() is sufficient.

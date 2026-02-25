@@ -1,14 +1,14 @@
 import type { MetadataRoute } from 'next';
-
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || 'https://www.customeraipro.com';
+import { getAppUrl } from '@/lib/app-url';
 
 export default function robots(): MetadataRoute.Robots {
+  const baseUrl = getAppUrl();
   return {
     rules: {
       userAgent: '*',
       allow: '/',
       disallow: ['/dashboard/', '/api/'],
     },
-    sitemap: `${BASE_URL}/sitemap.xml`,
+    sitemap: `${baseUrl}/sitemap.xml`,
   };
 }

@@ -10,7 +10,7 @@ Checked: codebase + env contract. Use this to verify all integrations and Cursor
 |-------------|---------|----------|-------------------|--------|
 | **Supabase** | Auth, DB, server client | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | `lib/supabase.ts`, `lib/supabase/client.ts`, `lib/supabase/server.ts`, `lib/auth-helper.ts`, `proxy.ts` | ✅ Wired |
 | **LINE** | Messaging, webhook | `LINE_CHANNEL_SECRET`, `LINE_CHANNEL_ACCESS_TOKEN`, `LINE_OWNER_USER_ID` | `lib/line.ts`, `app/api/webhook/line/route.ts`, `app/api/line/verify/route.ts` | ✅ Wired |
-| **OpenAI** | AI replies, usage | `OPENAI_API_KEY`, `OPENAI_TIMEOUT_MS`, `OPENAI_MAX_RETRIES`, `OPENAI_MONTHLY_BUDGET` | `lib/openai.ts`, `lib/openai-usage.ts`, `app/api/test-ai/route.ts` | ✅ Wired |
+| **OpenAI** | AI replies, usage | `OPENAI_API_KEY`, `OPENAI_TIMEOUT_MS`, `OPENAI_MAX_RETRIES`, `OPENAI_MONTHLY_BUDGET` | `lib/openai.ts`, `lib/openai-usage.ts`, `app/api/chat/route.ts` | ✅ Wired |
 | **Upstash Redis** | Cache, idempotency, rate limit | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | `lib/cache.ts`, `lib/idempotency.ts`, `lib/rate-limit.ts` | ✅ Wired (optional; fallback in-memory) |
 | **Vercel** | Hosting / deploy | (build env) | — | ✅ Deploy from GitHub main |
 
@@ -31,7 +31,7 @@ Checked: codebase + env contract. Use this to verify all integrations and Cursor
 ### OpenAI
 - **Chat**: `lib/openai.ts` — lazy client, uses `OPENAI_API_KEY`, `OPENAI_TIMEOUT_MS`, `OPENAI_MAX_RETRIES`.
 - **Usage/budget**: `lib/openai-usage.ts` — `OPENAI_MONTHLY_BUDGET` (USD/month).
-- **Test API**: `app/api/test-ai/route.ts` — uses same key.
+- **Chat API**: `app/api/chat/route.ts` — 儀表板內建聊天，使用同一 API key。
 
 ### Upstash Redis
 - **Cache**: `lib/cache.ts` — `getCached` / `setCached`; JSON + primitive fallback.
@@ -46,18 +46,18 @@ Checked: codebase + env contract. Use this to verify all integrations and Cursor
 
 ## 3. MCP (Cursor)
 
-**Config file**: `.cursor/mcp.json`
+**Config file**: `.cursor/mcp.json`  
+**完整清單與設定**：見 **[docs/MCP.md](MCP.md)**（含本機 npx 型與遠端 URL 型伺服器、環境變數、已知工具與注意事項）。
 
-| Server | URL | Purpose |
-|--------|-----|--------|
-| **vercel** | `https://mcp.vercel.com` | Vercel project/deploy from Cursor |
-| **supabase** | `https://mcp.supabase.com/mcp` | Supabase project/data from Cursor |
+| 類型 | 伺服器 | 說明 |
+|------|--------|------|
+| 遠端 | **vercel** | `https://mcp.vercel.com` — 專案／部署／日誌 |
+| 遠端 | **supabase** | `https://mcp.supabase.com/mcp` — 專案／資料 |
+| 本機 | puppeteer, fetch, brave-search, playwright, filesystem, memory-bank-mcp, knowledge-graph-memory | 見 MCP.md |
 
-**Connection**: Cursor reads `.cursor/mcp.json` and connects to these MCP servers. No code in the repo imports or calls MCP; they are editor/tooling integrations only.
+**Connection**: Cursor 讀取 `.cursor/mcp.json` 連線上述 MCP。Repo 內程式碼不呼叫 MCP，僅供編輯器／Agent 使用。
 
-**Check in Cursor**:  
-Settings → MCP → confirm “vercel” and “supabase” show as connected (or no errors). If a server is unreachable, check network and that the URL is reachable (e.g. `https://mcp.vercel.com`, `https://mcp.supabase.com/mcp`).
-
+**Check in Cursor**: Settings → MCP → 確認各 server 已連線（vercel / supabase 為遠端；其餘為 npx 啟動）。brave-search 需 `BRAVE_API_KEY`。
 ---
 
 ## 4. 連通檢查

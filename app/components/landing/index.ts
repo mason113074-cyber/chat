@@ -1,0 +1,10 @@
+export { LandingHero } from './LandingHero';
+export { LandingPartners } from './LandingPartners';
+export { LandingStats } from './LandingStats';
+export { LandingFeatures } from './LandingFeatures';
+export { LandingTestimonials } from './LandingTestimonials';
+export { LandingHowItWorks } from './LandingHowItWorks';
+export { LandingWhyChooseUs } from './LandingWhyChooseUs';
+export { LandingPricing } from './LandingPricing';
+export { LandingSecurity } from './LandingSecurity';
+export { LandingFinalCta } from './LandingFinalCta';
