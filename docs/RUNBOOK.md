@@ -100,6 +100,7 @@
 | 環境變數說明 | `.env.example`、`docs/DEPLOYMENT_AND_ENV_FAQ.md` |
 | 深度改善建議 | `docs/DEEP_DIVE_IMPROVEMENTS.md` |
 | 安全政策 | `SECURITY.md` |
+| **Migration 草稿（RLS/索引）** | `supabase/migrations/033_rls_auth_uid_subquery.sql`（RLS 效能）、`034_fk_indexes_draft.sql`（FK 索引）；需於 Supabase 執行前審閱，可分批套用。 |
 
 ---
 

@@ -59,8 +59,8 @@ const BASE_URL = getAppUrl();
 - **現狀**：`engineering-status.mdc` 已列：28 條 RLS 用 `auth.uid()` 而非 `(select auth.uid())`；7 個 FK 缺索引。
 - **影響**：高併發時可能鎖競爭或查詢變慢。
 - **建議**：排程 migration：  
-  - RLS 改為 `(select auth.uid())` 一次一表、分批上線並觀察。  
-  - 為 ab_test_assignments、ai_feedback、ai_suggestions、conversations、workflow_logs 等補上 FK 索引。
+  - RLS 改為 `(select auth.uid())` 一次一表、分批上線並觀察。**草稿**：`supabase/migrations/033_rls_auth_uid_subquery.sql`（Part 1：users, contacts, knowledge_base；其餘表列於檔內註解）。  
+  - 為 ab_test_assignments、ai_feedback、ai_suggestions、conversations、workflow_logs 等補上 FK 索引。**草稿**：`supabase/migrations/034_fk_indexes_draft.sql`。
 
 ---
 

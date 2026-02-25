@@ -29,8 +29,8 @@ alwaysApply: true
 ### P1 — 應盡快處理
 - **test-ai / test-alert 測試 API 殘留**：應移除或加 production guard。
 - **cache.ts 的 setInterval**：L179，serverless 無效，應移除。
-- **28 條 RLS policy 用 `auth.uid()` 而非 `(select auth.uid())`**：影響效能，需 migration 修。
-- **7 個 FK 缺索引**：ab_test_assignments, ai_feedback(x2), ai_suggestions(x2), conversations, workflow_logs。
+- **28 條 RLS policy 用 `auth.uid()` 而非 `(select auth.uid())`**：影響效能，需 migration 修。**草稿**：`033_rls_auth_uid_subquery.sql`（先做 users/contacts/knowledge_base；其餘表列在註解，可分批 follow-up）。
+- **7 個 FK 缺索引**：ab_test_assignments, ai_feedback(x2), ai_suggestions(x2), conversations, workflow_logs。**草稿**：`034_fk_indexes_draft.sql`（CREATE INDEX IF NOT EXISTS，可安全執行）。
 - **Auth redirect 硬編碼 `/zh-TW`**：LINE callback 和 forgot-password 寫死 locale，需改 locale-aware。
 - **proxy.ts 安全標頭**：已加 X-Frame-Options、X-Content-Type-Options、Referrer-Policy、HSTS（production）、CSP。**CSP 仍含 `unsafe-inline`/`unsafe-eval`**（遷就 Next/React），列為技術債；待改用 nonce 或 strict-dynamic 再收緊（見 docs/DEEP_DIVE_IMPROVEMENTS.md）。
 - **testsprite_tests 遺留目錄**：應清理。
