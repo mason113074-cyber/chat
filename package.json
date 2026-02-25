@@ -27,7 +27,7 @@
     "check-connections": "npx tsx scripts/check-connections.ts"
   },
   "dependencies": {
-    "@line/bot-sdk": "^9.4.0",
+    "@line/bot-sdk": "^10.6.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.45.0",
     "@swc/helpers": "0.5.10",
