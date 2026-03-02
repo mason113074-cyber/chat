@@ -30,7 +30,7 @@
   "dependencies": {
     "@line/bot-sdk": "^9.4.0",
     "@supabase/ssr": "^0.8.0",
-    "@supabase/supabase-js": "^2.45.0",
+    "@supabase/supabase-js": "^2.98.0",
     "@swc/helpers": "0.5.10",
     "@tailwindcss/typography": "^0.5.19",
     "@upstash/redis": "^1.36.2",
